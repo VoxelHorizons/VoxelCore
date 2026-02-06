@@ -1,4 +1,4 @@
-name: PluginCore
+name: ${project.artifactId}
 version: ${project.version}
-main: org.voxelhorizons.PluginCore
+main: ${plugin.mainClass}
 api-version: '1.16'
