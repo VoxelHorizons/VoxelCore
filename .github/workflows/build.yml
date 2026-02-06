@@ -16,7 +16,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      # Java 21 for compiling your plugin
+      - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -29,23 +30,38 @@ jobs:
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Build Spigot 1.9.4 dependencies (BuildTools)
+      # Java 8 JUST for BuildTools
+      - name: Set up Java 8 (BuildTools)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 8
+
+      - name: Build Spigot 1.9.4 dependencies
         run: |
-          mkdir -p buildtools
+          mkdir buildtools
           cd buildtools
-          curl -o BuildTools.jar https://hub.spigotmc.org/stash/projects/SPIGOT/repos/buildtools/browse/BuildTools.jar?raw
+          curl -L -o BuildTools.jar https://hub.spigotmc.org/stash/projects/SPIGOT/repos/buildtools/raw/BuildTools.jar
           java -jar BuildTools.jar --rev 1.9.4
+
+      # Switch back to Java 21 for Maven
+      - name: Set Java 21 again
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
 
       - name: Build plugin
         run: mvn -U clean package
 
-      - name: Delete existing release asset if it exists
+      - name: Delete existing release asset
         uses: mknejp/delete-release-assets@v1
         with:
           token: ${{ secrets.TOKEN }}
           tag: v${{ steps.project_version.outputs.version }}
           assets: |
-            ItemCore.jar
+            ItemCore-${{ steps.project_version.outputs.version }}.jar
         continue-on-error: true
 
       - name: Create or update GitHub Release
@@ -53,8 +69,8 @@ jobs:
         with:
           tag_name: v${{ steps.project_version.outputs.version }}
           name: ItemCore v${{ steps.project_version.outputs.version }}
+          prerelease: ${{ contains(steps.project_version.outputs.version, 'SNAPSHOT') }}
           files: |
-            target/*.jar
-          prerelease: true
+            target/ItemCore-*.jar
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
