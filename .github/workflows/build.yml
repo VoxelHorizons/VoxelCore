@@ -33,13 +33,13 @@ jobs:
       - name: Build plugin and extract info
         id: project_info
         run: |
-          # Extract artifactId and version
+          # Extract artifactId and version, trim whitespace
           NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout | tr -d '[:space:]')
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | tr -d '[:space:]')
 
-          # Debug output to see what we actually got
-          echo "DEBUG: NAME='$NAME'"
-          echo "DEBUG: VERSION='$VERSION'"
+          # Debug output inside shell
+          echo "DEBUG (shell): NAME='$NAME'"
+          echo "DEBUG (shell): VERSION='$VERSION'"
 
           # Build plugin
           mvn -U clean package
@@ -47,8 +47,12 @@ jobs:
           # Set GitHub Actions outputs
           echo "name=$NAME" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo ${{ steps.project_info.outputs.name }}
-          echo ${{ steps.project_info.outputs.version }}
+
+      # Next step: Debug GitHub outputs
+      - name: Debug outputs from previous step
+        run: |
+          echo "DEBUG (GH Actions): Project name = ${{ steps.project_info.outputs.name }}"
+          echo "DEBUG (GH Actions): Project version = ${{ steps.project_info.outputs.version }}"
       
 
       # Upload JAR artifact
