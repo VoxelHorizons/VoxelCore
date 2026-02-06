@@ -15,8 +15,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.set_outputs.outputs.version }}
-      name: ${{ steps.set_outputs.outputs.name }}
+      version: ${{ steps.project_info.outputs.version }}
+      name: ${{ steps.project_info.outputs.name }}
 
     steps:
       - uses: actions/checkout@v4
@@ -29,9 +29,9 @@ jobs:
           java-version: 21
           cache: maven
 
-      # Extract name/version and build in one step
+      # Extract name/version and build plugin
       - name: Build plugin and extract info
-        id: set_outputs
+        id: project_info
         run: |
           NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout | tr -d '[:space:]')
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | tr -d '[:space:]')
@@ -44,7 +44,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: plugin-jar
-          path: target/${{ steps.set_outputs.outputs.name }}-*.jar
+          path: target/${{ steps.project_info.outputs.name }}-*.jar
 
   # --------------------------
   # Job 2: Test plugin on MC versions
@@ -127,6 +127,16 @@ jobs:
           echo "Project name: ${{ needs.build.outputs.name }}"
           echo "Project version: ${{ needs.build.outputs.version }}"
           ls -la target/
+
+      # Delete existing release asset (optional)
+      - name: Delete existing release asset
+        uses: mknejp/delete-release-assets@v1
+        with:
+          token: ${{ secrets.TOKEN }}
+          tag: v${{ needs.build.outputs.version }}
+          assets: |
+            ${{ needs.build.outputs.name }}-${{ needs.build.outputs.version }}.jar
+        continue-on-error: true
 
       # Create or update GitHub Release
       - name: Create or update GitHub Release
