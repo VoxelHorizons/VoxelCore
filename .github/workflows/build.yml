@@ -104,7 +104,7 @@ jobs:
           mkdir -p server/plugins
           cp plugins/${{ needs.build.outputs.name }}-*.jar server/plugins/
           cd server
-          timeout 60s java -jar spigot.jar nogui || true
+          timeout 120s java -jar spigot.jar nogui || true
 
       # Verify plugin loaded dynamically
       - name: Verify plugin loaded
