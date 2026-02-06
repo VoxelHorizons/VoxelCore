@@ -119,7 +119,7 @@ jobs:
 
       - name: Verify plugin loaded
         run: |
-          grep -q "ItemCore.*enabled" server/logs/latest.log
+          grep -q "\[ItemCore\] Enabling ItemCore" server/logs/latest.log
         working-directory: ${{ github.workspace }}
   
 
