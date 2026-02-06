@@ -48,13 +48,6 @@ jobs:
           echo "name=$NAME" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      # Next step: Debug GitHub outputs
-      - name: Debug outputs from previous step
-        run: |
-          echo "DEBUG (GH Actions): Project name = ${{ steps.project_info.outputs.name }}"
-          echo "DEBUG (GH Actions): Project version = ${{ steps.project_info.outputs.version }}"
-      
-
       # Upload JAR artifact
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
