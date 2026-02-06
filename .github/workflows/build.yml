@@ -39,10 +39,11 @@ jobs:
 
       - name: Build Spigot 1.9.4 dependencies
         run: |
-          mkdir buildtools
+          mkdir -p buildtools
           cd buildtools
-          curl -L -o BuildTools.jar https://hub.spigotmc.org/stash/projects/SPIGOT/repos/buildtools/raw/BuildTools.jar
+          curl -L -o BuildTools.jar https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar
           java -jar BuildTools.jar --rev 1.9.4
+
 
       # Switch back to Java 21 for Maven
       - name: Set Java 21 again
