@@ -1,0 +1,60 @@
+name: Build and Release ItemCore
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: Extract version from pom.xml
+        id: project_version
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build Spigot 1.9.4 dependencies (BuildTools)
+        run: |
+          mkdir -p buildtools
+          cd buildtools
+          curl -o BuildTools.jar https://hub.spigotmc.org/stash/projects/SPIGOT/repos/buildtools/browse/BuildTools.jar?raw
+          java -jar BuildTools.jar --rev 1.9.4
+
+      - name: Build plugin
+        run: mvn -U clean package
+
+      - name: Delete existing release asset if it exists
+        uses: mknejp/delete-release-assets@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: v${{ steps.project_version.outputs.version }}
+          assets: |
+            ItemCore.jar
+        continue-on-error: true
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.project_version.outputs.version }}
+          name: ItemCore v${{ steps.project_version.outputs.version }}
+          files: |
+            target/*.jar
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
