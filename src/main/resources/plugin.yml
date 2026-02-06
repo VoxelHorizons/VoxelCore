@@ -1,4 +1,4 @@
 name: ItemCore
 version: '1.0-SNAPSHOT'
 main: org.voxelhorizons.ItemCore
-api-version: '1.9'
+api-version: '1.16'

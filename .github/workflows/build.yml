@@ -20,22 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Java 8 JUST for BuildTools
-      - name: Set up Java 8 (BuildTools)
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 8
-
-      # Build Spigot 1.9.4 dependencies (initial build for Maven)
-      - name: Build Spigot 1.9.4 dependencies
-        run: |
-          mkdir -p buildtools
-          cd buildtools
-          curl -L -o BuildTools.jar https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar
-          java -jar BuildTools.jar --rev 1.9.4
-
-      # Switch to Java 21 for Maven
+      # Set up Java 21 for Maven
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
@@ -43,7 +28,7 @@ jobs:
           java-version: 21
           cache: maven
 
-      # Extract version
+      # Extract project version
       - name: Extract version
         id: project_version
         run: |
@@ -62,7 +47,7 @@ jobs:
           path: target/ItemCore-*.jar
 
   # --------------------------
-  # Job 2: Test across MC versions
+  # Job 2: Test plugin on MC 1.16.5+
   # --------------------------
   test:
     needs: build
@@ -72,30 +57,27 @@ jobs:
       fail-fast: false
       matrix:
         mc:
-          - "1.9.4"
-          - "1.12.2"
           - "1.16.5"
           - "1.20.4"
 
     steps:
       - uses: actions/checkout@v4
 
+      # Download built plugin
       - name: Download built plugin
         uses: actions/download-artifact@v4
         with:
           name: itemcore-jar
           path: plugins
 
-      # Java selection for the test server
+      # Set Java for the server
       - name: Set Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: ${{ matrix.mc == '1.20.4' && '21' || '8' }}
+          java-version: ${{ matrix.mc == '1.20.4' && '21' || '17' }}
 
-      # --------------------------
-      # Build Spigot server via BuildTools for this version
-      # --------------------------
+      # Build Spigot server via BuildTools
       - name: Build Spigot ${{ matrix.mc }} server
         run: |
           mkdir -p server
@@ -104,24 +86,21 @@ jobs:
           cp spigot-${{ matrix.mc }}.jar server/spigot.jar
         working-directory: ${{ github.workspace }}
 
+      # Accept EULA
       - name: Accept EULA
-        run: |
-          echo "eula=true" > server/eula.txt
-        working-directory: ${{ github.workspace }}
+        run: echo "eula=true" > server/eula.txt
 
+      # Start server and test plugin
       - name: Start server and test plugin
         run: |
           mkdir -p server/plugins
           cp plugins/ItemCore-*.jar server/plugins/
           cd server
           timeout 60s java -jar spigot.jar nogui || true
-        working-directory: ${{ github.workspace }}
 
+      # Verify plugin loaded
       - name: Verify plugin loaded
-        run: |
-          grep -q "\[ItemCore\] Enabling ItemCore" server/logs/latest.log
-        working-directory: ${{ github.workspace }}
-  
+        run: grep -q "\[ItemCore\] Enabling ItemCore" server/logs/latest.log
 
   # --------------------------
   # Job 3: Release if tests pass
@@ -133,12 +112,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Download built plugin
       - name: Download built plugin
         uses: actions/download-artifact@v4
         with:
           name: itemcore-jar
           path: target
 
+      # Create GitHub Release
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
