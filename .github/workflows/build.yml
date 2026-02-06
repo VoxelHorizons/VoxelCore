@@ -27,7 +27,7 @@ jobs:
           distribution: temurin
           java-version: 8
 
-      # Build Spigot 1.9.4 dependencies
+      # Build Spigot 1.9.4 dependencies (initial build for Maven)
       - name: Build Spigot 1.9.4 dependencies
         run: |
           mkdir -p buildtools
@@ -86,18 +86,24 @@ jobs:
           name: itemcore-jar
           path: plugins
 
+      # Java selection for the test server
       - name: Set Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ matrix.mc == '1.20.4' && '21' || '8' }}
 
-      - name: Download Spigot server
+      # --------------------------
+      # Build Spigot server via BuildTools for this version
+      # --------------------------
+      - name: Build Spigot ${{ matrix.mc }} server
         run: |
-          mkdir server
-          cd server
-          curl -L -o spigot.jar \
-            https://download.getbukkit.org/spigot/spigot-${{ matrix.mc }}.jar
+          mkdir -p buildtools-${{ matrix.mc }}
+          cd buildtools-${{ matrix.mc }}
+          curl -L -o BuildTools.jar https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar
+          java -jar BuildTools.jar --rev ${{ matrix.mc }}
+          mkdir -p ../../server
+          cp spigot-${{ matrix.mc }}.jar ../../server/spigot.jar
 
       - name: Accept EULA
         run: |
@@ -105,10 +111,9 @@ jobs:
 
       - name: Start server and test plugin
         run: |
-          cd server
-          mkdir plugins
-          cp ../plugins/ItemCore-*.jar plugins/
-          timeout 60s java -jar spigot.jar nogui || true
+          mkdir -p server/plugins
+          cp plugins/ItemCore-*.jar server/plugins/
+          timeout 60s java -jar server/spigot.jar nogui || true
 
       - name: Verify plugin loaded
         run: |
