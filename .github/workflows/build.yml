@@ -30,17 +30,16 @@ jobs:
           cache: maven
 
       # Extract project version
-      - name: Extract version
+      - name: Extract project version
         id: project_version
         run: |
-          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | tr -d '[:space:]')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      # Extract project name dynamically
       - name: Extract project name
         id: project_name
         run: |
-          NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout | tr -d '[:space:]')
           echo "name=$NAME" >> $GITHUB_OUTPUT
 
       # Build plugin
