@@ -98,12 +98,11 @@ jobs:
       # --------------------------
       - name: Build Spigot ${{ matrix.mc }} server
         run: |
-          mkdir -p buildtools-${{ matrix.mc }}
-          cd buildtools-${{ matrix.mc }}
+          mkdir -p server
           curl -L -o BuildTools.jar https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar
           java -jar BuildTools.jar --rev ${{ matrix.mc }}
-          mkdir -p ../../server
-          cp spigot-${{ matrix.mc }}.jar ../../server/spigot.jar
+          cp spigot-${{ matrix.mc }}.jar server/spigot.jar
+        working-directory: ${{ github.workspace }}
 
       - name: Accept EULA
         run: |
@@ -118,6 +117,7 @@ jobs:
       - name: Verify plugin loaded
         run: |
           grep -q "ItemCore.*enabled" server/logs/latest.log
+  
 
   # --------------------------
   # Job 3: Release if tests pass
