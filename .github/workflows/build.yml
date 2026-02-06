@@ -60,7 +60,6 @@ jobs:
   test:
     needs: build
     runs-on: ubuntu-latest
-
     strategy:
       fail-fast: false
       matrix:
@@ -123,20 +122,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Download built plugin dynamically
+      # Download built plugin artifact dynamically
       - name: Download built plugin
         uses: actions/download-artifact@v4
         with:
           name: plugin-jar
           path: target
 
-      # Create GitHub Release dynamically
-      - name: Create GitHub Release
+      # Debug outputs (optional, helpful for troubleshooting)
+      - name: Debug build outputs
+        run: |
+          echo "Project name: ${{ needs.build.outputs.name }}"
+          echo "Project version: ${{ needs.build.outputs.version }}"
+          ls -la target/
+
+      # Create or update GitHub Release dynamically
+      - name: Create or update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.build.outputs.version }}
           name: ${{ needs.build.outputs.name }} v${{ needs.build.outputs.version }}
           prerelease: ${{ contains(needs.build.outputs.version, 'SNAPSHOT') }}
           files: target/${{ needs.build.outputs.name }}-*.jar
+          overwrite: true
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
