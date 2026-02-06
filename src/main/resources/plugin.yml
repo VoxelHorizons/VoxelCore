@@ -1,4 +1,4 @@
-name: ItemCore
+name: PluginCore
 version: ${project.version}
-main: org.voxelhorizons.ItemCore
+main: org.voxelhorizons.PluginCore
 api-version: '1.16'

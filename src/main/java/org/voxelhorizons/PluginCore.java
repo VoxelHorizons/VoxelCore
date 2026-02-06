@@ -2,7 +2,7 @@ package org.voxelhorizons;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
-public final class ItemCore extends JavaPlugin {
+public final class PluginCore extends JavaPlugin {
 
     @Override
     public void onEnable() {
