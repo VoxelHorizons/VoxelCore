@@ -1,4 +1,4 @@
-name: Build, Test, and Release ItemCore
+name: Build, Test, and Release Plugin
 
 on:
   push:
@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.project_version.outputs.version }}
+      name: ${{ steps.project_name.outputs.name }}
 
     steps:
       - uses: actions/checkout@v4
@@ -35,16 +36,23 @@ jobs:
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      # Extract project name dynamically
+      - name: Extract project name
+        id: project_name
+        run: |
+          NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          echo "name=$NAME" >> $GITHUB_OUTPUT
+
       # Build plugin
       - name: Build plugin
         run: mvn -U clean package
 
-      # Upload JAR artifact
+      # Upload JAR artifact dynamically
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
-          name: itemcore-jar
-          path: target/ItemCore-*.jar
+          name: plugin-jar
+          path: target/${{ steps.project_name.outputs.name }}-*.jar
 
   # --------------------------
   # Job 2: Test plugin on MC 1.16.5+
@@ -63,11 +71,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Download built plugin
+      # Download built plugin dynamically
       - name: Download built plugin
         uses: actions/download-artifact@v4
         with:
-          name: itemcore-jar
+          name: plugin-jar
           path: plugins
 
       # Set Java for the server
@@ -90,17 +98,20 @@ jobs:
       - name: Accept EULA
         run: echo "eula=true" > server/eula.txt
 
-      # Start server and test plugin
+      # Start server and test plugin dynamically
       - name: Start server and test plugin
         run: |
           mkdir -p server/plugins
-          cp plugins/ItemCore-*.jar server/plugins/
+          cp plugins/${{ needs.build.outputs.name }}-*.jar server/plugins/
           cd server
           timeout 60s java -jar spigot.jar nogui || true
 
-      # Verify plugin loaded
+      # Verify plugin loaded dynamically
       - name: Verify plugin loaded
-        run: grep -q "\[ItemCore\] Enabling ItemCore" server/logs/latest.log
+        run: |
+          grep -q "\[${{ needs.build.outputs.name }}\] Enabling ${{
+            needs.build.outputs.name
+          }}" server/logs/latest.log
 
   # --------------------------
   # Job 3: Release if tests pass
@@ -112,20 +123,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Download built plugin
+      # Download built plugin dynamically
       - name: Download built plugin
         uses: actions/download-artifact@v4
         with:
-          name: itemcore-jar
+          name: plugin-jar
           path: target
 
-      # Create GitHub Release
+      # Create GitHub Release dynamically
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.build.outputs.version }}
-          name: ItemCore v${{ needs.build.outputs.version }}
+          name: ${{ needs.build.outputs.name }} v${{ needs.build.outputs.version }}
           prerelease: ${{ contains(needs.build.outputs.version, 'SNAPSHOT') }}
-          files: target/ItemCore-*.jar
+          files: target/${{ needs.build.outputs.name }}-*.jar
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
