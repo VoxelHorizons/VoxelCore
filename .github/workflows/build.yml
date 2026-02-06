@@ -47,6 +47,9 @@ jobs:
           # Set GitHub Actions outputs
           echo "name=$NAME" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo ${{ steps.project_info.outputs.name }}
+          echo ${{ steps.project_info.outputs.version }}
+      
 
       # Upload JAR artifact
       - name: Upload JAR artifact
