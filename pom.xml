@@ -14,7 +14,6 @@
     <properties>
         <java.version>16</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <plugin.mainClass>org.voxelhorizons.PluginCore</plugin.mainClass>
     </properties>
 
     <build>

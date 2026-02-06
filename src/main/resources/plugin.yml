@@ -1,4 +1,4 @@
 name: ${project.artifactId}
 version: ${project.version}
-main: ${plugin.mainClass}
+main: ${project.groupId}.${project.artifactId}
 api-version: '1.16'
