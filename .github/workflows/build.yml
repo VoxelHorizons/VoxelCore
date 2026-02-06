@@ -51,7 +51,7 @@ jobs:
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
-          name: plugin-jar
+          name: ${{ steps.project_name.outputs.name }}-${{ steps.project_name.outputs.version }}.jar
           path: target/${{ steps.project_name.outputs.name }}-*.jar
 
   # --------------------------
@@ -74,8 +74,8 @@ jobs:
       - name: Download built plugin
         uses: actions/download-artifact@v4
         with:
-          name: plugin-jar
-          path: plugins
+          name: ${{ steps.project_name.outputs.name }}-${{ steps.project_name.outputs.version }}.jar
+          path: server/plugins
 
       # Set Java for the server
       - name: Set Java
@@ -101,14 +101,13 @@ jobs:
       - name: Start server and test plugin
         run: |
           mkdir -p server/plugins
-          cp plugins/${{ needs.build.outputs.name }}-*.jar server/plugins/
           cd server
           timeout 120s java -jar spigot.jar nogui || true
 
       # Verify plugin loaded dynamically
       - name: Verify plugin loaded
         run: |
-          grep -q "\[${{ needs.build.outputs.name }}\] Enabling ${{
+          grep -q "\[${{ steps.project_name.outputs.name }}\] Enabling ${{
             needs.build.outputs.name
           }}" server/logs/latest.log
 
@@ -126,24 +125,24 @@ jobs:
       - name: Download built plugin
         uses: actions/download-artifact@v4
         with:
-          name: plugin-jar
+          name: ${{ steps.project_name.outputs.name }}-${{ steps.project_name.outputs.version }}.jar
           path: target
 
       # Debug outputs (optional, helpful for troubleshooting)
       - name: Debug build outputs
         run: |
-          echo "Project name: ${{ needs.build.outputs.name }}"
-          echo "Project version: ${{ needs.build.outputs.version }}"
+          echo "Project name: ${{ steps.project_name.outputs.name }}"
+          echo "Project version: ${{ steps.project_name.outputs.version }}"
           ls -la target/
 
       # Create or update GitHub Release dynamically
       - name: Create or update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.build.outputs.version }}
-          name: ${{ needs.build.outputs.name }} v${{ needs.build.outputs.version }}
-          prerelease: ${{ contains(needs.build.outputs.version, 'SNAPSHOT') }}
-          files: target/${{ needs.build.outputs.name }}-*.jar
+          tag_name: v${{ steps.project_name.outputs.version }}
+          name: ${{ steps.project_name.outputs.name }} v${{ steps.project_name.outputs.version }}
+          prerelease: ${{ contains(steps.project_name.outputs.version, 'SNAPSHOT') }}
+          files: target/${{ steps.project_name.outputs.name }}-${{ steps.project_name.outputs.version }}.jar
           overwrite: true
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
