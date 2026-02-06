@@ -15,8 +15,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.project_version.outputs.version }}
-      name: ${{ steps.project_name.outputs.name }}
+      version: ${{ steps.set_outputs.outputs.version }}
+      name: ${{ steps.set_outputs.outputs.name }}
 
     steps:
       - uses: actions/checkout@v4
@@ -29,32 +29,25 @@ jobs:
           java-version: 21
           cache: maven
 
-      # Extract project version
-      - name: Extract project version
-        id: project_version
-        run: |
-          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | tr -d '[:space:]')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Extract project name
-        id: project_name
+      # Extract name/version and build in one step
+      - name: Build plugin and extract info
+        id: set_outputs
         run: |
           NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout | tr -d '[:space:]')
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | tr -d '[:space:]')
+          mvn -U clean package
           echo "name=$NAME" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      # Build plugin
-      - name: Build plugin
-        run: mvn -U clean package
-
-      # Upload JAR artifact dynamically
+      # Upload JAR artifact
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: plugin-jar
-          path: target/${{ steps.project_name.outputs.name }}-*.jar
+          path: target/${{ steps.set_outputs.outputs.name }}-*.jar
 
   # --------------------------
-  # Job 2: Test plugin on MC 1.16.5+
+  # Job 2: Test plugin on MC versions
   # --------------------------
   test:
     needs: build
@@ -76,7 +69,7 @@ jobs:
           name: plugin-jar
           path: plugins
 
-      # Set Java for the server
+      # Set Java version depending on MC version
       - name: Set Java
         uses: actions/setup-java@v4
         with:
@@ -96,7 +89,7 @@ jobs:
       - name: Accept EULA
         run: echo "eula=true" > server/eula.txt
 
-      # Start server and test plugin dynamically
+      # Start server and test plugin
       - name: Start server and test plugin
         run: |
           mkdir -p server/plugins
@@ -104,7 +97,7 @@ jobs:
           cd server
           timeout 180s java -Dci.mode=true -jar spigot.jar nogui || true
 
-      # Verify plugin loaded dynamically
+      # Verify plugin loaded
       - name: Verify plugin loaded
         run: |
           grep -q "\[${{ needs.build.outputs.name }}\] Enabling ${{
@@ -128,14 +121,14 @@ jobs:
           name: plugin-jar
           path: target
 
-      # Debug outputs (optional, helpful for troubleshooting)
+      # Debug outputs (optional)
       - name: Debug build outputs
         run: |
           echo "Project name: ${{ needs.build.outputs.name }}"
           echo "Project version: ${{ needs.build.outputs.version }}"
           ls -la target/
 
-      # Create or update GitHub Release dynamically
+      # Create or update GitHub Release
       - name: Create or update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -143,6 +136,6 @@ jobs:
           name: ${{ needs.build.outputs.name }} v${{ needs.build.outputs.version }}
           prerelease: ${{ contains(needs.build.outputs.version, 'SNAPSHOT') }}
           files: target/${{ needs.build.outputs.name }}-*.jar
-          overwrite: true
+          overwrite_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
