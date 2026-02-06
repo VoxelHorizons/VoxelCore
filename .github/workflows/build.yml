@@ -113,7 +113,8 @@ jobs:
         run: |
           mkdir -p server/plugins
           cp plugins/ItemCore-*.jar server/plugins/
-          timeout 60s java -jar server/spigot.jar nogui || true
+          cd server
+          timeout 60s java -jar spigot.jar nogui || true
         working-directory: ${{ github.workspace }}
 
       - name: Verify plugin loaded
