@@ -52,7 +52,7 @@ jobs:
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
-          name: plugin-jar
+          name: ${{ steps.project_info.outputs.name }}-${{ steps.project_info.outputs.version }}
           path: target/${{ steps.project_info.outputs.name }}-*.jar
 
   # --------------------------
@@ -75,8 +75,8 @@ jobs:
       - name: Download built plugin
         uses: actions/download-artifact@v4
         with:
-          name: plugin-jar
-          path: plugins
+          name: ${{ needs.build.outputs.name }}-${{ needs.build.outputs.version }}
+          path: server/plugins
 
       # Set Java version depending on MC version
       - name: Set Java
@@ -88,7 +88,6 @@ jobs:
       # Build Spigot server via BuildTools
       - name: Build Spigot ${{ matrix.mc }} server
         run: |
-          mkdir -p server
           curl -L -o BuildTools.jar https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar
           java -jar BuildTools.jar --rev ${{ matrix.mc }}
           cp spigot-${{ matrix.mc }}.jar server/spigot.jar
@@ -101,8 +100,6 @@ jobs:
       # Start server and test plugin
       - name: Start server and test plugin
         run: |
-          mkdir -p server/plugins
-          cp plugins/${{ needs.build.outputs.name }}-*.jar server/plugins/
           cd server
           timeout 180s java -Dci.mode=true -jar spigot.jar nogui || true
 
@@ -129,7 +126,7 @@ jobs:
       - name: Download built plugin
         uses: actions/download-artifact@v4
         with:
-          name: plugin-jar
+          name: ${{ needs.build.outputs.name }}-${{ needs.build.outputs.version }}
           path: target
 
       # Debug outputs (optional)
