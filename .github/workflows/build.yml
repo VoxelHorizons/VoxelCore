@@ -124,7 +124,9 @@ jobs:
   # Job 3: Release if tests pass
   # --------------------------
   release:
-    needs: test
+    needs:
+      - build
+      - test
     runs-on: ubuntu-latest
 
     steps:
