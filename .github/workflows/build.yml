@@ -33,7 +33,7 @@ jobs:
           mkdir -p buildtools
           cd buildtools
           curl -L -o BuildTools.jar https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar
-          java -jar BuildTools.jar --rev 1.9
+          java -jar BuildTools.jar --rev 1.9.4
 
       # Switch to Java 21 for Maven
       - name: Set up Java 21
