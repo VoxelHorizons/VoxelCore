@@ -42,7 +42,7 @@ jobs:
       - name: Delete existing release asset if it exists
         uses: mknejp/delete-release-assets@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.TOKEN }}
           tag: v${{ steps.project_version.outputs.version }}
           assets: |
             ItemCore.jar
@@ -57,4 +57,4 @@ jobs:
             target/*.jar
           prerelease: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
