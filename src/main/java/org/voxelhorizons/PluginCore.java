@@ -1,11 +1,14 @@
 package org.voxelhorizons;
 
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.voxelhorizons.debug.CIMode;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.logging.Logger;
 
 public final class PluginCore extends JavaPlugin {
@@ -54,6 +57,7 @@ public final class PluginCore extends JavaPlugin {
         } catch (Exception e) {
             e.printStackTrace();
         }
+        checkConfigVersion();
         this.config = this.getConfig();
     }
 
@@ -66,5 +70,49 @@ public final class PluginCore extends JavaPlugin {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private void replaceConfig() {
+        File oldConfig = new File(getDataFolder(), "config.yml");
+        File backup = new File(getDataFolder(), "config.yml.old");
+
+        if (backup.exists()) {
+            backup.delete();
+        }
+
+        if (oldConfig.exists()) {
+            oldConfig.renameTo(backup);
+        }
+
+        saveDefaultConfig();
+        reloadConfig();
+    }
+
+    private void checkConfigVersion() {
+        int currentVersion = getConfig().getInt("version", -1);
+        int defaultVersion = getDefaultConfigVersion();
+
+        if (currentVersion == -1) {
+            logger.warning("Config version missing! Regenerating config.");
+            replaceConfig();
+            return;
+        }
+
+        if (currentVersion != defaultVersion) {
+            logger.warning("Outdated config detected (v" + currentVersion +
+                    " → v" + defaultVersion + ")");
+            replaceConfig();
+        }
+    }
+
+    private int getDefaultConfigVersion() {
+        FileConfiguration defaultConfig =
+                YamlConfiguration.loadConfiguration(
+                        new InputStreamReader(
+                                getResource("config.yml"),
+                                StandardCharsets.UTF_8
+                        )
+                );
+        return defaultConfig.getInt("version", -1);
     }
 }
