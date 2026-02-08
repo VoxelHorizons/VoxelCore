@@ -3,6 +3,10 @@ package org.voxelhorizons;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.voxelhorizons.command.CommandFactory;
+import org.voxelhorizons.command.RootCommand;
+import org.voxelhorizons.command.commands.AdminCommand;
+import org.voxelhorizons.command.commands.BaseCommand;
 import org.voxelhorizons.debug.CIMode;
 
 import java.io.File;
@@ -59,6 +63,12 @@ public final class PluginCore extends JavaPlugin {
         }
         checkConfigVersion();
         this.config = this.getConfig();
+
+        // Command Factories
+        RootCommand baseCommand = new BaseCommand();
+        CommandFactory commandFactory = new CommandFactory(baseCommand);
+
+        commandFactory.register(new AdminCommand());
     }
 
     @Override
@@ -70,6 +80,10 @@ public final class PluginCore extends JavaPlugin {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public void onReload() {
+
     }
 
     private void replaceConfig() {
