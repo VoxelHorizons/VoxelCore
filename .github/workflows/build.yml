@@ -84,7 +84,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: ${{ matrix.mc == '1.20.4' && '21' || '16' }}
+          java-version: ${{ (matrix.mc == '1.20.4' || matrix.mc == 'latest') && '21' || '16' }}
 
       # Build Spigot server via BuildTools
       - name: Build Spigot ${{ matrix.mc }} server
