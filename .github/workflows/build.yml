@@ -91,7 +91,7 @@ jobs:
         run: |
           curl -L -o BuildTools.jar https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar
           java -jar BuildTools.jar --rev ${{ matrix.mc }}
-          cp spigot-${{ matrix.mc }}.jar server/spigot.jar
+          cp spigot-*.jar server/spigot.jar
         working-directory: ${{ github.workspace }}
 
       # Accept EULA
