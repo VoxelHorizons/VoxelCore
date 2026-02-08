@@ -1,6 +1,7 @@
 package org.voxelhorizons.debug;
 
 import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class CIMode {
@@ -17,6 +18,16 @@ public class CIMode {
         }
 
         plugin.getLogger().info("CI mode detected, scheduling automated shutdown...");
+
+        // Test Demo Commands
+        CommandSender console = Bukkit.getConsoleSender();
+        try {
+            Bukkit.dispatchCommand(console, "plugincore");
+            Bukkit.dispatchCommand(console, "plugincore admin");
+            Bukkit.dispatchCommand(console, "plugincore admin reload");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
         // Schedule task 10 seconds after startup
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {

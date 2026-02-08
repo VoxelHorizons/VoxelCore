@@ -6,9 +6,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class CommandFactory implements CommandExecutor, TabCompleter {
 
@@ -123,5 +121,22 @@ public class CommandFactory implements CommandExecutor, TabCompleter {
                 java.util.Arrays.copyOfRange(args, 1, args.length),
                 current.getChildren()
         );
+    }
+
+    public Set<String> getAllCommandPaths() {
+        Set<String> paths = new HashSet<>();
+        collectPaths(root.getName(), subCommands, paths);
+        return paths;
+    }
+
+    private void collectPaths(String prefix, Map<String, SubCommand> commands, Set<String> out) {
+        for (SubCommand cmd : new HashSet<>(commands.values())) {
+            String path = prefix + " " + cmd.getName();
+            out.add(path);
+
+            if (!cmd.getChildren().isEmpty()) {
+                collectPaths(path, cmd.getChildren(), out);
+            }
+        }
     }
 }
