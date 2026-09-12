@@ -1,53 +1,62 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project
+        xmlns="http://maven.apache.org/POM/4.0.0"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation=" http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
     <groupId>org.voxelhorizons</groupId>
-    <artifactId>PluginCore</artifactId>
+    <artifactId>VoxelCore</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
-
-    <name>PluginCore</name>
-
+    <name>VoxelCore</name>
     <properties>
         <java.version>16</java.version>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.build.sourceEncoding> UTF-8 </project.build.sourceEncoding>
     </properties>
-
+    <repositories>
+        <repository>
+            <id>spigot-repo</id>
+            <url> https://hub.spigotmc.org/nexus/content/groups/public/ </url>
+        </repository>
+    </repositories>
+    <dependencies>
+        <dependency>
+            <groupId>org.spigotmc</groupId>
+            <artifactId>spigot-api</artifactId>
+            <version>1.14.4-R0.1-SNAPSHOT</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
     <build>
-        <defaultGoal>clean package</defaultGoal>
+        <defaultGoal> clean package </defaultGoal>
         <plugins>
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.13.0</version>
+                <groupId> org.apache.maven.plugins </groupId>
+                <artifactId> maven-compiler-plugin </artifactId>
+                <version> 3.13.0 </version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <release> ${java.version} </release>
                 </configuration>
             </plugin>
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <version>3.5.3</version>
+                <groupId> org.apache.maven.plugins </groupId>
+                <artifactId> maven-shade-plugin </artifactId>
+                <version> 3.5.3 </version>
                 <executions>
                     <execution>
-                        <phase>package</phase>
+                        <phase> package </phase>
                         <goals>
-                            <goal>shade</goal>
+                            <goal> shade </goal>
                         </goals>
                         <configuration>
-                            <finalName>PluginCore-${project.version}</finalName>
-                            <minimizeJar>true</minimizeJar>
+                            <finalName> VoxelCore-${project.version} </finalName>
+                            <minimizeJar> true </minimizeJar>
                             <filters>
                                 <filter>
-                                    <artifact>*:*</artifact>
+                                    <artifact> *:* </artifact>
                                     <excludes>
-                                        <exclude>META-INF/*.SF</exclude>
-                                        <exclude>META-INF/*.DSA</exclude>
-                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude> META-INF/*.SF </exclude>
+                                        <exclude> META-INF/*.DSA </exclude>
+                                        <exclude> META-INF/*.RSA </exclude>
                                     </excludes>
                                 </filter>
                             </filters>
@@ -58,39 +67,9 @@
         </plugins>
         <resources>
             <resource>
-                <directory>src/main/resources</directory>
-                <filtering>true</filtering>
+                <directory> src/main/resources </directory>
+                <filtering> true </filtering>
             </resource>
         </resources>
     </build>
-
-    <repositories>
-        <repository>
-            <id>papermc</id>
-            <url>https://repo.papermc.io/repository/maven-public/</url>
-        </repository>
-        <repository>
-            <id>glaremasters-repo</id>
-            <url>https://repo.glaremasters.me/repository/towny/</url>
-        </repository>
-        <repository>
-            <id>sonatype-snapshots</id>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-        </repository>
-    </repositories>
-
-    <dependencies>
-        <dependency>
-            <groupId>org.spigotmc</groupId>
-            <artifactId>spigot-api</artifactId>
-            <version>1.9-R0.1-SNAPSHOT</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>net.md-5</groupId>
-            <artifactId>bungeecord-chat</artifactId>
-            <version>1.9-SNAPSHOT</version>
-            <scope>provided</scope>
-        </dependency>
-    </dependencies>
 </project>
