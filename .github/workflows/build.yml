@@ -53,10 +53,10 @@ jobs:
           name: VoxelCore-mc1.20.5-1.21.3
           path: voxelcore-v1_20_5/target/VoxelCore-*.jar
 
-      - name: Upload Minecraft 1.21.4+ artifact
+      - name: Upload Minecraft 1.21.4 artifact
         uses: actions/upload-artifact@v4
         with:
-          name: VoxelCore-mc1.21.4-plus
+          name: VoxelCore-mc1.21.4
           path: voxelcore-v1_21_4/target/VoxelCore-*.jar
 
       - name: Publish snapshot release from main
