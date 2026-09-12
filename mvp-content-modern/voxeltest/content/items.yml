@@ -23,6 +23,28 @@ items:
         powered: true
         intensity: 0.75
         tint: '#ff0000'
+      rule:
+        select:
+          key: variant
+          cases:
+            red:
+              condition:
+                key: powered
+                true:
+                  range:
+                    key: intensity
+                    entries:
+                      0.25:
+                        model:
+                          id: voxeltest:item/red_powered
+                          tint: tint
+                      0.75:
+                        model:
+                          id: voxeltest:item/red_powered_high
+                          tint: tint
+                    fallback: voxeltest:item/red_item
+                false: voxeltest:item/red_item
+          fallback: voxeltest:item/red_item
 
   child_item:
     extends: red_item
