@@ -34,11 +34,11 @@ items:
                   range:
                     key: intensity
                     entries:
-                      0.25:
+                      '0.25':
                         model:
                           id: voxeltest:item/red_powered
                           tint: tint
-                      0.75:
+                      '0.75':
                         model:
                           id: voxeltest:item/red_powered_high
                           tint: tint
