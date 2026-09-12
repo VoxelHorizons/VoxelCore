@@ -9,5 +9,5 @@ import java.util.Optional;
 public interface ItemPlatformAdapter {
     ItemStack createItem(ItemDefinition definition, int quantity);
     Optional<ContentID> getContentId(ItemStack stack);
-    void setContentId(ItemStack stack, ContentID id);
+    ItemStack setContentId(ItemStack stack, ContentID id);
 }
