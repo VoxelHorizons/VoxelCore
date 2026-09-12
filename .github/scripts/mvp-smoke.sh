@@ -6,6 +6,7 @@ MODULE="$2"
 IMAGE="$3"
 SERVER_TYPE="$4"
 FIXTURE_ROOT="${5:-mvp-content}"
+PACK_TARGET="mc-$MC_VERSION"
 NAME="voxelcore-smoke-${MC_VERSION//./-}"
 DATA_DIR="$PWD/.smoke/${MC_VERSION}"
 FIXTURE_ITEMS="$PWD/$FIXTURE_ROOT/voxeltest/content/items.yml"
@@ -67,6 +68,15 @@ grep -q 'content revision 1: 3 items' <<<"$CONTENT_INFO"
 VERIFY="$(docker exec "$NAME" rcon-cli --password voxelcore-smoke 'voxelcore admin item verify voxeltest:red_item')"
 echo "$VERIFY"
 grep -q 'VOXELCORE_ITEM_VERIFY_OK id=voxeltest:red_item' <<<"$VERIFY"
+
+PACK_VALIDATE="$(docker exec "$NAME" rcon-cli --password voxelcore-smoke "voxelcore admin pack validate $PACK_TARGET")"
+echo "$PACK_VALIDATE"
+grep -q "pack valid for $PACK_TARGET" <<<"$PACK_VALIDATE"
+
+PACK_BUILD="$(docker exec "$NAME" rcon-cli --password voxelcore-smoke "voxelcore admin pack build $PACK_TARGET")"
+echo "$PACK_BUILD"
+grep -q "pack built for $PACK_TARGET" <<<"$PACK_BUILD"
+test -f "$DATA_DIR/plugins/VoxelCore/build/resource-packs/$PACK_TARGET.zip"
 
 docker exec -i "$NAME" sh -c "cat > '$CONTAINER_ITEMS'" <<'BROKEN'
 items:
