@@ -3,12 +3,14 @@ package org.voxelhorizons.platform.v1_14;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.voxelhorizons.content.ContentID;
 import org.voxelhorizons.content.item.CustomModelDataDefinition;
 import org.voxelhorizons.content.item.ItemDefinition;
+import org.voxelhorizons.platform.item.ItemMetadataSupport;
 import org.voxelhorizons.platform.item.ItemPlatformAdapter;
 
 import java.util.Optional;
@@ -26,6 +28,10 @@ public final class v1_14_ItemAdapter implements ItemPlatformAdapter {
         if (meta != null) {
             if (definition.displayName() != null) meta.setDisplayName(definition.displayName());
             if (!definition.lore().isEmpty()) meta.setLore(definition.lore());
+            ItemMetadataSupport.applyCommon(meta, definition.render());
+            if (definition.render() != null && definition.render().durability() != null) {
+                applyDurability(meta, material, definition.render().durability().intValue(), definition);
+            }
             if (definition.render() != null && definition.render().customModelData() != null) {
                 CustomModelDataDefinition data = definition.render().customModelData();
                 if (!data.isNumeric()) throw new IllegalArgumentException("Structured custom_model_data requires Minecraft 1.21.4+ for " + definition.id());
@@ -35,6 +41,13 @@ public final class v1_14_ItemAdapter implements ItemPlatformAdapter {
             stack.setItemMeta(meta);
         }
         return stack;
+    }
+
+    private static void applyDurability(ItemMeta meta, Material material, int durability, ItemDefinition definition) {
+        int max = material.getMaxDurability();
+        if (!(meta instanceof Damageable) || max <= 0) throw new IllegalArgumentException("durability requires a damageable material for " + definition.id());
+        if (durability < 0 || durability >= max) throw new IllegalArgumentException("durability " + durability + " is invalid for " + definition.id() + "; expected 0.." + (max - 1));
+        ((Damageable) meta).setDamage(durability);
     }
 
     @Override
