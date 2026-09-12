@@ -18,6 +18,10 @@ public final class JavaPackTarget {
     public int packFormat() { return packFormat; }
     public JavaPackMode mode() { return mode; }
 
+    public static JavaPackTarget legacyDamage(String id, int packFormat) {
+        return new JavaPackTarget(id, packFormat, JavaPackMode.LEGACY_DAMAGE_UNBREAKABLE);
+    }
+
     public static JavaPackTarget numericCmd(String id, int packFormat) {
         return new JavaPackTarget(id, packFormat, JavaPackMode.NUMERIC_CUSTOM_MODEL_DATA);
     }

@@ -19,10 +19,17 @@ jobs:
             module: voxelcore-v1_12
             image: itzg/minecraft-server:java8
             server_type: SPIGOT
+            fixture_root: mvp-content
+          - minecraft: '1.14.4'
+            module: voxelcore-v1_14
+            image: itzg/minecraft-server:java8
+            server_type: SPIGOT
+            fixture_root: mvp-content
           - minecraft: '1.21.4'
             module: voxelcore-v1_21_4
             image: itzg/minecraft-server:java21
             server_type: PAPER
+            fixture_root: mvp-content-modern
 
     steps:
       - name: Checkout repository
@@ -39,7 +46,7 @@ jobs:
         run: mvn -U -pl "${{ matrix.module }}" -am package
 
       - name: Run real-server MVP smoke test
-        run: bash .github/scripts/mvp-smoke.sh "${{ matrix.minecraft }}" "${{ matrix.module }}" "${{ matrix.image }}" "${{ matrix.server_type }}"
+        run: bash .github/scripts/mvp-smoke.sh "${{ matrix.minecraft }}" "${{ matrix.module }}" "${{ matrix.image }}" "${{ matrix.server_type }}" "${{ matrix.fixture_root }}"
 
       - name: Upload smoke server logs
         if: always()

@@ -1,5 +1,6 @@
 package org.voxelhorizons.platform.v1_21_4;
 
+import org.bukkit.Color;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
@@ -8,30 +9,26 @@ import org.bukkit.inventory.meta.components.CustomModelDataComponent;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.voxelhorizons.content.ContentID;
+import org.voxelhorizons.content.item.CustomModelDataDefinition;
 import org.voxelhorizons.content.item.ItemDefinition;
 import org.voxelhorizons.platform.item.ItemPlatformAdapter;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public final class v1_21_4_ItemAdapter implements ItemPlatformAdapter {
-
     private final NamespacedKey contentIdKey;
-
-    public v1_21_4_ItemAdapter(Plugin plugin) {
-        this.contentIdKey = new NamespacedKey(plugin, "content_id");
-    }
+    public v1_21_4_ItemAdapter(Plugin plugin) { this.contentIdKey = new NamespacedKey(plugin, "content_id"); }
 
     @Override
     public ItemStack createItem(ItemDefinition definition, int quantity) {
         Material material = Material.matchMaterial(definition.material().replace("minecraft:", ""));
-        if (material == null) {
-            throw new IllegalArgumentException("Unknown Minecraft material: " + definition.material());
-        }
-
+        if (material == null) throw new IllegalArgumentException("Unknown Minecraft material: " + definition.material());
         ItemStack stack = new ItemStack(material, quantity);
         ItemMeta meta = stack.getItemMeta();
-
         if (meta != null) {
             if (definition.displayName() != null) meta.setDisplayName(definition.displayName());
             if (!definition.lore().isEmpty()) meta.setLore(definition.lore());
@@ -39,27 +36,49 @@ public final class v1_21_4_ItemAdapter implements ItemPlatformAdapter {
             if (definition.render() != null) {
                 if (definition.render().model() != null && !definition.render().model().trim().isEmpty()) {
                     NamespacedKey model = NamespacedKey.fromString(definition.render().model());
-                    if (model != null) {
-                        meta.setItemModel(model);
-                    }
+                    if (model != null) meta.setItemModel(model);
                 }
-
-                if (definition.render().legacyCustomModelData() != null) {
-                    CustomModelDataComponent component = meta.getCustomModelDataComponent();
-                    component.setFloats(Collections.singletonList(definition.render().legacyCustomModelData().floatValue()));
-                    meta.setCustomModelDataComponent(component);
+                if (definition.render().customModelData() != null) {
+                    applyCustomModelData(meta, definition.render().customModelData());
                 }
             }
 
             meta.getPersistentDataContainer().set(contentIdKey, PersistentDataType.STRING, definition.id().toString());
             stack.setItemMeta(meta);
         }
-
         return stack;
     }
 
-    @Override
-    public Optional<ContentID> getContentId(ItemStack stack) {
+    private static void applyCustomModelData(ItemMeta meta, CustomModelDataDefinition data) {
+        CustomModelDataComponent component = meta.getCustomModelDataComponent();
+        if (data.isNumeric()) {
+            component.setFloats(Collections.singletonList(data.numeric().floatValue()));
+        } else {
+            List<Float> floats = new ArrayList<Float>();
+            for (Map.Entry<String, CustomModelDataDefinition.Value> entry : data.valuesOfType(CustomModelDataDefinition.ValueType.FLOAT)) {
+                floats.add(Float.valueOf(entry.getValue().floatValue()));
+            }
+            List<Boolean> flags = new ArrayList<Boolean>();
+            for (Map.Entry<String, CustomModelDataDefinition.Value> entry : data.valuesOfType(CustomModelDataDefinition.ValueType.FLAG)) {
+                flags.add(Boolean.valueOf(entry.getValue().booleanValue()));
+            }
+            List<String> strings = new ArrayList<String>();
+            for (Map.Entry<String, CustomModelDataDefinition.Value> entry : data.valuesOfType(CustomModelDataDefinition.ValueType.STRING)) {
+                strings.add(entry.getValue().stringValue());
+            }
+            List<Color> colors = new ArrayList<Color>();
+            for (Map.Entry<String, CustomModelDataDefinition.Value> entry : data.valuesOfType(CustomModelDataDefinition.ValueType.COLOR)) {
+                colors.add(Color.fromRGB(entry.getValue().colorRgb()));
+            }
+            component.setFloats(floats);
+            component.setFlags(flags);
+            component.setStrings(strings);
+            component.setColors(colors);
+        }
+        meta.setCustomModelDataComponent(component);
+    }
+
+    @Override public Optional<ContentID> getContentId(ItemStack stack) {
         if (stack == null || !stack.hasItemMeta()) return Optional.empty();
         ItemMeta meta = stack.getItemMeta();
         if (meta == null) return Optional.empty();
@@ -67,8 +86,7 @@ public final class v1_21_4_ItemAdapter implements ItemPlatformAdapter {
         return value == null ? Optional.<ContentID>empty() : Optional.of(ContentID.parse(value, "voxelhorizons"));
     }
 
-    @Override
-    public ItemStack setContentId(ItemStack stack, ContentID id) {
+    @Override public ItemStack setContentId(ItemStack stack, ContentID id) {
         if (stack == null) throw new IllegalArgumentException("stack cannot be null");
         ItemMeta meta = stack.getItemMeta();
         if (meta != null) {
