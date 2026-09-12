@@ -1,0 +1,23 @@
+items:
+  base:
+    material: minecraft:paper
+    display_name: Base Modern MVP Item
+    bound: true
+    lore:
+      - Loaded from the VoxelCore structured modern MVP fixture
+
+  red_item:
+    extends: base
+    display_name: Red Test Item
+    render:
+      model: voxeltest:item/red_item
+      custom_model_data:
+        variant: red
+        powered: true
+        intensity: 0.75
+        tint: '#ff0000'
+
+  child_item:
+    extends: red_item
+    display_name: Inherited Test Item
+    bound: false
