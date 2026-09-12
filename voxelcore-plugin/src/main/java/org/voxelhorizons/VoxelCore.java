@@ -1,5 +1,6 @@
 package org.voxelhorizons;
 
+import org.bukkit.command.PluginCommand;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -107,10 +108,22 @@ public final class VoxelCore extends JavaPlugin {
         commandFactory.register(new AdminCommand());
 
         try {
+            PluginCommand bukkitCommand = getCommand(baseCommand.getName());
+            if (bukkitCommand == null) {
+                throw new IllegalStateException("Command '" + baseCommand.getName() + "' is missing from plugin.yml");
+            }
+            bukkitCommand.setExecutor(commandFactory);
+            bukkitCommand.setTabCompleter(commandFactory);
             CommandRegistry.register(commandFactory);
         } catch (Exception exception) {
             logger.log(Level.SEVERE, "Unable to register VoxelCore commands", exception);
+            getServer().getPluginManager().disablePlugin(this);
+            return;
         }
+
+        logger.info("VOXELCORE_READY revision=" + contentRuntime.current().revision()
+                + " items=" + contentRuntime.current().items().size()
+                + " platform=" + versionAdapter.version());
     }
 
     @Override

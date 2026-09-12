@@ -46,6 +46,12 @@
                         <configuration>
                             <finalName>VoxelCore-${project.version}-mc1.20.5-1.21.3</finalName>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.yaml.snakeyaml</pattern>
+                                    <shadedPattern>org.voxelhorizons.shaded.snakeyaml</shadedPattern>
+                                </relocation>
+                            </relocations>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
