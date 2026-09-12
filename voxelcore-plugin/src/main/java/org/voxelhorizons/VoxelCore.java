@@ -9,6 +9,7 @@ import org.voxelhorizons.command.CommandRegistry;
 import org.voxelhorizons.command.RootCommand;
 import org.voxelhorizons.command.commands.AdminCommand;
 import org.voxelhorizons.command.commands.BaseCommand;
+import org.voxelhorizons.config.ConfigMigrationSupport;
 import org.voxelhorizons.content.item.ItemDefinition;
 import org.voxelhorizons.content.item.ItemDefinitionRegistry;
 import org.voxelhorizons.content.load.ContentLoadException;
@@ -69,22 +70,22 @@ public final class VoxelCore extends JavaPlugin {
                 logger.info("No Configuration File Found. Generating A New One...");
                 saveDefaultConfig();
             }
-        } catch (Exception exception) {
-            logger.log(Level.SEVERE, "Unable to initialize VoxelCore data folder", exception);
-            getServer().getPluginManager().disablePlugin(this);
-            return;
-        }
-
-        try {
             checkConfigVersion();
         } catch (RuntimeException exception) {
-            logger.log(Level.SEVERE, "Unable to migrate VoxelCore configuration", exception);
+            logger.log(Level.SEVERE, "Unable to initialize or migrate VoxelCore configuration", exception);
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
         config = getConfig();
 
-        versionAdapter = VersionAdapterFactory.create(this);
+        try {
+            versionAdapter = VersionAdapterFactory.create(this);
+        } catch (RuntimeException exception) {
+            logger.log(Level.SEVERE, "VoxelCore does not support this Minecraft platform", exception);
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+
         contentLoader = new ContentLoader();
         contentRoot = getDataFolder().toPath().resolve("content");
 
@@ -147,11 +148,8 @@ public final class VoxelCore extends JavaPlugin {
     @Override
     public void onDisable() {
         if (config == null || configFile == null) return;
-        try {
-            config.save(configFile);
-        } catch (IOException exception) {
-            logger.log(Level.SEVERE, "Unable to save VoxelCore configuration", exception);
-        }
+        try { config.save(configFile); }
+        catch (IOException exception) { logger.log(Level.SEVERE, "Unable to save VoxelCore configuration", exception); }
     }
 
     public ContentReloadResult onReload() {
@@ -179,15 +177,9 @@ public final class VoxelCore extends JavaPlugin {
         YamlConfiguration defaults = YamlConfiguration.loadConfiguration(
                 new InputStreamReader(getResource("config.yml"), StandardCharsets.UTF_8));
         backupConfig();
-        for (String key : defaults.getKeys(true)) {
-            if (!current.contains(key)) current.set(key, defaults.get(key));
-        }
-        current.set("version", Integer.valueOf(defaultVersion));
-        try {
-            current.save(configFile);
-        } catch (IOException exception) {
-            throw new IllegalStateException("Unable to save migrated config", exception);
-        }
+        ConfigMigrationSupport.merge(current, defaults, defaultVersion);
+        try { current.save(configFile); }
+        catch (IOException exception) { throw new IllegalStateException("Unable to save migrated config", exception); }
         reloadConfig();
     }
 
@@ -196,11 +188,8 @@ public final class VoxelCore extends JavaPlugin {
         File backup = new File(getDataFolder(), "config.yml.old");
         int suffix = 1;
         while (backup.exists()) backup = new File(getDataFolder(), "config.yml.old." + suffix++);
-        try {
-            Files.copy(configFile.toPath(), backup.toPath(), StandardCopyOption.COPY_ATTRIBUTES);
-        } catch (IOException exception) {
-            throw new IllegalStateException("Unable to back up existing config to " + backup, exception);
-        }
+        try { Files.copy(configFile.toPath(), backup.toPath(), StandardCopyOption.COPY_ATTRIBUTES); }
+        catch (IOException exception) { throw new IllegalStateException("Unable to back up existing config to " + backup, exception); }
     }
 
     private void checkConfigVersion() {
