@@ -1,0 +1,74 @@
+name: Build VoxelCore Distributions
+
+on:
+  push:
+    branches:
+      - main
+      - 'chore/**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: Build all distributions
+        run: mvn -U clean package
+
+      - name: Upload Minecraft 1.12-1.13 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoxelCore-mc1.12-1.13
+          path: voxelcore-dist-v1_12/target/VoxelCore-*.jar
+
+      - name: Upload Minecraft 1.14-1.19.3 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoxelCore-mc1.14-1.19.3
+          path: voxelcore-dist-v1_14/target/VoxelCore-*.jar
+
+      - name: Upload Minecraft 1.19.4-1.20.4 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoxelCore-mc1.19.4-1.20.4
+          path: voxelcore-dist-v1_19_4/target/VoxelCore-*.jar
+
+      - name: Upload Minecraft 1.20.5-1.21.3 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoxelCore-mc1.20.5-1.21.3
+          path: voxelcore-dist-v1_20_5/target/VoxelCore-*.jar
+
+      - name: Upload Minecraft 1.21.4+ artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoxelCore-mc1.21.4-plus
+          path: voxelcore-dist-v1_21_4/target/VoxelCore-*.jar
+
+      - name: Publish snapshot release from main
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0-SNAPSHOT
+          name: VoxelCore v1.0-SNAPSHOT
+          prerelease: true
+          files: |
+            voxelcore-dist-v1_12/target/VoxelCore-*.jar
+            voxelcore-dist-v1_14/target/VoxelCore-*.jar
+            voxelcore-dist-v1_19_4/target/VoxelCore-*.jar
+            voxelcore-dist-v1_20_5/target/VoxelCore-*.jar
+            voxelcore-dist-v1_21_4/target/VoxelCore-*.jar
