@@ -19,11 +19,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java 21
+      - name: Set up Java 25
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 25
           cache: maven
 
       - name: Build all distributions
@@ -59,6 +59,12 @@ jobs:
           name: VoxelCore-mc1.21.4
           path: voxelcore-v1_21_4/target/VoxelCore-*.jar
 
+      - name: Upload Minecraft 26.2 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoxelCore-mc26.2
+          path: voxelcore-v26_2/target/VoxelCore-*.jar
+
       - name: Publish snapshot release from main
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: softprops/action-gh-release@v2
@@ -72,3 +78,4 @@ jobs:
             voxelcore-v1_19_4/target/VoxelCore-*.jar
             voxelcore-v1_20_5/target/VoxelCore-*.jar
             voxelcore-v1_21_4/target/VoxelCore-*.jar
+            voxelcore-v26_2/target/VoxelCore-*.jar
