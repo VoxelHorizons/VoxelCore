@@ -94,6 +94,21 @@ public class JavaPackCompilerTest {
     }
 
     @Test
+    public void writesModernRangeMetadataForMinecraft262() throws Exception {
+        File contentRoot = temporaryFolder.newFolder("metadata-content");
+        File pack = new File(contentRoot, "mypack");
+        assertTrue(new File(pack, "content").mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: mypack\n");
+        Path build = temporaryFolder.newFolder("metadata-build").toPath();
+        Path zip = build.resolve("mc-26.2.zip");
+        new JavaPackCompiler().compile(contentRoot.toPath(), zip, build.resolve("allocations.yml"), JavaPackTarget.MC_26_2);
+        String metadata = zipText(zip, "pack.mcmeta");
+        assertTrue(metadata.contains("\"min_format\": [88, 0]"));
+        assertTrue(metadata.contains("\"max_format\": [88, 0]"));
+        assertTrue(!metadata.contains("\"pack_format\""));
+    }
+
+    @Test
     public void compilesStructuredModernDecisionTreeUsingStableIndices() throws Exception {
         File contentRoot = temporaryFolder.newFolder("rule-content");
         File pack = new File(contentRoot, "mypack");
