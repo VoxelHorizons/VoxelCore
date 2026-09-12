@@ -11,6 +11,10 @@ public final class RawItemRenderDefinition {
     private final Map<String, Boolean> attributes;
     private final CustomModelDataDefinition customModelData;
 
+    public RawItemRenderDefinition(String model, CustomModelDataDefinition customModelData) {
+        this(model, null, null, null, customModelData);
+    }
+
     public RawItemRenderDefinition(String model,
                                    Boolean unbreakable,
                                    Integer durability,
