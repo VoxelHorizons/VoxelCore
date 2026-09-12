@@ -25,14 +25,14 @@ public class ContentLoaderTest {
     public void loadsYamlAndCompilesInheritance() throws Exception {
         File root = temporaryFolder.newFolder("content");
         File pack = new File(root, "voxel_horizons");
-        File definitions = new File(pack, "definitions");
-        assertTrue(definitions.mkdirs());
+        File content = new File(pack, "content");
+        assertTrue(content.mkdirs());
 
         write(new File(pack, "pack.yml"),
                 "schema: 1\n" +
                 "namespace: voxelhorizons\n");
 
-        write(new File(definitions, "items.yml"),
+        write(new File(content, "items.yml"),
                 "items:\n" +
                 "  chair_base:\n" +
                 "    material: minecraft:paper\n" +
@@ -69,14 +69,33 @@ public class ContentLoaderTest {
     }
 
     @Test
+    public void loadsYamlRecursivelyFromNestedContentDirectories() throws Exception {
+        File root = temporaryFolder.newFolder("recursive-content");
+        File pack = new File(root, "my_pack");
+        File vehicles = new File(pack, "content/vehicles");
+        assertTrue(vehicles.mkdirs());
+
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: test\n");
+        write(new File(vehicles, "cars.yml"),
+                "items:\n  car:\n    material: minecraft:paper\n");
+        write(new File(vehicles, "trucks.yml"),
+                "items:\n  truck:\n    material: minecraft:paper\n");
+
+        ItemDefinitionRegistry registry = new ContentLoader().load(root.toPath());
+        assertEquals(2, registry.size());
+        assertTrue(registry.contains(ContentID.of("test", "car")));
+        assertTrue(registry.contains(ContentID.of("test", "truck")));
+    }
+
+    @Test
     public void rejectsDuplicateIdsAcrossFiles() throws Exception {
         File root = temporaryFolder.newFolder("duplicates");
         File pack = new File(root, "pack");
-        File definitions = new File(pack, "definitions");
-        assertTrue(definitions.mkdirs());
+        File content = new File(pack, "content");
+        assertTrue(content.mkdirs());
         write(new File(pack, "pack.yml"), "schema: 1\nnamespace: test\n");
-        write(new File(definitions, "a.yml"), "items:\n  thing:\n    material: minecraft:paper\n");
-        write(new File(definitions, "b.yml"), "items:\n  thing:\n    material: minecraft:stone\n");
+        write(new File(content, "a.yml"), "items:\n  thing:\n    material: minecraft:paper\n");
+        write(new File(content, "b.yml"), "items:\n  thing:\n    material: minecraft:stone\n");
 
         try {
             new ContentLoader().load(root.toPath());
@@ -92,10 +111,10 @@ public class ContentLoaderTest {
     public void rejectsUnsupportedItemKeys() throws Exception {
         File root = temporaryFolder.newFolder("unknown-key");
         File pack = new File(root, "pack");
-        File definitions = new File(pack, "definitions");
-        assertTrue(definitions.mkdirs());
+        File content = new File(pack, "content");
+        assertTrue(content.mkdirs());
         write(new File(pack, "pack.yml"), "schema: 1\nnamespace: test\n");
-        write(new File(definitions, "items.yml"),
+        write(new File(content, "items.yml"),
                 "items:\n  thing:\n    material: minecraft:paper\n    typo_field: nope\n");
 
         try {
