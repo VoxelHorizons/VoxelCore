@@ -10,6 +10,7 @@ import org.bukkit.plugin.Plugin;
 import org.voxelhorizons.content.ContentID;
 import org.voxelhorizons.content.item.CustomModelDataDefinition;
 import org.voxelhorizons.content.item.ItemDefinition;
+import org.voxelhorizons.content.render.RenderAllocation;
 import org.voxelhorizons.platform.item.ItemMetadataSupport;
 import org.voxelhorizons.platform.item.ItemPlatformAdapter;
 
@@ -21,6 +22,11 @@ public final class v1_14_ItemAdapter implements ItemPlatformAdapter {
 
     @Override
     public ItemStack createItem(ItemDefinition definition, int quantity) {
+        return createItem(definition, quantity, null);
+    }
+
+    @Override
+    public ItemStack createItem(ItemDefinition definition, int quantity, RenderAllocation allocation) {
         Material material = Material.matchMaterial(definition.material().replace("minecraft:", ""));
         if (material == null) throw new IllegalArgumentException("Unknown Minecraft material: " + definition.material());
         ItemStack stack = new ItemStack(material, quantity);
@@ -32,15 +38,23 @@ public final class v1_14_ItemAdapter implements ItemPlatformAdapter {
             if (definition.render() != null && definition.render().durability() != null) {
                 applyDurability(meta, material, definition.render().durability().intValue(), definition);
             }
-            if (definition.render() != null && definition.render().customModelData() != null) {
-                CustomModelDataDefinition data = definition.render().customModelData();
-                if (!data.isNumeric()) throw new IllegalArgumentException("Structured custom_model_data requires Minecraft 1.21.4+ for " + definition.id());
-                meta.setCustomModelData(data.numeric());
+            if (definition.render() != null && definition.render().customModelData() != null
+                    && definition.render().customModelData().isStructured()) {
+                throw new IllegalArgumentException("Structured custom_model_data requires Minecraft 1.21.4+ for " + definition.id());
             }
+            Integer customModelData = numericCustomModelData(definition, allocation);
+            if (customModelData != null) meta.setCustomModelData(customModelData);
             meta.getPersistentDataContainer().set(contentIdKey, PersistentDataType.STRING, definition.id().toString());
             stack.setItemMeta(meta);
         }
         return stack;
+    }
+
+    private static Integer numericCustomModelData(ItemDefinition definition, RenderAllocation allocation) {
+        if (allocation != null && allocation.active()) return Integer.valueOf(allocation.customModelData());
+        if (definition.render() == null) return null;
+        CustomModelDataDefinition data = definition.render().customModelData();
+        return data != null && data.isNumeric() ? data.numeric() : null;
     }
 
     private static void applyDurability(ItemMeta meta, Material material, int durability, ItemDefinition definition) {
