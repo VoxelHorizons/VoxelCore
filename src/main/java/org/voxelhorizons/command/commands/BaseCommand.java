@@ -1,7 +1,7 @@
 package org.voxelhorizons.command.commands;
 
 import org.bukkit.command.CommandSender;
-import org.voxelhorizons.PluginCore;
+import org.voxelhorizons.VoxelCore;
 import org.voxelhorizons.command.RootCommand;
 
 import java.util.List;
@@ -10,7 +10,7 @@ public class BaseCommand implements RootCommand {
 
     @Override
     public String getName() {
-        return PluginCore.getInstance().getName().toLowerCase();
+        return VoxelCore.getInstance().getName().toLowerCase();
     }
 
     @Override
@@ -30,6 +30,6 @@ public class BaseCommand implements RootCommand {
 
     @Override
     public void execute(CommandSender sender, String[] args) {
-        sender.sendMessage(PluginCore.getInstance().getDescription().getName() + " " + PluginCore.getInstance().getDescription().getVersion());
+        sender.sendMessage(VoxelCore.getInstance().getDescription().getName() + " " + VoxelCore.getInstance().getDescription().getVersion());
     }
 }

@@ -7,7 +7,7 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="ItemCore" />
-        <module name="PluginCore" />
+        <module name="VoxelCore" />
       </profile>
     </annotationProcessing>
   </component>

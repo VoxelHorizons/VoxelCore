@@ -1,7 +1,7 @@
 package org.voxelhorizons.command.commands;
 
 import org.bukkit.command.CommandSender;
-import org.voxelhorizons.PluginCore;
+import org.voxelhorizons.VoxelCore;
 import org.voxelhorizons.command.SubCommand;
 
 import java.util.HashMap;
@@ -35,7 +35,7 @@ public class AdminCommand implements SubCommand {
 
     @Override
     public String getPermission() {
-        return PluginCore.getInstance().getDescription().getName().toLowerCase() + ".admin";
+        return VoxelCore.getInstance().getDescription().getName().toLowerCase() + ".admin";
     }
 
     @Override
@@ -45,6 +45,6 @@ public class AdminCommand implements SubCommand {
 
     @Override
     public void execute(CommandSender sender, String[] args) {
-        sender.sendMessage("Reloading " + PluginCore.getInstance().getDescription().getName() + "...");
+        sender.sendMessage("Reloading " + VoxelCore.getInstance().getDescription().getName() + "...");
     }
 }
