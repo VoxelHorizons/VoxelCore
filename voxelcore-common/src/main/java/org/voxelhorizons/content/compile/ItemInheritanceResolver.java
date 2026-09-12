@@ -74,7 +74,8 @@ public final class ItemInheritanceResolver {
                 child.unbreakable() != null ? child.unbreakable() : parent.unbreakable(),
                 child.durability() != null ? child.durability() : parent.durability(),
                 mergeBooleanMaps(parent.attributes(), child.attributes()),
-                mergeCustomModelData(parent.customModelData(), child.customModelData())
+                mergeCustomModelData(parent.customModelData(), child.customModelData()),
+                child.rule() != null ? deepCopyMap(child.rule()) : deepCopyMap(parent.rule())
         );
     }
 
