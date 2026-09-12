@@ -17,6 +17,7 @@ public class AdminCommand implements SubCommand {
         register(new ReloadCommand());
         register(new ContentCommand());
         register(new ItemCommand());
+        register(new PackCommand());
     }
 
     private void register(SubCommand command) {
@@ -27,32 +28,22 @@ public class AdminCommand implements SubCommand {
     }
 
     @Override
-    public String getName() {
-        return "admin";
-    }
+    public String getName() { return "admin"; }
 
     @Override
-    public List<String> getAliases() {
-        return Collections.singletonList("a");
-    }
+    public List<String> getAliases() { return Collections.singletonList("a"); }
 
     @Override
-    public String getPermission() {
-        return VoxelCore.getInstance().getDescription().getName().toLowerCase() + ".admin";
-    }
+    public String getPermission() { return VoxelCore.getInstance().getDescription().getName().toLowerCase() + ".admin"; }
 
     @Override
-    public boolean playerOnly() {
-        return false;
-    }
+    public boolean playerOnly() { return false; }
 
     @Override
-    public Map<String, SubCommand> getChildren() {
-        return children;
-    }
+    public Map<String, SubCommand> getChildren() { return children; }
 
     @Override
     public void execute(CommandSender sender, String[] args) {
-        sender.sendMessage("Usage: /voxelcore admin <reload|content|item>");
+        sender.sendMessage("Usage: /voxelcore admin <reload|content|item|pack>");
     }
 }

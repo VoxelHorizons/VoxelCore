@@ -33,3 +33,11 @@ permissions:
     default: op
   voxelcore.admin.item.verify:
     default: op
+  voxelcore.admin.pack:
+    default: op
+  voxelcore.admin.pack.info:
+    default: op
+  voxelcore.admin.pack.validate:
+    default: op
+  voxelcore.admin.pack.build:
+    default: op
