@@ -26,7 +26,7 @@ public final class ItemDefinitionParser {
             "extends", "type", "material", "display_name", "lore", "bound", "render", "properties"
     ));
     private static final Set<String> RENDER_KEYS = new HashSet<String>(Arrays.asList(
-            "model", "custom_model_data"
+            "model", "unbreakable", "durability", "attributes", "custom_model_data"
     ));
 
     public List<RawItemDefinition> parse(ContentPack pack, Path file) {
@@ -99,8 +99,11 @@ public final class ItemDefinitionParser {
             Map<?, ?> renderMap = (Map<?, ?>) value;
             rejectUnknown(renderMap, RENDER_KEYS, file, "render for " + id);
             String model = string(renderMap, "model", file, false);
+            Boolean unbreakable = booleanValue(renderMap, "unbreakable", id, file);
+            Integer durability = nonNegativeInteger(renderMap, "durability", id, file);
+            Map<String, Boolean> attributes = booleanMap(renderMap, "attributes", id, file);
             CustomModelDataDefinition customModelData = parseCustomModelData(renderMap, id, file);
-            render = new RawItemRenderDefinition(model, customModelData);
+            render = new RawItemRenderDefinition(model, unbreakable, durability, attributes, customModelData);
         }
 
         Map<String, Object> properties = null;
@@ -112,6 +115,43 @@ public final class ItemDefinitionParser {
 
         return new RawItemDefinition(id, parent, type, string(map, "material", file, false),
                 string(map, "display_name", file, false), lore, bound, render, properties);
+    }
+
+    private static Boolean booleanValue(Map<?, ?> map, String key, ContentID id, Path file) {
+        if (!map.containsKey(key)) return null;
+        Object value = map.get(key);
+        if (!(value instanceof Boolean)) throw new ContentLoadException(key + " must be boolean for " + id + " in " + file);
+        return (Boolean) value;
+    }
+
+    private static Integer nonNegativeInteger(Map<?, ?> map, String key, ContentID id, Path file) {
+        if (!map.containsKey(key)) return null;
+        Object raw = map.get(key);
+        if (!(raw instanceof Number)) throw new ContentLoadException(key + " must be an integer for " + id + " in " + file);
+        Number number = (Number) raw;
+        double value = number.doubleValue();
+        int integer = number.intValue();
+        if (value != integer || integer < 0) {
+            throw new ContentLoadException(key + " must be a non-negative whole number for " + id + " in " + file);
+        }
+        return Integer.valueOf(integer);
+    }
+
+    private static Map<String, Boolean> booleanMap(Map<?, ?> map, String key, ContentID id, Path file) {
+        if (!map.containsKey(key)) return null;
+        Object raw = map.get(key);
+        if (!(raw instanceof Map)) throw new ContentLoadException(key + " must be a mapping for " + id + " in " + file);
+        Map<String, Boolean> values = new LinkedHashMap<String, Boolean>();
+        for (Map.Entry<?, ?> entry : ((Map<?, ?>) raw).entrySet()) {
+            if (!(entry.getKey() instanceof String) || ((String) entry.getKey()).trim().isEmpty()) {
+                throw new ContentLoadException(key + " keys must be non-empty strings for " + id + " in " + file);
+            }
+            if (!(entry.getValue() instanceof Boolean)) {
+                throw new ContentLoadException(key + " value for '" + entry.getKey() + "' must be boolean for " + id + " in " + file);
+            }
+            values.put(((String) entry.getKey()).trim().toLowerCase(java.util.Locale.ROOT), (Boolean) entry.getValue());
+        }
+        return values;
     }
 
     private static CustomModelDataDefinition parseCustomModelData(Map<?, ?> renderMap, ContentID id, Path file) {
