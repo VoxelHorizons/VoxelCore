@@ -1,17 +1,17 @@
 items:
   base:
-    material: minecraft:paper
+    material: minecraft:diamond_hoe
     display_name: Base MVP Item
     bound: true
     lore:
-      - Loaded from the VoxelCore MVP fixture
+      - Loaded from the VoxelCore numeric MVP fixture
 
   red_item:
     extends: base
     display_name: Red Test Item
     render:
-      legacy_custom_model_data: 1001
       model: voxeltest:item/red_item
+      custom_model_data: 5
 
   child_item:
     extends: red_item
