@@ -19,6 +19,7 @@ import org.voxelhorizons.content.runtime.ContentRuntime;
 import org.voxelhorizons.content.runtime.ContentRuntimeReloader;
 import org.voxelhorizons.content.runtime.ContentSnapshot;
 import org.voxelhorizons.item.ItemManager;
+import org.voxelhorizons.pack.PackManager;
 import org.voxelhorizons.platform.VersionAdapter;
 import org.voxelhorizons.platform.VersionAdapterFactory;
 
@@ -44,6 +45,7 @@ public final class VoxelCore extends JavaPlugin {
     private ContentRuntime contentRuntime;
     private ContentRuntimeReloader contentReloader;
     private ItemManager itemManager;
+    private PackManager packManager;
     private Path contentRoot;
 
     public static VoxelCore getInstance() { return instance; }
@@ -85,6 +87,7 @@ public final class VoxelCore extends JavaPlugin {
             allocationStore.save(initialAllocations);
             contentRuntime = new ContentRuntime(new ContentSnapshot(1L, initialRegistry, initialAllocations));
             contentReloader = new ContentRuntimeReloader(contentLoader, contentRoot, contentRuntime, allocationStore);
+            packManager = new PackManager(getDataFolder().toPath(), contentRoot, versionAdapter.version());
         } catch (IOException exception) {
             logger.log(Level.SEVERE, "Unable to create VoxelCore content directory " + contentRoot, exception);
             getServer().getPluginManager().disablePlugin(this);
@@ -151,6 +154,7 @@ public final class VoxelCore extends JavaPlugin {
     public ContentRuntime getContentRuntime() { return contentRuntime; }
     public ItemDefinitionRegistry getItemRegistry() { return contentRuntime.current().items(); }
     public ItemManager getItemManager() { return itemManager; }
+    public PackManager getPackManager() { return packManager; }
 
     private void replaceConfig() {
         File oldConfig = new File(getDataFolder(), "config.yml");
