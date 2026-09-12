@@ -5,9 +5,10 @@ MC_VERSION="$1"
 MODULE="$2"
 IMAGE="$3"
 SERVER_TYPE="$4"
+FIXTURE_ROOT="${5:-mvp-content}"
 NAME="voxelcore-smoke-${MC_VERSION//./-}"
 DATA_DIR="$PWD/.smoke/${MC_VERSION}"
-FIXTURE_ITEMS="$PWD/mvp-content/voxeltest/content/items.yml"
+FIXTURE_ITEMS="$PWD/$FIXTURE_ROOT/voxeltest/content/items.yml"
 CONTAINER_ITEMS="/data/plugins/VoxelCore/content/voxeltest/content/items.yml"
 
 cleanup() {
@@ -25,7 +26,7 @@ if [[ -z "$JAR" ]]; then
 fi
 
 cp "$JAR" "$DATA_DIR/plugins/VoxelCore.jar"
-cp -R "$PWD/mvp-content/." "$DATA_DIR/plugins/VoxelCore/content/"
+cp -R "$PWD/$FIXTURE_ROOT/." "$DATA_DIR/plugins/VoxelCore/content/"
 
 docker run -d --name "$NAME" \
   -e EULA=TRUE \
@@ -91,4 +92,4 @@ FINAL_VERIFY="$(docker exec "$NAME" rcon-cli --password voxelcore-smoke 'voxelco
 echo "$FINAL_VERIFY"
 grep -q 'VOXELCORE_ITEM_VERIFY_OK id=voxeltest:child_item' <<<"$FINAL_VERIFY"
 
-echo "VoxelCore MVP smoke test passed for Minecraft $MC_VERSION"
+echo "VoxelCore MVP smoke test passed for Minecraft $MC_VERSION using $FIXTURE_ROOT"

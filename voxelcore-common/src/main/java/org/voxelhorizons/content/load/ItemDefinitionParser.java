@@ -1,12 +1,12 @@
 package org.voxelhorizons.content.load;
 
 import org.voxelhorizons.content.ContentID;
+import org.voxelhorizons.content.item.CustomModelDataDefinition;
 import org.voxelhorizons.content.item.ItemType;
 import org.voxelhorizons.content.item.RawItemDefinition;
 import org.voxelhorizons.content.item.RawItemRenderDefinition;
 import org.voxelhorizons.content.pack.ContentPack;
 import org.voxelhorizons.content.pack.ContentPackDiscovery;
-import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,7 +15,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,7 +26,7 @@ public final class ItemDefinitionParser {
             "extends", "type", "material", "display_name", "lore", "bound", "render", "properties"
     ));
     private static final Set<String> RENDER_KEYS = new HashSet<String>(Arrays.asList(
-            "model", "legacy_custom_model_data"
+            "model", "custom_model_data"
     ));
 
     public List<RawItemDefinition> parse(ContentPack pack, Path file) {
@@ -39,28 +38,21 @@ public final class ItemDefinitionParser {
         } catch (RuntimeException exception) {
             throw new ContentLoadException("Invalid YAML in item definitions: " + file, exception);
         }
-        if (!(loaded instanceof Map)) {
-            throw new ContentLoadException("Definition file must be a mapping: " + file);
-        }
+        if (!(loaded instanceof Map)) throw new ContentLoadException("Definition file must be a mapping: " + file);
         Map<?, ?> root = (Map<?, ?>) loaded;
         for (Object key : root.keySet()) {
-            if (!"items".equals(key)) {
-                throw new ContentLoadException("Unsupported top-level key '" + key + "' in " + file);
-            }
+            if (!"items".equals(key)) throw new ContentLoadException("Unsupported top-level key '" + key + "' in " + file);
         }
         Object itemsValue = root.get("items");
         if (itemsValue == null) return Collections.emptyList();
-        if (!(itemsValue instanceof Map)) {
-            throw new ContentLoadException("'items' must be a mapping in " + file);
-        }
+        if (!(itemsValue instanceof Map)) throw new ContentLoadException("'items' must be a mapping in " + file);
 
         List<RawItemDefinition> definitions = new ArrayList<RawItemDefinition>();
         for (Map.Entry<?, ?> entry : ((Map<?, ?>) itemsValue).entrySet()) {
             if (!(entry.getKey() instanceof String) || !(entry.getValue() instanceof Map)) {
                 throw new ContentLoadException("Each item must be a named mapping in " + file);
             }
-            String localId = ((String) entry.getKey()).trim();
-            ContentID id = ContentID.parse(localId, pack.manifest().namespace());
+            ContentID id = ContentID.parse(((String) entry.getKey()).trim(), pack.manifest().namespace());
             if (!id.namespace().equals(pack.manifest().namespace())) {
                 throw new ContentLoadException("Item " + id + " in " + file + " must use pack namespace " + pack.manifest().namespace());
             }
@@ -107,13 +99,8 @@ public final class ItemDefinitionParser {
             Map<?, ?> renderMap = (Map<?, ?>) value;
             rejectUnknown(renderMap, RENDER_KEYS, file, "render for " + id);
             String model = string(renderMap, "model", file, false);
-            Integer cmd = null;
-            if (renderMap.containsKey("legacy_custom_model_data")) {
-                Object raw = renderMap.get("legacy_custom_model_data");
-                if (!(raw instanceof Number)) throw new ContentLoadException("legacy_custom_model_data must be numeric for " + id + " in " + file);
-                cmd = ((Number) raw).intValue();
-            }
-            render = new RawItemRenderDefinition(model, cmd);
+            CustomModelDataDefinition customModelData = parseCustomModelData(renderMap, id, file);
+            render = new RawItemRenderDefinition(model, customModelData);
         }
 
         Map<String, Object> properties = null;
@@ -125,6 +112,51 @@ public final class ItemDefinitionParser {
 
         return new RawItemDefinition(id, parent, type, string(map, "material", file, false),
                 string(map, "display_name", file, false), lore, bound, render, properties);
+    }
+
+    private static CustomModelDataDefinition parseCustomModelData(Map<?, ?> renderMap, ContentID id, Path file) {
+        if (!renderMap.containsKey("custom_model_data")) return null;
+        Object raw = renderMap.get("custom_model_data");
+        if (raw instanceof Number) {
+            Number number = (Number) raw;
+            double value = number.doubleValue();
+            int integer = number.intValue();
+            if (value != integer || integer < 0) {
+                throw new ContentLoadException("custom_model_data integer must be a non-negative whole number for " + id + " in " + file);
+            }
+            return CustomModelDataDefinition.numeric(integer);
+        }
+        if (!(raw instanceof Map)) {
+            throw new ContentLoadException("custom_model_data must be an integer or mapping for " + id + " in " + file);
+        }
+        Map<String, CustomModelDataDefinition.Value> values = new LinkedHashMap<String, CustomModelDataDefinition.Value>();
+        for (Map.Entry<?, ?> entry : ((Map<?, ?>) raw).entrySet()) {
+            if (!(entry.getKey() instanceof String) || ((String) entry.getKey()).trim().isEmpty()) {
+                throw new ContentLoadException("custom_model_data keys must be non-empty strings for " + id + " in " + file);
+            }
+            String key = ((String) entry.getKey()).trim();
+            if (values.containsKey(key)) throw new ContentLoadException("Duplicate custom_model_data key '" + key + "' for " + id + " in " + file);
+            Object value = entry.getValue();
+            if (value instanceof Boolean) {
+                values.put(key, CustomModelDataDefinition.Value.flag(((Boolean) value).booleanValue()));
+            } else if (value instanceof Number) {
+                values.put(key, CustomModelDataDefinition.Value.floating(((Number) value).floatValue()));
+            } else if (value instanceof String) {
+                String text = (String) value;
+                if (text.matches("#[0-9a-fA-F]{6}")) {
+                    values.put(key, CustomModelDataDefinition.Value.color(Integer.parseInt(text.substring(1), 16)));
+                } else {
+                    values.put(key, CustomModelDataDefinition.Value.string(text));
+                }
+            } else {
+                throw new ContentLoadException("custom_model_data value for '" + key + "' must be number, boolean or string for " + id + " in " + file);
+            }
+        }
+        try {
+            return CustomModelDataDefinition.structured(values);
+        } catch (IllegalArgumentException exception) {
+            throw new ContentLoadException("Invalid custom_model_data for " + id + " in " + file + ": " + exception.getMessage(), exception);
+        }
     }
 
     private static String string(Map<?, ?> map, String key, Path file, boolean required) {

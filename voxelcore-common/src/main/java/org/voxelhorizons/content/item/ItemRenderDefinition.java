@@ -2,13 +2,13 @@ package org.voxelhorizons.content.item;
 
 public final class ItemRenderDefinition {
     private final String model;
-    private final Integer legacyCustomModelData;
+    private final CustomModelDataDefinition customModelData;
 
-    public ItemRenderDefinition(String model, Integer legacyCustomModelData) {
+    public ItemRenderDefinition(String model, CustomModelDataDefinition customModelData) {
         this.model = model;
-        this.legacyCustomModelData = legacyCustomModelData;
+        this.customModelData = customModelData;
     }
 
     public String model() { return model; }
-    public Integer legacyCustomModelData() { return legacyCustomModelData; }
+    public CustomModelDataDefinition customModelData() { return customModelData; }
 }
