@@ -7,6 +7,8 @@ IMAGE="$3"
 SERVER_TYPE="$4"
 NAME="voxelcore-smoke-${MC_VERSION//./-}"
 DATA_DIR="$PWD/.smoke/${MC_VERSION}"
+FIXTURE_ITEMS="$PWD/mvp-content/voxeltest/definitions/items.yml"
+CONTAINER_ITEMS="/data/plugins/VoxelCore/content/voxeltest/definitions/items.yml"
 
 cleanup() {
   docker rm -f "$NAME" >/dev/null 2>&1 || true
@@ -24,9 +26,6 @@ fi
 
 cp "$JAR" "$DATA_DIR/plugins/VoxelCore.jar"
 cp -R "$PWD/mvp-content/." "$DATA_DIR/plugins/VoxelCore/content/"
-
-VALID_ITEMS="$DATA_DIR/plugins/VoxelCore/content/voxeltest/definitions/items.yml"
-cp "$VALID_ITEMS" "$VALID_ITEMS.valid"
 
 docker run -d --name "$NAME" \
   -e EULA=TRUE \
@@ -68,7 +67,7 @@ VERIFY="$(docker exec "$NAME" rcon-cli --password voxelcore-smoke 'voxelcore adm
 echo "$VERIFY"
 grep -q 'VOXELCORE_ITEM_VERIFY_OK id=voxeltest:red_item' <<<"$VERIFY"
 
-cat > "$VALID_ITEMS" <<'BROKEN'
+docker exec -i "$NAME" sh -c "cat > '$CONTAINER_ITEMS'" <<'BROKEN'
 items:
   red_item:
     extends: missing_parent
@@ -83,7 +82,7 @@ VERIFY_AFTER_FAILURE="$(docker exec "$NAME" rcon-cli --password voxelcore-smoke 
 echo "$VERIFY_AFTER_FAILURE"
 grep -q 'VOXELCORE_ITEM_VERIFY_OK id=voxeltest:red_item' <<<"$VERIFY_AFTER_FAILURE"
 
-mv "$VALID_ITEMS.valid" "$VALID_ITEMS"
+docker exec -i "$NAME" sh -c "cat > '$CONTAINER_ITEMS'" < "$FIXTURE_ITEMS"
 SUCCESS_RELOAD="$(docker exec "$NAME" rcon-cli --password voxelcore-smoke 'voxelcore admin content reload')"
 echo "$SUCCESS_RELOAD"
 grep -q 'content reloaded: revision 2, 3 items' <<<"$SUCCESS_RELOAD"
