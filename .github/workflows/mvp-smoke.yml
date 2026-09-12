@@ -25,6 +25,16 @@ jobs:
             image: itzg/minecraft-server:java8
             server_type: SPIGOT
             fixture_root: mvp-content
+          - minecraft: '1.19.4'
+            module: voxelcore-v1_19_4
+            image: itzg/minecraft-server:java17
+            server_type: PAPER
+            fixture_root: mvp-content
+          - minecraft: '1.20.5'
+            module: voxelcore-v1_20_5
+            image: itzg/minecraft-server:java21
+            server_type: PAPER
+            fixture_root: mvp-content
           - minecraft: '1.21.4'
             module: voxelcore-v1_21_4
             image: itzg/minecraft-server:java21
