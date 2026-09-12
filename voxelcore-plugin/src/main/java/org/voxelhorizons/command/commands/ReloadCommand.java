@@ -3,6 +3,7 @@ package org.voxelhorizons.command.commands;
 import org.bukkit.command.CommandSender;
 import org.voxelhorizons.VoxelCore;
 import org.voxelhorizons.command.SubCommand;
+import org.voxelhorizons.content.runtime.ContentReloadResult;
 
 import java.util.Collections;
 import java.util.List;
@@ -30,8 +31,18 @@ public class ReloadCommand implements SubCommand {
 
     @Override
     public void execute(CommandSender sender, String[] args) {
-        sender.sendMessage("Reloading " + VoxelCore.getInstance().getDescription().getName() + "...");
-        VoxelCore.getInstance().onReload();
-        sender.sendMessage("Reloaded " + VoxelCore.getInstance().getDescription().getName() + " Successfully.");
+        String name = VoxelCore.getInstance().getDescription().getName();
+        sender.sendMessage("Reloading " + name + " content...");
+
+        ContentReloadResult result = VoxelCore.getInstance().onReload();
+        if (result.success()) {
+            sender.sendMessage("Reloaded " + name + " successfully. Content revision "
+                    + result.activeRevision() + " is active with " + result.itemCount() + " items.");
+            return;
+        }
+
+        sender.sendMessage("Reload failed: " + result.message());
+        sender.sendMessage("Content revision " + result.activeRevision()
+                + " remains active with " + result.itemCount() + " items.");
     }
 }

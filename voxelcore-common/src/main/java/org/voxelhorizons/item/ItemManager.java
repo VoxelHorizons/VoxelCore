@@ -3,27 +3,27 @@ package org.voxelhorizons.item;
 import org.bukkit.inventory.ItemStack;
 import org.voxelhorizons.content.ContentID;
 import org.voxelhorizons.content.item.ItemDefinition;
-import org.voxelhorizons.content.item.ItemDefinitionRegistry;
+import org.voxelhorizons.content.runtime.ContentRuntime;
 import org.voxelhorizons.platform.VersionAdapter;
 
 import java.util.Optional;
 
 public final class ItemManager {
 
-    private final ItemDefinitionRegistry registry;
+    private final ContentRuntime content;
     private final VersionAdapter platform;
 
-    public ItemManager(ItemDefinitionRegistry registry, VersionAdapter platform) {
-        this.registry = registry;
+    public ItemManager(ContentRuntime content, VersionAdapter platform) {
+        this.content = content;
         this.platform = platform;
     }
 
     public Optional<ItemDefinition> getDefinition(ContentID id) {
-        return registry.get(id);
+        return content.current().items().get(id);
     }
 
     public boolean hasItem(ContentID id) {
-        return registry.contains(id);
+        return content.current().items().contains(id);
     }
 
     public ItemStack createItem(ContentID id) {
@@ -31,7 +31,7 @@ public final class ItemManager {
     }
 
     public ItemStack createItem(ContentID id, int quantity) {
-        ItemDefinition definition = registry.get(id).orElseThrow(() ->
+        ItemDefinition definition = content.current().items().get(id).orElseThrow(() ->
                 new IllegalArgumentException("Unknown item: " + id)
         );
         return platform.items().createItem(definition, quantity);
