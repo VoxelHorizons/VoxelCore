@@ -107,7 +107,7 @@ public final class ItemDefinitionParser {
             if (renderMap.containsKey("rule")) {
                 Object rawRule = renderMap.get("rule");
                 if (!(rawRule instanceof Map)) throw new ContentLoadException("render.rule must be a mapping for " + id + " in " + file);
-                rule = normalizeMap((Map<?, ?>) rawRule, file);
+                rule = normalizeRuleMap((Map<?, ?>) rawRule, file);
                 if (rule.isEmpty()) throw new ContentLoadException("render.rule cannot be empty for " + id + " in " + file);
             }
             render = new RawItemRenderDefinition(model, unbreakable, durability, attributes, customModelData, rule);
@@ -231,6 +231,43 @@ public final class ItemDefinitionParser {
             result.put((String) entry.getKey(), normalizeValue(entry.getValue(), file));
         }
         return result;
+    }
+
+    /**
+     * Render rules intentionally use scalar mapping keys for branch selectors and range thresholds.
+     * SnakeYAML therefore materializes natural YAML such as {@code true:} and {@code 0.75:} as
+     * Boolean/Number keys. Canonicalize those keys to strings for the render-rule AST while keeping
+     * general item properties strict about string keys.
+     */
+    private static Map<String, Object> normalizeRuleMap(Map<?, ?> source, Path file) {
+        Map<String, Object> result = new LinkedHashMap<String, Object>();
+        for (Map.Entry<?, ?> entry : source.entrySet()) {
+            Object rawKey = entry.getKey();
+            final String key;
+            if (rawKey instanceof String) {
+                key = (String) rawKey;
+            } else if (rawKey instanceof Boolean || rawKey instanceof Number) {
+                key = String.valueOf(rawKey);
+            } else {
+                throw new ContentLoadException("Render rule keys must be strings, booleans or numbers in " + file);
+            }
+            if (result.containsKey(key)) {
+                throw new ContentLoadException("Duplicate render rule key '" + key + "' after YAML normalization in " + file);
+            }
+            result.put(key, normalizeRuleValue(entry.getValue(), file));
+        }
+        return result;
+    }
+
+    private static Object normalizeRuleValue(Object value, Path file) {
+        if (value instanceof Map) return normalizeRuleMap((Map<?, ?>) value, file);
+        if (value instanceof List) {
+            List<Object> result = new ArrayList<Object>();
+            for (Object element : (List<?>) value) result.add(normalizeRuleValue(element, file));
+            return result;
+        }
+        if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean) return value;
+        throw new ContentLoadException("Unsupported render rule value type " + value.getClass().getName() + " in " + file);
     }
 
     private static Object normalizeValue(Object value, Path file) {
