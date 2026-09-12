@@ -1,6 +1,6 @@
 items:
   base:
-    material: minecraft:paper
+    material: minecraft:diamond_hoe
     display_name: Base Modern MVP Item
     bound: true
     lore:
@@ -11,6 +11,13 @@ items:
     display_name: Red Test Item
     render:
       model: voxeltest:item/red_item
+      unbreakable: true
+      durability: 1
+      attributes:
+        hide_enchantments: true
+        hide_attributes: true
+        hide_unbreakable: true
+        hide_potion_effects: true
       custom_model_data:
         variant: red
         powered: true
