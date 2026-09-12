@@ -65,6 +65,53 @@ public class RenderAllocationRegistryTest {
         assertTrue(second.get(ContentID.of("test", "emerald")).get().active());
     }
 
+    @Test
+    public void inheritedItemsMayShareExplicitAllocationForSameModel() throws Exception {
+        File root = temporaryFolder.newFolder("inherited-content");
+        File pack = new File(root, "pack");
+        File content = new File(pack, "content");
+        assertTrue(content.mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: test\n");
+        write(new File(content, "items.yml"),
+                "items:\n" +
+                "  red_item:\n" +
+                "    material: minecraft:diamond_hoe\n" +
+                "    render:\n" +
+                "      model: test:item/red_item\n" +
+                "      custom_model_data: 5\n" +
+                "  child_item:\n" +
+                "    extends: red_item\n" +
+                "    display_name: Child\n");
+
+        RenderAllocationRegistry registry = RenderAllocationRegistry.reconcile(
+                new ContentLoader().load(root.toPath()), RenderAllocationRegistry.empty());
+        assertEquals(5, registry.get(ContentID.of("test", "red_item")).get().customModelData());
+        assertEquals(5, registry.get(ContentID.of("test", "child_item")).get().customModelData());
+        assertEquals("test:item/red_item", registry.get(ContentID.of("test", "child_item")).get().model());
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsSameExplicitAllocationForDifferentModels() throws Exception {
+        File root = temporaryFolder.newFolder("collision-content");
+        File pack = new File(root, "pack");
+        File content = new File(pack, "content");
+        assertTrue(content.mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: test\n");
+        write(new File(content, "items.yml"),
+                "items:\n" +
+                "  ruby:\n" +
+                "    material: minecraft:paper\n" +
+                "    render:\n" +
+                "      model: test:item/ruby\n" +
+                "      custom_model_data: 5\n" +
+                "  sapphire:\n" +
+                "    material: minecraft:paper\n" +
+                "    render:\n" +
+                "      model: test:item/sapphire\n" +
+                "      custom_model_data: 5\n");
+        RenderAllocationRegistry.reconcile(new ContentLoader().load(root.toPath()), RenderAllocationRegistry.empty());
+    }
+
     @Test(expected = IllegalArgumentException.class)
     public void rejectsChangingAnExistingExplicitAllocation() throws Exception {
         File root = temporaryFolder.newFolder("explicit-content");
