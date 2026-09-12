@@ -3,7 +3,9 @@ package org.voxelhorizons.item;
 import org.bukkit.inventory.ItemStack;
 import org.voxelhorizons.content.ContentID;
 import org.voxelhorizons.content.item.ItemDefinition;
+import org.voxelhorizons.content.render.RenderAllocation;
 import org.voxelhorizons.content.runtime.ContentRuntime;
+import org.voxelhorizons.content.runtime.ContentSnapshot;
 import org.voxelhorizons.platform.VersionAdapter;
 
 import java.util.Optional;
@@ -31,10 +33,12 @@ public final class ItemManager {
     }
 
     public ItemStack createItem(ContentID id, int quantity) {
-        ItemDefinition definition = content.current().items().get(id).orElseThrow(() ->
+        ContentSnapshot snapshot = content.current();
+        ItemDefinition definition = snapshot.items().get(id).orElseThrow(() ->
                 new IllegalArgumentException("Unknown item: " + id)
         );
-        return platform.items().createItem(definition, quantity);
+        RenderAllocation allocation = snapshot.renderAllocations().get(id).orElse(null);
+        return platform.items().createItem(definition, quantity, allocation);
     }
 
     public Optional<ContentID> identify(ItemStack stack) {
