@@ -26,7 +26,7 @@ public final class ItemDefinitionParser {
             "extends", "type", "material", "display_name", "lore", "bound", "render", "properties"
     ));
     private static final Set<String> RENDER_KEYS = new HashSet<String>(Arrays.asList(
-            "model", "unbreakable", "durability", "attributes", "custom_model_data"
+            "model", "unbreakable", "durability", "attributes", "custom_model_data", "rule"
     ));
 
     public List<RawItemDefinition> parse(ContentPack pack, Path file) {
@@ -103,7 +103,14 @@ public final class ItemDefinitionParser {
             Integer durability = nonNegativeInteger(renderMap, "durability", id, file);
             Map<String, Boolean> attributes = booleanMap(renderMap, "attributes", id, file);
             CustomModelDataDefinition customModelData = parseCustomModelData(renderMap, id, file);
-            render = new RawItemRenderDefinition(model, unbreakable, durability, attributes, customModelData);
+            Map<String, Object> rule = null;
+            if (renderMap.containsKey("rule")) {
+                Object rawRule = renderMap.get("rule");
+                if (!(rawRule instanceof Map)) throw new ContentLoadException("render.rule must be a mapping for " + id + " in " + file);
+                rule = normalizeMap((Map<?, ?>) rawRule, file);
+                if (rule.isEmpty()) throw new ContentLoadException("render.rule cannot be empty for " + id + " in " + file);
+            }
+            render = new RawItemRenderDefinition(model, unbreakable, durability, attributes, customModelData, rule);
         }
 
         Map<String, Object> properties = null;
