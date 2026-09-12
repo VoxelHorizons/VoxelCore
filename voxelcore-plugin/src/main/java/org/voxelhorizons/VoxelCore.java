@@ -12,6 +12,8 @@ import org.voxelhorizons.command.commands.BaseCommand;
 import org.voxelhorizons.content.item.ItemDefinitionRegistry;
 import org.voxelhorizons.content.load.ContentLoadException;
 import org.voxelhorizons.content.load.ContentLoader;
+import org.voxelhorizons.content.render.RenderAllocationRegistry;
+import org.voxelhorizons.content.render.RenderAllocationStore;
 import org.voxelhorizons.content.runtime.ContentReloadResult;
 import org.voxelhorizons.content.runtime.ContentRuntime;
 import org.voxelhorizons.content.runtime.ContentRuntimeReloader;
@@ -44,14 +46,10 @@ public final class VoxelCore extends JavaPlugin {
     private ItemManager itemManager;
     private Path contentRoot;
 
-    public static VoxelCore getInstance() {
-        return instance;
-    }
+    public static VoxelCore getInstance() { return instance; }
 
     public VoxelCore() {
-        if (instance != null) {
-            throw new IllegalStateException(getName() + " already initialized!");
-        }
+        if (instance != null) throw new IllegalStateException(getName() + " already initialized!");
         instance = this;
     }
 
@@ -60,10 +58,7 @@ public final class VoxelCore extends JavaPlugin {
         logger = getLogger();
 
         try {
-            if (!getDataFolder().exists()) {
-                getDataFolder().mkdirs();
-            }
-
+            if (!getDataFolder().exists()) getDataFolder().mkdirs();
             configFile = new File(getDataFolder(), "config.yml");
             if (!configFile.exists()) {
                 logger.info("No Configuration File Found. Generating A New One...");
@@ -85,14 +80,21 @@ public final class VoxelCore extends JavaPlugin {
         try {
             Files.createDirectories(contentRoot);
             ItemDefinitionRegistry initialRegistry = contentLoader.load(contentRoot);
-            contentRuntime = new ContentRuntime(new ContentSnapshot(1L, initialRegistry));
-            contentReloader = new ContentRuntimeReloader(contentLoader, contentRoot, contentRuntime);
+            RenderAllocationStore allocationStore = new RenderAllocationStore(getDataFolder().toPath().resolve("render-allocations.yml"));
+            RenderAllocationRegistry initialAllocations = RenderAllocationRegistry.reconcile(initialRegistry, allocationStore.load());
+            allocationStore.save(initialAllocations);
+            contentRuntime = new ContentRuntime(new ContentSnapshot(1L, initialRegistry, initialAllocations));
+            contentReloader = new ContentRuntimeReloader(contentLoader, contentRoot, contentRuntime, allocationStore);
         } catch (IOException exception) {
             logger.log(Level.SEVERE, "Unable to create VoxelCore content directory " + contentRoot, exception);
             getServer().getPluginManager().disablePlugin(this);
             return;
         } catch (ContentLoadException exception) {
             logger.log(Level.SEVERE, "VoxelCore content failed to load; plugin startup aborted. " + exception.getMessage(), exception);
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        } catch (RuntimeException exception) {
+            logger.log(Level.SEVERE, "VoxelCore render allocations failed to initialize; plugin startup aborted. " + exception.getMessage(), exception);
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
@@ -109,9 +111,7 @@ public final class VoxelCore extends JavaPlugin {
 
         try {
             PluginCommand bukkitCommand = getCommand(baseCommand.getName());
-            if (bukkitCommand == null) {
-                throw new IllegalStateException("Command '" + baseCommand.getName() + "' is missing from plugin.yml");
-            }
+            if (bukkitCommand == null) throw new IllegalStateException("Command '" + baseCommand.getName() + "' is missing from plugin.yml");
             bukkitCommand.setExecutor(commandFactory);
             bukkitCommand.setTabCompleter(commandFactory);
             CommandRegistry.register(commandFactory);
@@ -128,10 +128,7 @@ public final class VoxelCore extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        if (config == null || configFile == null) {
-            return;
-        }
-
+        if (config == null || configFile == null) return;
         try {
             config.save(configFile);
         } catch (IOException exception) {
@@ -140,49 +137,26 @@ public final class VoxelCore extends JavaPlugin {
     }
 
     public ContentReloadResult onReload() {
-        if (contentReloader == null || contentRuntime == null) {
-            throw new IllegalStateException("VoxelCore content runtime is not initialized");
-        }
-
+        if (contentReloader == null || contentRuntime == null) throw new IllegalStateException("VoxelCore content runtime is not initialized");
         ContentReloadResult result = contentReloader.reload();
         if (result.success()) {
-            logger.info("Published content revision " + result.activeRevision()
-                    + " (" + result.itemCount() + " items)");
+            logger.info("Published content revision " + result.activeRevision() + " (" + result.itemCount() + " items)");
         } else {
-            logger.warning("Content reload failed; revision " + result.activeRevision()
-                    + " remains active. " + result.message());
+            logger.warning("Content reload failed; revision " + result.activeRevision() + " remains active. " + result.message());
         }
         return result;
     }
 
-    public VersionAdapter getVersionAdapter() {
-        return versionAdapter;
-    }
-
-    public ContentRuntime getContentRuntime() {
-        return contentRuntime;
-    }
-
-    public ItemDefinitionRegistry getItemRegistry() {
-        return contentRuntime.current().items();
-    }
-
-    public ItemManager getItemManager() {
-        return itemManager;
-    }
+    public VersionAdapter getVersionAdapter() { return versionAdapter; }
+    public ContentRuntime getContentRuntime() { return contentRuntime; }
+    public ItemDefinitionRegistry getItemRegistry() { return contentRuntime.current().items(); }
+    public ItemManager getItemManager() { return itemManager; }
 
     private void replaceConfig() {
         File oldConfig = new File(getDataFolder(), "config.yml");
         File backup = new File(getDataFolder(), "config.yml.old");
-
-        if (backup.exists()) {
-            backup.delete();
-        }
-
-        if (oldConfig.exists()) {
-            oldConfig.renameTo(backup);
-        }
-
+        if (backup.exists()) backup.delete();
+        if (oldConfig.exists()) oldConfig.renameTo(backup);
         saveDefaultConfig();
         reloadConfig();
     }
@@ -190,13 +164,11 @@ public final class VoxelCore extends JavaPlugin {
     private void checkConfigVersion() {
         int currentVersion = getConfig().getInt("version", -1);
         int defaultVersion = getDefaultConfigVersion();
-
         if (currentVersion == -1) {
             logger.warning("Config version missing! Regenerating config.");
             replaceConfig();
             return;
         }
-
         if (currentVersion != defaultVersion) {
             logger.warning("Outdated config detected (v" + currentVersion + " → v" + defaultVersion + ")");
             replaceConfig();
@@ -204,8 +176,6 @@ public final class VoxelCore extends JavaPlugin {
     }
 
     private int getDefaultConfigVersion() {
-        return YamlConfiguration.loadConfiguration(
-                new InputStreamReader(getResource("config.yml"), StandardCharsets.UTF_8)
-        ).getInt("version", -1);
+        return YamlConfiguration.loadConfiguration(new InputStreamReader(getResource("config.yml"), StandardCharsets.UTF_8)).getInt("version", -1);
     }
 }
