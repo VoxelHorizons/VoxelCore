@@ -69,6 +69,44 @@ public class ContentLoaderTest {
     }
 
     @Test
+    public void normalizesScalarYamlKeysInsideRenderRules() throws Exception {
+        File root = temporaryFolder.newFolder("render-rule-keys");
+        File pack = new File(root, "pack");
+        File content = new File(pack, "content");
+        assertTrue(content.mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: test\n");
+        write(new File(content, "items.yml"),
+                "items:\n" +
+                "  thing:\n" +
+                "    material: minecraft:paper\n" +
+                "    render:\n" +
+                "      model: test:item/thing\n" +
+                "      custom_model_data:\n" +
+                "        powered: true\n" +
+                "        intensity: 0.75\n" +
+                "      rule:\n" +
+                "        condition:\n" +
+                "          key: powered\n" +
+                "          true:\n" +
+                "            range:\n" +
+                "              key: intensity\n" +
+                "              entries:\n" +
+                "                0.75: test:item/high\n" +
+                "              fallback: test:item/thing\n" +
+                "          false: test:item/thing\n");
+
+        ItemDefinition item = new ContentLoader().load(root.toPath())
+                .get(ContentID.of("test", "thing")).get();
+        java.util.Map<?, ?> condition = (java.util.Map<?, ?>) item.render().rule().get("condition");
+        assertTrue(condition.containsKey("true"));
+        assertTrue(condition.containsKey("false"));
+        java.util.Map<?, ?> trueBranch = (java.util.Map<?, ?>) condition.get("true");
+        java.util.Map<?, ?> range = (java.util.Map<?, ?>) trueBranch.get("range");
+        java.util.Map<?, ?> entries = (java.util.Map<?, ?>) range.get("entries");
+        assertTrue(entries.containsKey("0.75"));
+    }
+
+    @Test
     public void loadsYamlRecursivelyFromNestedContentDirectories() throws Exception {
         File root = temporaryFolder.newFolder("recursive-content");
         File pack = new File(root, "my_pack");

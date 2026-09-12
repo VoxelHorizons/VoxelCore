@@ -70,9 +70,10 @@ public class JavaPackCompilerTest {
         assertTrue(!hoeDamage.contains("1002"));
 
         String allocationText = new String(Files.readAllBytes(allocations), StandardCharsets.UTF_8);
-        assertTrue(allocationText.contains("schema: 2"));
+        assertTrue(allocationText.contains("schema: 3"));
         assertTrue(allocationText.contains("custom_model_data: 1001"));
         assertTrue(allocationText.contains("custom_model_data: 1002"));
+        assertTrue(allocationText.contains("structured_model_data:"));
         assertTrue(!allocationText.contains("legacy_custom_model_data"));
 
         Path numeric = build.resolve("numeric.zip");
@@ -90,6 +91,39 @@ public class JavaPackCompilerTest {
         Path secondNumeric = build.resolve("numeric-second.zip");
         compiler.compile(contentRoot.toPath(), secondNumeric, allocations, JavaPackTarget.numericCmd("1.14-test", 4));
         assertEquals(java.util.Arrays.toString(Files.readAllBytes(numeric)), java.util.Arrays.toString(Files.readAllBytes(secondNumeric)));
+    }
+
+    @Test
+    public void compilesStructuredModernDecisionTreeUsingStableIndices() throws Exception {
+        File contentRoot = temporaryFolder.newFolder("rule-content");
+        File pack = new File(contentRoot, "mypack");
+        assertTrue(new File(pack, "content").mkdirs());
+        assertTrue(new File(pack, "assets/mypack/models/item").mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: mypack\n");
+        write(new File(pack, "content/ruby.yml"),
+                "items:\n  ruby:\n    material: minecraft:paper\n    render:\n      model: mypack:item/ruby\n" +
+                "      custom_model_data:\n        variant: red\n        powered: true\n        intensity: 0.75\n        tint: '#ff0000'\n" +
+                "      rule:\n        select:\n          key: variant\n          cases:\n            red:\n              condition:\n                key: powered\n                true:\n                  range:\n                    key: intensity\n                    entries:\n                      '0.75':\n                        model:\n                          id: mypack:item/powered\n                          tint: tint\n                    fallback: mypack:item/ruby\n                false: mypack:item/ruby\n          fallback: mypack:item/ruby\n");
+        write(new File(pack, "assets/mypack/models/item/ruby.json"), "{\"parent\":\"minecraft:item/generated\"}\n");
+        write(new File(pack, "assets/mypack/models/item/powered.json"), "{\"parent\":\"minecraft:item/generated\"}\n");
+
+        Path build = temporaryFolder.newFolder("rule-build").toPath();
+        Path allocations = build.resolve("render-allocations.yml");
+        Path zip = build.resolve("modern.zip");
+        new JavaPackCompiler().compile(contentRoot.toPath(), zip, allocations, JavaPackTarget.MC_1_21_4);
+
+        String itemInfo = zipText(zip, "assets/mypack/items/item/ruby.json");
+        assertTrue(itemInfo.contains("\"type\":\"minecraft:select\""));
+        assertTrue(itemInfo.contains("\"type\":\"minecraft:condition\""));
+        assertTrue(itemInfo.contains("\"type\":\"minecraft:range_dispatch\""));
+        assertTrue(itemInfo.contains("\"tints\":[{\"type\":\"minecraft:custom_model_data\""));
+        assertTrue(itemInfo.contains("\"index\":0"));
+
+        String manifest = new String(Files.readAllBytes(allocations), StandardCharsets.UTF_8);
+        assertTrue(manifest.contains("'intensity': 0"));
+        assertTrue(manifest.contains("'powered': 0"));
+        assertTrue(manifest.contains("'variant': 0"));
+        assertTrue(manifest.contains("'tint': 0"));
     }
 
     @Test
