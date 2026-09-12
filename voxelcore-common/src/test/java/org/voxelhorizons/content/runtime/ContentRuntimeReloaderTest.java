@@ -25,11 +25,11 @@ public class ContentRuntimeReloaderTest {
     public void publishesSuccessfulReloadAndPreservesPreviousSnapshotOnFailure() throws Exception {
         File root = temporaryFolder.newFolder("content");
         File pack = new File(root, "pack");
-        File definitions = new File(pack, "definitions");
-        assertTrue(definitions.mkdirs());
+        File content = new File(pack, "content");
+        assertTrue(content.mkdirs());
 
         write(new File(pack, "pack.yml"), "schema: 1\nnamespace: test\n");
-        File items = new File(definitions, "items.yml");
+        File items = new File(content, "items.yml");
         write(items,
                 "items:\n" +
                 "  first:\n" +
