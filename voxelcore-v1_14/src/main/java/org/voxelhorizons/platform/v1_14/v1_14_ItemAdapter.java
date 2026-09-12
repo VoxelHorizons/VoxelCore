@@ -20,10 +20,7 @@ public final class v1_14_ItemAdapter implements ItemPlatformAdapter {
     private final NamespacedKey contentIdKey;
     public v1_14_ItemAdapter(Plugin plugin) { this.contentIdKey = new NamespacedKey(plugin, "content_id"); }
 
-    @Override
-    public ItemStack createItem(ItemDefinition definition, int quantity) {
-        return createItem(definition, quantity, null);
-    }
+    @Override public ItemStack createItem(ItemDefinition definition, int quantity) { return createItem(definition, quantity, null); }
 
     @Override
     public ItemStack createItem(ItemDefinition definition, int quantity, RenderAllocation allocation) {
@@ -35,11 +32,8 @@ public final class v1_14_ItemAdapter implements ItemPlatformAdapter {
             if (definition.displayName() != null) meta.setDisplayName(definition.displayName());
             if (!definition.lore().isEmpty()) meta.setLore(definition.lore());
             ItemMetadataSupport.applyCommon(meta, definition.render());
-            if (definition.render() != null && definition.render().durability() != null) {
-                applyDurability(meta, material, definition.render().durability().intValue(), definition);
-            }
-            if (definition.render() != null && definition.render().customModelData() != null
-                    && definition.render().customModelData().isStructured()) {
+            if (definition.render() != null && definition.render().durability() != null) applyDurability(meta, material, definition.render().durability().intValue(), definition);
+            if (definition.render() != null && definition.render().customModelData() != null && definition.render().customModelData().isStructured()) {
                 throw new IllegalArgumentException("Structured custom_model_data requires Minecraft 1.21.4+ for " + definition.id());
             }
             Integer customModelData = numericCustomModelData(definition, allocation);
@@ -64,17 +58,14 @@ public final class v1_14_ItemAdapter implements ItemPlatformAdapter {
         ((Damageable) meta).setDamage(durability);
     }
 
-    @Override
-    public Optional<ContentID> getContentId(ItemStack stack) {
+    @Override public Optional<ContentID> getContentId(ItemStack stack) {
         if (stack == null || !stack.hasItemMeta()) return Optional.empty();
         ItemMeta meta = stack.getItemMeta();
         if (meta == null) return Optional.empty();
-        String value = meta.getPersistentDataContainer().get(contentIdKey, PersistentDataType.STRING);
-        return value == null ? Optional.<ContentID>empty() : Optional.of(ContentID.parse(value, "voxelhorizons"));
+        return ItemPlatformAdapter.parseStoredContentId(meta.getPersistentDataContainer().get(contentIdKey, PersistentDataType.STRING));
     }
 
-    @Override
-    public ItemStack setContentId(ItemStack stack, ContentID id) {
+    @Override public ItemStack setContentId(ItemStack stack, ContentID id) {
         if (stack == null) throw new IllegalArgumentException("stack cannot be null");
         ItemMeta meta = stack.getItemMeta();
         if (meta != null) {

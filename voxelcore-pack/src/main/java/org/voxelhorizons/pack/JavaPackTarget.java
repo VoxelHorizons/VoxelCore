@@ -9,13 +9,14 @@ import java.util.Locale;
 
 public final class JavaPackTarget {
     public static final JavaPackTarget MC_1_12_2 = legacyDamage("mc-1.12.2", 3);
+    public static final JavaPackTarget MC_1_13_2 = legacyDamage("mc-1.13.2", 4);
     public static final JavaPackTarget MC_1_14_4 = numericCmd("mc-1.14.4", 4);
     public static final JavaPackTarget MC_1_19_4 = numericCmd("mc-1.19.4", 13);
     public static final JavaPackTarget MC_1_20_5 = numericCmd("mc-1.20.5", 32);
     public static final JavaPackTarget MC_1_21_4 = modern("mc-1.21.4", 46);
 
     private static final List<JavaPackTarget> KNOWN = Collections.unmodifiableList(Arrays.asList(
-            MC_1_12_2, MC_1_14_4, MC_1_19_4, MC_1_20_5, MC_1_21_4));
+            MC_1_12_2, MC_1_13_2, MC_1_14_4, MC_1_19_4, MC_1_20_5, MC_1_21_4));
 
     private final String id;
     private final int packFormat;
@@ -34,26 +35,15 @@ public final class JavaPackTarget {
     public int packFormat() { return packFormat; }
     public JavaPackMode mode() { return mode; }
 
-    public static JavaPackTarget legacyDamage(String id, int packFormat) {
-        return new JavaPackTarget(id, packFormat, JavaPackMode.LEGACY_DAMAGE_UNBREAKABLE);
-    }
-
-    public static JavaPackTarget numericCmd(String id, int packFormat) {
-        return new JavaPackTarget(id, packFormat, JavaPackMode.NUMERIC_CUSTOM_MODEL_DATA);
-    }
-
-    public static JavaPackTarget modern(String id, int packFormat) {
-        return new JavaPackTarget(id, packFormat, JavaPackMode.ITEM_MODEL_1_21_4_PLUS);
-    }
-
+    public static JavaPackTarget legacyDamage(String id, int packFormat) { return new JavaPackTarget(id, packFormat, JavaPackMode.LEGACY_DAMAGE_UNBREAKABLE); }
+    public static JavaPackTarget numericCmd(String id, int packFormat) { return new JavaPackTarget(id, packFormat, JavaPackMode.NUMERIC_CUSTOM_MODEL_DATA); }
+    public static JavaPackTarget modern(String id, int packFormat) { return new JavaPackTarget(id, packFormat, JavaPackMode.ITEM_MODEL_1_21_4_PLUS); }
     public static List<JavaPackTarget> knownTargets() { return KNOWN; }
 
     public static JavaPackTarget byId(String id) {
         if (id == null) return null;
         String normalized = id.trim().toLowerCase(Locale.ROOT);
-        for (JavaPackTarget target : KNOWN) {
-            if (target.id.equals(normalized)) return target;
-        }
+        for (JavaPackTarget target : KNOWN) if (target.id.equals(normalized)) return target;
         return null;
     }
 
@@ -61,6 +51,7 @@ public final class JavaPackTarget {
     public static JavaPackTarget forVersion(Version version) {
         if (version == null) return null;
         if (version.compareTo(Version.of(1, 12, 2)) == 0) return MC_1_12_2;
+        if (version.compareTo(Version.of(1, 13, 2)) == 0) return MC_1_13_2;
         if (version.compareTo(Version.of(1, 14, 4)) == 0) return MC_1_14_4;
         if (version.compareTo(Version.of(1, 19, 4)) == 0) return MC_1_19_4;
         if (version.compareTo(Version.of(1, 20, 5)) == 0) return MC_1_20_5;

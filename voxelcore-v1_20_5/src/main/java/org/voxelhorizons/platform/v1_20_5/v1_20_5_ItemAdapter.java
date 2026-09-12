@@ -22,8 +22,7 @@ public final class v1_20_5_ItemAdapter implements ItemPlatformAdapter {
 
     @Override public ItemStack createItem(ItemDefinition definition, int quantity) { return createItem(definition, quantity, null); }
 
-    @Override
-    public ItemStack createItem(ItemDefinition definition, int quantity, RenderAllocation allocation) {
+    @Override public ItemStack createItem(ItemDefinition definition, int quantity, RenderAllocation allocation) {
         Material material = Material.matchMaterial(definition.material().replace("minecraft:", ""));
         if (material == null) throw new IllegalArgumentException("Unknown Minecraft material: " + definition.material());
         ItemStack stack = new ItemStack(material, quantity);
@@ -32,11 +31,8 @@ public final class v1_20_5_ItemAdapter implements ItemPlatformAdapter {
             if (definition.displayName() != null) meta.setDisplayName(definition.displayName());
             if (!definition.lore().isEmpty()) meta.setLore(definition.lore());
             ItemMetadataSupport.applyCommon(meta, definition.render());
-            if (definition.render() != null && definition.render().durability() != null) {
-                applyDurability(meta, material, definition.render().durability().intValue(), definition);
-            }
-            if (definition.render() != null && definition.render().customModelData() != null
-                    && definition.render().customModelData().isStructured()) {
+            if (definition.render() != null && definition.render().durability() != null) applyDurability(meta, material, definition.render().durability().intValue(), definition);
+            if (definition.render() != null && definition.render().customModelData() != null && definition.render().customModelData().isStructured()) {
                 throw new IllegalArgumentException("Structured custom_model_data requires Minecraft 1.21.4+ for " + definition.id());
             }
             Integer customModelData = numericCustomModelData(definition, allocation);
@@ -65,8 +61,7 @@ public final class v1_20_5_ItemAdapter implements ItemPlatformAdapter {
         if (stack == null || !stack.hasItemMeta()) return Optional.empty();
         ItemMeta meta = stack.getItemMeta();
         if (meta == null) return Optional.empty();
-        String value = meta.getPersistentDataContainer().get(contentIdKey, PersistentDataType.STRING);
-        return value == null ? Optional.<ContentID>empty() : Optional.of(ContentID.parse(value, "voxelhorizons"));
+        return ItemPlatformAdapter.parseStoredContentId(meta.getPersistentDataContainer().get(contentIdKey, PersistentDataType.STRING));
     }
 
     @Override public ItemStack setContentId(ItemStack stack, ContentID id) {
