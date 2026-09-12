@@ -8,8 +8,13 @@ import org.voxelhorizons.command.CommandRegistry;
 import org.voxelhorizons.command.RootCommand;
 import org.voxelhorizons.command.commands.AdminCommand;
 import org.voxelhorizons.command.commands.BaseCommand;
-import org.voxelhorizons.content.item.ItemDefinition;
 import org.voxelhorizons.content.item.ItemDefinitionRegistry;
+import org.voxelhorizons.content.load.ContentLoadException;
+import org.voxelhorizons.content.load.ContentLoader;
+import org.voxelhorizons.content.runtime.ContentReloadResult;
+import org.voxelhorizons.content.runtime.ContentRuntime;
+import org.voxelhorizons.content.runtime.ContentRuntimeReloader;
+import org.voxelhorizons.content.runtime.ContentSnapshot;
 import org.voxelhorizons.item.ItemManager;
 import org.voxelhorizons.platform.VersionAdapter;
 import org.voxelhorizons.platform.VersionAdapterFactory;
@@ -18,7 +23,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public final class VoxelCore extends JavaPlugin {
@@ -30,8 +37,11 @@ public final class VoxelCore extends JavaPlugin {
     public FileConfiguration config;
 
     private VersionAdapter versionAdapter;
-    private ItemDefinitionRegistry itemRegistry;
+    private ContentLoader contentLoader;
+    private ContentRuntime contentRuntime;
+    private ContentRuntimeReloader contentReloader;
     private ItemManager itemManager;
+    private Path contentRoot;
 
     public static VoxelCore getInstance() {
         return instance;
@@ -59,17 +69,38 @@ public final class VoxelCore extends JavaPlugin {
                 saveDefaultConfig();
             }
         } catch (Exception exception) {
-            exception.printStackTrace();
+            logger.log(Level.SEVERE, "Unable to initialize VoxelCore data folder", exception);
+            getServer().getPluginManager().disablePlugin(this);
+            return;
         }
 
         checkConfigVersion();
         config = getConfig();
 
         versionAdapter = VersionAdapterFactory.create(this);
-        itemRegistry = new ItemDefinitionRegistry(Collections.<org.voxelhorizons.content.ContentID, ItemDefinition>emptyMap());
-        itemManager = new ItemManager(itemRegistry, versionAdapter);
+        contentLoader = new ContentLoader();
+        contentRoot = getDataFolder().toPath().resolve("content");
 
-        logger.info("VoxelCore platform ready for Minecraft " + versionAdapter.version());
+        try {
+            Files.createDirectories(contentRoot);
+            ItemDefinitionRegistry initialRegistry = contentLoader.load(contentRoot);
+            contentRuntime = new ContentRuntime(new ContentSnapshot(1L, initialRegistry));
+            contentReloader = new ContentRuntimeReloader(contentLoader, contentRoot, contentRuntime);
+        } catch (IOException exception) {
+            logger.log(Level.SEVERE, "Unable to create VoxelCore content directory " + contentRoot, exception);
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        } catch (ContentLoadException exception) {
+            logger.log(Level.SEVERE, "VoxelCore content failed to load; plugin startup aborted. " + exception.getMessage(), exception);
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+
+        itemManager = new ItemManager(contentRuntime, versionAdapter);
+
+        logger.info("VoxelCore platform ready for Minecraft " + versionAdapter.version()
+                + " with content revision " + contentRuntime.current().revision()
+                + " (" + contentRuntime.current().items().size() + " items)");
 
         RootCommand baseCommand = new BaseCommand();
         CommandFactory commandFactory = new CommandFactory(baseCommand);
@@ -78,7 +109,7 @@ public final class VoxelCore extends JavaPlugin {
         try {
             CommandRegistry.register(commandFactory);
         } catch (Exception exception) {
-            exception.printStackTrace();
+            logger.log(Level.SEVERE, "Unable to register VoxelCore commands", exception);
         }
     }
 
@@ -91,19 +122,36 @@ public final class VoxelCore extends JavaPlugin {
         try {
             config.save(configFile);
         } catch (IOException exception) {
-            exception.printStackTrace();
+            logger.log(Level.SEVERE, "Unable to save VoxelCore configuration", exception);
         }
     }
 
-    public void onReload() {
+    public ContentReloadResult onReload() {
+        if (contentReloader == null || contentRuntime == null) {
+            throw new IllegalStateException("VoxelCore content runtime is not initialized");
+        }
+
+        ContentReloadResult result = contentReloader.reload();
+        if (result.success()) {
+            logger.info("Published content revision " + result.activeRevision()
+                    + " (" + result.itemCount() + " items)");
+        } else {
+            logger.warning("Content reload failed; revision " + result.activeRevision()
+                    + " remains active. " + result.message());
+        }
+        return result;
     }
 
     public VersionAdapter getVersionAdapter() {
         return versionAdapter;
     }
 
+    public ContentRuntime getContentRuntime() {
+        return contentRuntime;
+    }
+
     public ItemDefinitionRegistry getItemRegistry() {
-        return itemRegistry;
+        return contentRuntime.current().items();
     }
 
     public ItemManager getItemManager() {
