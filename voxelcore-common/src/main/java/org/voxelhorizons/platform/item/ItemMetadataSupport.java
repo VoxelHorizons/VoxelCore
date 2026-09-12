@@ -27,11 +27,11 @@ public final class ItemMetadataSupport {
         if ("hide_enchantments".equals(normalized)) bukkit = "HIDE_ENCHANTS";
         else if ("hide_destroyable".equals(normalized)) bukkit = "HIDE_DESTROYS";
         else if ("hide_placeable".equals(normalized)) bukkit = "HIDE_PLACED_ON";
-        else if ("hide_unbreakable").equals(normalized)) bukkit = "HIDE_UNBREAKABLE";
-        else if ("hide_enchants").equals(normalized)) bukkit = "HIDE_ENCHANTS";
-        else if ("hide_potion_effects").equals(normalized)) bukkit = "HIDE_POTION_EFFECTS";
-        else if ("hide_attributes").equals(normalized)) bukkit = "HIDE_ATTRIBUTES";
-        else if ("hide_dye").equals(normalized)) bukkit = "HIDE_DYE";
+        else if ("hide_unbreakable".equals(normalized)) bukkit = "HIDE_UNBREAKABLE";
+        else if ("hide_enchants".equals(normalized)) bukkit = "HIDE_ENCHANTS";
+        else if ("hide_potion_effects".equals(normalized)) bukkit = "HIDE_POTION_EFFECTS";
+        else if ("hide_attributes".equals(normalized)) bukkit = "HIDE_ATTRIBUTES";
+        else if ("hide_dye".equals(normalized)) bukkit = "HIDE_DYE";
         else bukkit = normalized.toUpperCase(Locale.ROOT);
         try {
             return ItemFlag.valueOf(bukkit);
