@@ -444,6 +444,11 @@ final class JavaPackCompilerEngine {
     }
 
     private static String packMeta(JavaPackTarget target) {
+        if (target.usesRangeMetadata()) {
+            return "{\n  \"pack\": {\n    \"min_format\": [" + target.packFormat() + ", " + target.packFormatMinor()
+                    + "],\n    \"max_format\": [" + target.packFormat() + ", " + target.packFormatMinor()
+                    + "],\n    \"description\": \"VoxelCore generated pack (" + json(target.id()) + ")\"\n  }\n}\n";
+        }
         return "{\n  \"pack\": {\n    \"pack_format\": " + target.packFormat()
                 + ",\n    \"description\": \"VoxelCore generated pack (" + json(target.id()) + ")\"\n  }\n}\n";
     }
