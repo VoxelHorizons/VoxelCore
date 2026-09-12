@@ -11,6 +11,12 @@ items:
     display_name: Red Test Item
     render:
       model: voxeltest:item/red_item
+      unbreakable: true
+      durability: 1
+      attributes:
+        hide_enchantments: true
+        hide_attributes: true
+        hide_unbreakable: true
       custom_model_data: 5
 
   child_item:
