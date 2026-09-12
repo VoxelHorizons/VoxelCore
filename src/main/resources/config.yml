@@ -1,3 +1,0 @@
-version: 1 # DO NOT CHANGE
-game:
-  bedrock_support: false # Disabled by Default (Enable if you use Geyser/Floodgate)
