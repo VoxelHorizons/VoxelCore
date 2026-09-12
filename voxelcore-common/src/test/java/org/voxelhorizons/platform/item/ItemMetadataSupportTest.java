@@ -12,7 +12,7 @@ public class ItemMetadataSupportTest {
     public void resolvesBukkitEnumNamesWithoutHardCodedBranches() {
         assertEquals(ItemFlag.HIDE_ATTRIBUTES, ItemMetadataSupport.resolveFlag("hide_attributes"));
         assertEquals(ItemFlag.HIDE_UNBREAKABLE, ItemMetadataSupport.resolveFlag("HIDE_UNBREAKABLE"));
-        assertEquals(ItemFlag.HIDE_DYE, ItemMetadataSupport.resolveFlag("hide-dye"));
+        assertEquals(ItemFlag.HIDE_POTION_EFFECTS, ItemMetadataSupport.resolveFlag("hide-potion-effects"));
     }
 
     @Test
@@ -23,7 +23,9 @@ public class ItemMetadataSupportTest {
     }
 
     @Test
-    public void ignoresUnknownOrEmptyFlags() {
+    public void ignoresUnknownOrVersionUnsupportedFlags() {
+        assertNull(ItemMetadataSupport.resolveFlag("hide_dye"));
+        assertNull(ItemMetadataSupport.resolveFlag("hide_item_model"));
         assertNull(ItemMetadataSupport.resolveFlag("hide_definitely_not_a_real_flag"));
         assertNull(ItemMetadataSupport.resolveFlag("  "));
         assertNull(ItemMetadataSupport.resolveFlag(null));
