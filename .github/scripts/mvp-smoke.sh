@@ -7,8 +7,8 @@ IMAGE="$3"
 SERVER_TYPE="$4"
 NAME="voxelcore-smoke-${MC_VERSION//./-}"
 DATA_DIR="$PWD/.smoke/${MC_VERSION}"
-FIXTURE_ITEMS="$PWD/mvp-content/voxeltest/definitions/items.yml"
-CONTAINER_ITEMS="/data/plugins/VoxelCore/content/voxeltest/definitions/items.yml"
+FIXTURE_ITEMS="$PWD/mvp-content/voxeltest/content/items.yml"
+CONTAINER_ITEMS="/data/plugins/VoxelCore/content/voxeltest/content/items.yml"
 
 cleanup() {
   docker rm -f "$NAME" >/dev/null 2>&1 || true

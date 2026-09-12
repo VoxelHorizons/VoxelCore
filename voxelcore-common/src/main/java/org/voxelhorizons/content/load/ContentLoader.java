@@ -40,12 +40,12 @@ public final class ContentLoader {
         Map<ContentID, Path> sources = new LinkedHashMap<ContentID, Path>();
 
         for (ContentPack pack : packs) {
-            Path definitionsRoot = pack.root().resolve("definitions");
-            if (!Files.exists(definitionsRoot)) continue;
-            if (!Files.isDirectory(definitionsRoot)) {
-                throw new ContentLoadException("Definitions path is not a directory: " + definitionsRoot);
+            Path packContentRoot = pack.root().resolve("content");
+            if (!Files.exists(packContentRoot)) continue;
+            if (!Files.isDirectory(packContentRoot)) {
+                throw new ContentLoadException("Pack content path is not a directory: " + packContentRoot);
             }
-            for (Path file : definitionFiles(definitionsRoot)) {
+            for (Path file : contentFiles(packContentRoot)) {
                 for (RawItemDefinition definition : itemParser.parse(pack, file)) {
                     Path previous = sources.put(definition.id(), file);
                     if (previous != null) {
@@ -68,14 +68,14 @@ public final class ContentLoader {
         }
     }
 
-    private static List<Path> definitionFiles(Path root) {
+    private static List<Path> contentFiles(Path root) {
         List<Path> files = new ArrayList<Path>();
         try {
             java.nio.file.DirectoryStream<Path> stream = Files.newDirectoryStream(root);
             try {
                 for (Path path : stream) {
                     if (Files.isDirectory(path)) {
-                        files.addAll(definitionFiles(path));
+                        files.addAll(contentFiles(path));
                     } else {
                         String name = path.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
                         if (name.endsWith(".yml") || name.endsWith(".yaml")) files.add(path);
@@ -85,7 +85,7 @@ public final class ContentLoader {
                 stream.close();
             }
         } catch (IOException exception) {
-            throw new ContentLoadException("Unable to discover definition files under " + root, exception);
+            throw new ContentLoadException("Unable to discover content files under " + root, exception);
         }
         Collections.sort(files, new Comparator<Path>() {
             @Override
