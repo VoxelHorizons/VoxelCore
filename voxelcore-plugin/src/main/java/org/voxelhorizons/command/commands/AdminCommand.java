@@ -15,6 +15,8 @@ public class AdminCommand implements SubCommand {
 
     public AdminCommand() {
         register(new ReloadCommand());
+        register(new ContentCommand());
+        register(new ItemCommand());
     }
 
     private void register(SubCommand command) {
@@ -51,6 +53,6 @@ public class AdminCommand implements SubCommand {
 
     @Override
     public void execute(CommandSender sender, String[] args) {
-        sender.sendMessage("Reloading " + VoxelCore.getInstance().getDescription().getName() + "...");
+        sender.sendMessage("Usage: /voxelcore admin <reload|content|item>");
     }
 }

@@ -1,0 +1,19 @@
+items:
+  base:
+    material: minecraft:paper
+    display_name: Base MVP Item
+    bound: true
+    lore:
+      - Loaded from the VoxelCore MVP fixture
+
+  red_item:
+    extends: base
+    display_name: Red Test Item
+    render:
+      legacy_custom_model_data: 1001
+      model: voxeltest:item/red_item
+
+  child_item:
+    extends: red_item
+    display_name: Inherited Test Item
+    bound: false
