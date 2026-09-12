@@ -7,11 +7,11 @@ import org.voxelhorizons.platform.VersionAdapter;
 
 public final class v1_21_4_PlatformProvider implements PlatformProvider {
     @Override
-    public String name() { return "v1_21_4 (1.21.4+)"; }
+    public String name() { return "v1_21_4 (1.21.4 validated)"; }
 
     @Override
     public boolean supports(Version version) {
-        return version.atLeast(1, 21, 4);
+        return version.compareTo(Version.of(1, 21, 4)) == 0;
     }
 
     @Override

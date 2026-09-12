@@ -8,19 +8,18 @@ import java.lang.reflect.Method;
 final class LegacyNbtIdentity {
 
     private static final String CONTENT_ID_KEY = "VoxelCoreContentId";
+    private static volatile Reflection cachedReflection;
 
     private LegacyNbtIdentity() {
     }
 
     static ItemStack write(ItemStack stack, String contentId) {
         try {
-            Reflection reflection = Reflection.create();
+            Reflection reflection = reflection();
             Object nmsStack = reflection.asNmsCopy.invoke(null, stack);
             Object tag = reflection.getTag.invoke(nmsStack);
 
-            if (tag == null) {
-                tag = reflection.nbtCompoundClass.newInstance();
-            }
+            if (tag == null) tag = reflection.nbtCompoundClass.newInstance();
 
             reflection.setString.invoke(tag, CONTENT_ID_KEY, contentId);
             reflection.setTag.invoke(nmsStack, tag);
@@ -32,19 +31,30 @@ final class LegacyNbtIdentity {
 
     static String read(ItemStack stack) {
         try {
-            Reflection reflection = Reflection.create();
+            Reflection reflection = reflection();
             Object nmsStack = reflection.asNmsCopy.invoke(null, stack);
             Object tag = reflection.getTag.invoke(nmsStack);
 
-            if (tag == null) {
-                return null;
-            }
+            if (tag == null) return null;
 
             String value = (String) reflection.getString.invoke(tag, CONTENT_ID_KEY);
             return value == null || value.isEmpty() ? null : value;
         } catch (Exception exception) {
             throw new IllegalStateException("Unable to read VoxelCore legacy NBT identity", exception);
         }
+    }
+
+    private static Reflection reflection() throws Exception {
+        Reflection value = cachedReflection;
+        if (value != null) return value;
+        synchronized (LegacyNbtIdentity.class) {
+            value = cachedReflection;
+            if (value == null) {
+                value = Reflection.create();
+                cachedReflection = value;
+            }
+        }
+        return value;
     }
 
     private static final class Reflection {
@@ -88,15 +98,7 @@ final class LegacyNbtIdentity {
             Method setString = nbtCompoundClass.getMethod("setString", String.class, String.class);
             Method getString = nbtCompoundClass.getMethod("getString", String.class);
 
-            return new Reflection(
-                    nbtCompoundClass,
-                    asNmsCopy,
-                    asBukkitCopy,
-                    getTag,
-                    setTag,
-                    setString,
-                    getString
-            );
+            return new Reflection(nbtCompoundClass, asNmsCopy, asBukkitCopy, getTag, setTag, setString, getString);
         }
     }
 }
