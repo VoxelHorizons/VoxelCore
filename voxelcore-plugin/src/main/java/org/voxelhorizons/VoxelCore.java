@@ -9,6 +9,7 @@ import org.voxelhorizons.command.CommandRegistry;
 import org.voxelhorizons.command.RootCommand;
 import org.voxelhorizons.command.commands.AdminCommand;
 import org.voxelhorizons.command.commands.BaseCommand;
+import org.voxelhorizons.content.item.ItemDefinition;
 import org.voxelhorizons.content.item.ItemDefinitionRegistry;
 import org.voxelhorizons.content.load.ContentLoadException;
 import org.voxelhorizons.content.load.ContentLoader;
@@ -18,6 +19,7 @@ import org.voxelhorizons.content.runtime.ContentReloadResult;
 import org.voxelhorizons.content.runtime.ContentRuntime;
 import org.voxelhorizons.content.runtime.ContentRuntimeReloader;
 import org.voxelhorizons.content.runtime.ContentSnapshot;
+import org.voxelhorizons.content.runtime.ContentSnapshotValidator;
 import org.voxelhorizons.item.ItemManager;
 import org.voxelhorizons.pack.PackManager;
 import org.voxelhorizons.platform.VersionAdapter;
@@ -29,6 +31,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -72,7 +75,13 @@ public final class VoxelCore extends JavaPlugin {
             return;
         }
 
-        checkConfigVersion();
+        try {
+            checkConfigVersion();
+        } catch (RuntimeException exception) {
+            logger.log(Level.SEVERE, "Unable to migrate VoxelCore configuration", exception);
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
         config = getConfig();
 
         versionAdapter = VersionAdapterFactory.create(this);
@@ -84,9 +93,15 @@ public final class VoxelCore extends JavaPlugin {
             ItemDefinitionRegistry initialRegistry = contentLoader.load(contentRoot);
             RenderAllocationStore allocationStore = new RenderAllocationStore(getDataFolder().toPath().resolve("render-allocations.yml"));
             RenderAllocationRegistry initialAllocations = RenderAllocationRegistry.reconcile(initialRegistry, allocationStore.load());
+            validateForPlatform(initialRegistry, initialAllocations);
             allocationStore.save(initialAllocations);
             contentRuntime = new ContentRuntime(new ContentSnapshot(1L, initialRegistry, initialAllocations));
-            contentReloader = new ContentRuntimeReloader(contentLoader, contentRoot, contentRuntime, allocationStore);
+            contentReloader = new ContentRuntimeReloader(contentLoader, contentRoot, contentRuntime, allocationStore,
+                    new ContentSnapshotValidator() {
+                        @Override public void validate(ItemDefinitionRegistry items, RenderAllocationRegistry allocations) {
+                            validateForPlatform(items, allocations);
+                        }
+                    });
             packManager = new PackManager(getDataFolder().toPath(), contentRoot, versionAdapter.version());
         } catch (IOException exception) {
             logger.log(Level.SEVERE, "Unable to create VoxelCore content directory " + contentRoot, exception);
@@ -97,7 +112,7 @@ public final class VoxelCore extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         } catch (RuntimeException exception) {
-            logger.log(Level.SEVERE, "VoxelCore render allocations failed to initialize; plugin startup aborted. " + exception.getMessage(), exception);
+            logger.log(Level.SEVERE, "VoxelCore content failed platform validation; plugin startup aborted. " + exception.getMessage(), exception);
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
@@ -142,11 +157,8 @@ public final class VoxelCore extends JavaPlugin {
     public ContentReloadResult onReload() {
         if (contentReloader == null || contentRuntime == null) throw new IllegalStateException("VoxelCore content runtime is not initialized");
         ContentReloadResult result = contentReloader.reload();
-        if (result.success()) {
-            logger.info("Published content revision " + result.activeRevision() + " (" + result.itemCount() + " items)");
-        } else {
-            logger.warning("Content reload failed; revision " + result.activeRevision() + " remains active. " + result.message());
-        }
+        if (result.success()) logger.info("Published content revision " + result.activeRevision() + " (" + result.itemCount() + " items)");
+        else logger.warning("Content reload failed; revision " + result.activeRevision() + " remains active. " + result.message());
         return result;
     }
 
@@ -156,26 +168,51 @@ public final class VoxelCore extends JavaPlugin {
     public ItemManager getItemManager() { return itemManager; }
     public PackManager getPackManager() { return packManager; }
 
-    private void replaceConfig() {
-        File oldConfig = new File(getDataFolder(), "config.yml");
-        File backup = new File(getDataFolder(), "config.yml.old");
-        if (backup.exists()) backup.delete();
-        if (oldConfig.exists()) oldConfig.renameTo(backup);
-        saveDefaultConfig();
+    private void validateForPlatform(ItemDefinitionRegistry items, RenderAllocationRegistry allocations) {
+        for (ItemDefinition definition : items.entries().values()) {
+            versionAdapter.items().validateDefinition(definition, allocations.get(definition.id()).orElse(null));
+        }
+    }
+
+    private void migrateConfig(int defaultVersion) {
+        FileConfiguration current = getConfig();
+        YamlConfiguration defaults = YamlConfiguration.loadConfiguration(
+                new InputStreamReader(getResource("config.yml"), StandardCharsets.UTF_8));
+        backupConfig();
+        for (String key : defaults.getKeys(true)) {
+            if (!current.contains(key)) current.set(key, defaults.get(key));
+        }
+        current.set("version", Integer.valueOf(defaultVersion));
+        try {
+            current.save(configFile);
+        } catch (IOException exception) {
+            throw new IllegalStateException("Unable to save migrated config", exception);
+        }
         reloadConfig();
+    }
+
+    private void backupConfig() {
+        if (configFile == null || !configFile.isFile()) return;
+        File backup = new File(getDataFolder(), "config.yml.old");
+        int suffix = 1;
+        while (backup.exists()) backup = new File(getDataFolder(), "config.yml.old." + suffix++);
+        try {
+            Files.copy(configFile.toPath(), backup.toPath(), StandardCopyOption.COPY_ATTRIBUTES);
+        } catch (IOException exception) {
+            throw new IllegalStateException("Unable to back up existing config to " + backup, exception);
+        }
     }
 
     private void checkConfigVersion() {
         int currentVersion = getConfig().getInt("version", -1);
         int defaultVersion = getDefaultConfigVersion();
+        if (defaultVersion < 0) throw new IllegalStateException("Bundled config.yml has no valid version");
         if (currentVersion == -1) {
-            logger.warning("Config version missing! Regenerating config.");
-            replaceConfig();
-            return;
-        }
-        if (currentVersion != defaultVersion) {
-            logger.warning("Outdated config detected (v" + currentVersion + " → v" + defaultVersion + ")");
-            replaceConfig();
+            logger.warning("Config version missing; preserving existing values and adding current defaults.");
+            migrateConfig(defaultVersion);
+        } else if (currentVersion != defaultVersion) {
+            logger.warning("Config schema change detected (v" + currentVersion + " → v" + defaultVersion + "); preserving user values.");
+            migrateConfig(defaultVersion);
         }
     }
 
