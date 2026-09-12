@@ -64,6 +64,6 @@ public final class ItemDefinitionCompiler {
 
     private ItemRenderDefinition compileRender(RawItemRenderDefinition raw) {
         if (raw == null) return null;
-        return new ItemRenderDefinition(raw.model(), raw.customModelData());
+        return new ItemRenderDefinition(raw.model(), raw.unbreakable(), raw.durability(), raw.attributes(), raw.customModelData());
     }
 }
