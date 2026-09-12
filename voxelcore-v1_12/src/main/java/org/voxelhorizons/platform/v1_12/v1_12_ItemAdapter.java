@@ -8,13 +8,15 @@ import org.voxelhorizons.content.item.CustomModelDataDefinition;
 import org.voxelhorizons.content.item.ItemDefinition;
 import org.voxelhorizons.platform.item.ItemPlatformAdapter;
 
+import java.util.Locale;
 import java.util.Optional;
 
 public final class v1_12_ItemAdapter implements ItemPlatformAdapter {
 
     @Override
     public ItemStack createItem(ItemDefinition definition, int quantity) {
-        Material material = Material.matchMaterial(definition.material().replace("minecraft:", ""));
+        String materialName = definition.material().replace("minecraft:", "").toUpperCase(Locale.ROOT);
+        Material material = Material.matchMaterial(materialName);
         if (material == null) throw new IllegalArgumentException("Unknown Minecraft material: " + definition.material());
 
         ItemStack stack = new ItemStack(material, quantity);
