@@ -1,10 +1,10 @@
 items:
   base:
     material: minecraft:diamond_hoe
-    display_name: Base MVP Item
+    display_name: Base Legacy MVP Item
     bound: true
     lore:
-      - Loaded from the VoxelCore numeric MVP fixture
+      - Loaded from the VoxelCore pre-1.14 MVP fixture
 
   red_item:
     extends: base
@@ -17,7 +17,9 @@ items:
         hide_enchantments: true
         hide_attributes: true
         hide_unbreakable: true
-      custom_model_data: 5
+      custom_model_data:
+        variant: ignored-before-1.14
+        powered: true
 
   child_item:
     extends: red_item

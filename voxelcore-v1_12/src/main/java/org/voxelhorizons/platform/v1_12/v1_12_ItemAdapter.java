@@ -4,8 +4,8 @@ import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.voxelhorizons.content.ContentID;
-import org.voxelhorizons.content.item.CustomModelDataDefinition;
 import org.voxelhorizons.content.item.ItemDefinition;
+import org.voxelhorizons.platform.item.ItemMetadataSupport;
 import org.voxelhorizons.platform.item.ItemPlatformAdapter;
 
 import java.util.Locale;
@@ -21,36 +21,34 @@ public final class v1_12_ItemAdapter implements ItemPlatformAdapter {
 
         ItemStack stack = new ItemStack(material, quantity);
         ItemMeta meta = stack.getItemMeta();
-        Integer legacyDamage = null;
+        Integer durability = null;
 
         if (meta != null) {
             if (definition.displayName() != null) meta.setDisplayName(definition.displayName());
             if (!definition.lore().isEmpty()) meta.setLore(definition.lore());
-
-            if (definition.render() != null && definition.render().customModelData() != null) {
-                CustomModelDataDefinition customModelData = definition.render().customModelData();
-                if (!customModelData.isNumeric()) {
-                    throw new IllegalArgumentException("Structured custom_model_data requires Minecraft 1.21.4+ for " + definition.id());
-                }
-                int damage = customModelData.numeric().intValue();
-                int maxDurability = material.getMaxDurability();
-                if (maxDurability <= 0) {
-                    throw new IllegalArgumentException("Minecraft 1.12-1.13 custom models require a damageable material for " + definition.id());
-                }
-                if (damage <= 0 || damage >= maxDurability) {
-                    throw new IllegalArgumentException("custom_model_data " + damage + " cannot be used as legacy damage for "
-                            + definition.id() + "; expected 1.." + (maxDurability - 1));
-                }
-                meta.setUnbreakable(true);
-                legacyDamage = Integer.valueOf(damage);
+            ItemMetadataSupport.applyCommon(meta, definition.render());
+            if (definition.render() != null && definition.render().durability() != null) {
+                durability = definition.render().durability();
+                validateDurability(material, durability.intValue(), definition);
             }
+            // custom_model_data intentionally has no runtime representation before 1.14.
             stack.setItemMeta(meta);
         }
 
-        // ItemStack#setDurability must be applied after ItemMeta on legacy Bukkit or
-        // a later setItemMeta call can overwrite the damage value.
-        if (legacyDamage != null) stack.setDurability(legacyDamage.shortValue());
+        // Legacy Bukkit stores damage/durability directly on ItemStack.
+        if (durability != null) stack.setDurability(durability.shortValue());
         return setContentId(stack, definition.id());
+    }
+
+    private static void validateDurability(Material material, int durability, ItemDefinition definition) {
+        int max = material.getMaxDurability();
+        if (max <= 0) {
+            throw new IllegalArgumentException("durability requires a damageable material for " + definition.id());
+        }
+        if (durability < 0 || durability >= max) {
+            throw new IllegalArgumentException("durability " + durability + " is invalid for " + definition.id()
+                    + "; expected 0.." + (max - 1));
+        }
     }
 
     @Override

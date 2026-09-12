@@ -19,7 +19,7 @@ jobs:
             module: voxelcore-v1_12
             image: itzg/minecraft-server:java8
             server_type: SPIGOT
-            fixture_root: mvp-content
+            fixture_root: mvp-content-legacy
           - minecraft: '1.14.4'
             module: voxelcore-v1_14
             image: itzg/minecraft-server:java8
