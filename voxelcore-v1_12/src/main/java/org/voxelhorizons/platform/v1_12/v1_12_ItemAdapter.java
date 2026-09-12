@@ -54,8 +54,7 @@ public final class v1_12_ItemAdapter implements ItemPlatformAdapter {
     @Override
     public Optional<ContentID> getContentId(ItemStack stack) {
         if (stack == null) return Optional.empty();
-        String value = LegacyNbtIdentity.read(stack);
-        return value == null ? Optional.<ContentID>empty() : Optional.of(ContentID.parse(value, "voxelhorizons"));
+        return ItemPlatformAdapter.parseStoredContentId(LegacyNbtIdentity.read(stack));
     }
 
     @Override
