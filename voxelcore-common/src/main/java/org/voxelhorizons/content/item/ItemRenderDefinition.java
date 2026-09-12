@@ -37,9 +37,7 @@ public final class ItemRenderDefinition {
                 ? Collections.<String, Boolean>emptyMap()
                 : Collections.unmodifiableMap(new LinkedHashMap<String, Boolean>(attributes));
         this.customModelData = customModelData;
-        this.rule = rule == null
-                ? Collections.<String, Object>emptyMap()
-                : Collections.unmodifiableMap(new LinkedHashMap<String, Object>(rule));
+        this.rule = ImmutableData.map(rule);
     }
 
     public String model() { return model; }
