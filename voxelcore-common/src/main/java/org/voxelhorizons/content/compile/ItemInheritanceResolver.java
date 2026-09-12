@@ -71,8 +71,19 @@ public final class ItemInheritanceResolver {
         if (child == null) return parent;
         return new RawItemRenderDefinition(
                 child.model() != null ? child.model() : parent.model(),
+                child.unbreakable() != null ? child.unbreakable() : parent.unbreakable(),
+                child.durability() != null ? child.durability() : parent.durability(),
+                mergeBooleanMaps(parent.attributes(), child.attributes()),
                 mergeCustomModelData(parent.customModelData(), child.customModelData())
         );
+    }
+
+    private Map<String, Boolean> mergeBooleanMaps(Map<String, Boolean> parent, Map<String, Boolean> child) {
+        if (parent == null && child == null) return null;
+        Map<String, Boolean> merged = new LinkedHashMap<String, Boolean>();
+        if (parent != null) merged.putAll(parent);
+        if (child != null) merged.putAll(child);
+        return merged;
     }
 
     private CustomModelDataDefinition mergeCustomModelData(CustomModelDataDefinition parent, CustomModelDataDefinition child) {
