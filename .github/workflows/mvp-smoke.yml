@@ -45,16 +45,21 @@ jobs:
             image: itzg/minecraft-server:java21
             server_type: PAPER
             fixture_root: mvp-content-modern
+          - minecraft: '26.2'
+            module: voxelcore-v26_2
+            image: itzg/minecraft-server:java25
+            server_type: PAPER
+            fixture_root: mvp-content-modern
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java 21
+      - name: Set up Java 25
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 25
           cache: maven
 
       - name: Build target distribution
