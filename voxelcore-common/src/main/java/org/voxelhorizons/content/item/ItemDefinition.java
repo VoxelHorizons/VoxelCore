@@ -4,7 +4,6 @@ import org.voxelhorizons.content.ContentID;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,7 +36,7 @@ public final class ItemDefinition {
         this.bound = bound;
         this.parent = parent == null ? Optional.<ContentID>empty() : parent;
         this.render = render;
-        this.properties = Collections.unmodifiableMap(new HashMap<String, Object>(properties == null ? Collections.<String, Object>emptyMap() : properties));
+        this.properties = ImmutableData.map(properties);
     }
 
     public ContentID id() { return id; }
