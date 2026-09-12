@@ -36,17 +36,19 @@ public final class ContentLoader {
 
     public List<RawItemDefinition> loadRaw(Path contentRoot) {
         List<ContentPack> packs = packDiscovery.discover(contentRoot);
+        Map<String, ContentPack> packsByNamespace = indexAndValidatePacks(packs);
         Map<ContentID, RawItemDefinition> definitions = new LinkedHashMap<ContentID, RawItemDefinition>();
         Map<ContentID, Path> sources = new LinkedHashMap<ContentID, Path>();
 
         for (ContentPack pack : packs) {
-            Path packContentRoot = pack.root().resolve("content");
-            if (!Files.exists(packContentRoot)) continue;
-            if (!Files.isDirectory(packContentRoot)) {
-                throw new ContentLoadException("Pack content path is not a directory: " + packContentRoot);
+            Path authoredRoot = pack.root().resolve("content");
+            if (!Files.exists(authoredRoot)) continue;
+            if (!Files.isDirectory(authoredRoot)) {
+                throw new ContentLoadException("Content path is not a directory: " + authoredRoot);
             }
-            for (Path file : contentFiles(packContentRoot)) {
+            for (Path file : contentFiles(authoredRoot)) {
                 for (RawItemDefinition definition : itemParser.parse(pack, file)) {
+                    validateParentDependency(pack, definition);
                     Path previous = sources.put(definition.id(), file);
                     if (previous != null) {
                         throw new ContentLoadException("Duplicate item id " + definition.id()
@@ -65,6 +67,37 @@ public final class ContentLoader {
             return compiler.compile(loadRaw(contentRoot));
         } catch (ContentCompileException exception) {
             throw new ContentLoadException("Content compilation failed: " + exception.getMessage(), exception);
+        }
+    }
+
+    private static Map<String, ContentPack> indexAndValidatePacks(List<ContentPack> packs) {
+        Map<String, ContentPack> indexed = new LinkedHashMap<String, ContentPack>();
+        for (ContentPack pack : packs) {
+            String namespace = pack.manifest().namespace();
+            ContentPack previous = indexed.put(namespace, pack);
+            if (previous != null) {
+                throw new ContentLoadException("Duplicate content pack namespace '" + namespace + "' in "
+                        + previous.root() + " and " + pack.root());
+            }
+        }
+        for (ContentPack pack : packs) {
+            for (String dependency : pack.manifest().dependencies()) {
+                if (!indexed.containsKey(dependency)) {
+                    throw new ContentLoadException("Content pack '" + pack.manifest().namespace()
+                            + "' requires missing dependency '" + dependency + "'");
+                }
+            }
+        }
+        return indexed;
+    }
+
+    private static void validateParentDependency(ContentPack pack, RawItemDefinition definition) {
+        ContentID parent = definition.parent();
+        if (parent == null || parent.namespace().equals(pack.manifest().namespace())) return;
+        if (!pack.manifest().dependsOn(parent.namespace())) {
+            throw new ContentLoadException("Item " + definition.id() + " extends " + parent
+                    + " but pack '" + pack.manifest().namespace() + "' does not declare dependency '"
+                    + parent.namespace() + "'");
         }
     }
 

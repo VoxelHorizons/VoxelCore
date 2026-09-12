@@ -77,7 +77,7 @@ public final class ContentPackDiscovery {
         }
 
         Map<?, ?> values = (Map<?, ?>) loaded;
-        rejectUnknown(values, manifestPath, "schema", "namespace");
+        rejectUnknown(values, manifestPath, "schema", "namespace", "dependencies");
 
         Object schemaValue = values.get("schema");
         Object namespaceValue = values.get("namespace");
@@ -88,8 +88,22 @@ public final class ContentPackDiscovery {
             throw new ContentLoadException("pack.yml namespace must be a non-empty string: " + manifestPath);
         }
 
+        List<String> dependencies = new ArrayList<String>();
+        Object dependenciesValue = values.get("dependencies");
+        if (dependenciesValue != null) {
+            if (!(dependenciesValue instanceof List)) {
+                throw new ContentLoadException("pack.yml dependencies must be a list: " + manifestPath);
+            }
+            for (Object value : (List<?>) dependenciesValue) {
+                if (!(value instanceof String) || ((String) value).trim().isEmpty()) {
+                    throw new ContentLoadException("pack.yml dependencies must contain non-empty strings: " + manifestPath);
+                }
+                dependencies.add((String) value);
+            }
+        }
+
         try {
-            return new ContentPackManifest(((Number) schemaValue).intValue(), (String) namespaceValue);
+            return new ContentPackManifest(((Number) schemaValue).intValue(), (String) namespaceValue, dependencies);
         } catch (IllegalArgumentException exception) {
             throw new ContentLoadException("Invalid content pack manifest " + manifestPath + ": " + exception.getMessage(), exception);
         }
