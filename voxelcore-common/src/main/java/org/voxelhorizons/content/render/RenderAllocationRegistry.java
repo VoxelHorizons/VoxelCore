@@ -51,6 +51,26 @@ public final class RenderAllocationRegistry {
         for (RenderAllocation allocation : previous.allocations.values()) reserved.add(allocation.customModelData());
         int nextValue = previous.nextCustomModelData;
 
+        /*
+         * A child definition may inherit an explicit numeric CMD from its parent. In that case
+         * both content IDs intentionally describe the same visual state and may share the number,
+         * but only while an active definition claims that number for the same model. A number held
+         * only by tombstones stays reserved and cannot be silently reused by a new content ID.
+         */
+        Map<Integer, String> activeClaims = new HashMap<Integer, String>();
+        for (Map.Entry<ContentID, RenderAllocation> entry : previous.allocations.entrySet()) {
+            ItemDefinition definition = items.entries().get(entry.getKey());
+            String currentModel = modelOf(definition);
+            if (currentModel == null) continue;
+            int value = entry.getValue().customModelData();
+            String claimedModel = activeClaims.get(Integer.valueOf(value));
+            if (claimedModel != null && !claimedModel.equals(currentModel)) {
+                throw new IllegalArgumentException("Custom model data " + value
+                        + " is claimed by multiple active render models: " + claimedModel + " and " + currentModel);
+            }
+            activeClaims.put(Integer.valueOf(value), currentModel);
+        }
+
         List<ItemDefinition> definitions = new ArrayList<ItemDefinition>(items.entries().values());
         Collections.sort(definitions, new Comparator<ItemDefinition>() {
             @Override public int compare(ItemDefinition left, ItemDefinition right) {
@@ -59,10 +79,10 @@ public final class RenderAllocationRegistry {
         });
 
         for (ItemDefinition definition : definitions) {
-            ItemRenderDefinition render = definition.render();
-            if (render == null || render.model() == null || render.model().trim().isEmpty()) continue;
+            String model = modelOf(definition);
+            if (model == null) continue;
 
-            String model = render.model().trim().toLowerCase(java.util.Locale.ROOT);
+            ItemRenderDefinition render = definition.render();
             CustomModelDataDefinition authored = render.customModelData();
             Integer explicit = authored != null && authored.isNumeric() ? authored.numeric() : null;
             RenderAllocation existing = next.get(definition.id());
@@ -72,6 +92,12 @@ public final class RenderAllocationRegistry {
                     throw new IllegalArgumentException("Item " + definition.id() + " requests custom_model_data " + explicit
                             + " but stable allocation manifest already reserves " + existing.customModelData());
                 }
+                String claimedModel = activeClaims.get(Integer.valueOf(existing.customModelData()));
+                if (claimedModel != null && !claimedModel.equals(model)) {
+                    throw new IllegalArgumentException("Custom model data " + existing.customModelData()
+                            + " cannot render both " + claimedModel + " and " + model);
+                }
+                activeClaims.put(Integer.valueOf(existing.customModelData()), model);
                 next.put(definition.id(), existing.withModelAndActive(model, true));
                 continue;
             }
@@ -80,19 +106,33 @@ public final class RenderAllocationRegistry {
             if (explicit != null) {
                 if (explicit.intValue() < 0) throw new IllegalArgumentException("Custom model data cannot be negative for " + definition.id());
                 allocated = explicit.intValue();
-                if (reserved.contains(allocated)) {
-                    throw new IllegalArgumentException("Custom model data " + allocated + " is already reserved by another content ID");
+                if (reserved.contains(Integer.valueOf(allocated))) {
+                    String claimedModel = activeClaims.get(Integer.valueOf(allocated));
+                    if (claimedModel == null || !claimedModel.equals(model)) {
+                        throw new IllegalArgumentException("Custom model data " + allocated + " is already reserved by another content ID");
+                    }
+                } else {
+                    reserved.add(Integer.valueOf(allocated));
                 }
+                activeClaims.put(Integer.valueOf(allocated), model);
             } else {
                 allocated = Math.max(FIRST_AUTO_CUSTOM_MODEL_DATA, nextValue);
-                while (reserved.contains(allocated)) allocated++;
+                while (reserved.contains(Integer.valueOf(allocated))) allocated++;
+                reserved.add(Integer.valueOf(allocated));
+                activeClaims.put(Integer.valueOf(allocated), model);
             }
 
-            reserved.add(allocated);
             nextValue = Math.max(nextValue, allocated + 1);
             next.put(definition.id(), new RenderAllocation(allocated, model, true));
         }
 
         return new RenderAllocationRegistry(nextValue, next);
+    }
+
+    private static String modelOf(ItemDefinition definition) {
+        if (definition == null) return null;
+        ItemRenderDefinition render = definition.render();
+        if (render == null || render.model() == null || render.model().trim().isEmpty()) return null;
+        return render.model().trim().toLowerCase(java.util.Locale.ROOT);
     }
 }
