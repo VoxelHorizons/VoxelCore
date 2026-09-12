@@ -1,0 +1,27 @@
+items:
+  base:
+    material: minecraft:diamond_hoe
+    display_name: Base Legacy MVP Item
+    bound: true
+    lore:
+      - Loaded from the VoxelCore pre-1.14 MVP fixture
+
+  red_item:
+    extends: base
+    display_name: Red Test Item
+    render:
+      model: voxeltest:item/red_item
+      unbreakable: true
+      durability: 1
+      attributes:
+        hide_enchantments: true
+        hide_attributes: true
+        hide_unbreakable: true
+      custom_model_data:
+        variant: ignored-before-1.14
+        powered: true
+
+  child_item:
+    extends: red_item
+    display_name: Inherited Test Item
+    bound: false

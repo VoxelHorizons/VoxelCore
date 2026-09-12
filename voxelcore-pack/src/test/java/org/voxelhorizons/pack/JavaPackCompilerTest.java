@@ -21,7 +21,7 @@ public class JavaPackCompilerTest {
     @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
     @Test
-    public void compilesDamageNumericAndModernPacksFromOneNumericDefinition() throws Exception {
+    public void keepsDurabilityAndNumericCustomModelDataIndependentAcrossTargets() throws Exception {
         File contentRoot = temporaryFolder.newFolder("content");
         File pack = new File(contentRoot, "mypack");
         File content = new File(pack, "content/items");
@@ -39,13 +39,15 @@ public class JavaPackCompilerTest {
                 "    display_name: Ruby\n" +
                 "    render:\n" +
                 "      model: mypack:item/ruby\n" +
-                "      custom_model_data: 5\n" +
+                "      durability: 7\n" +
+                "      custom_model_data: 1001\n" +
                 "  sapphire:\n" +
                 "    extends: gem_base\n" +
                 "    display_name: Sapphire\n" +
                 "    render:\n" +
                 "      model: mypack:item/sapphire\n" +
-                "      custom_model_data: 6\n");
+                "      durability: 11\n" +
+                "      custom_model_data: 1002\n");
         write(new File(models, "ruby.json"), "{\"parent\":\"minecraft:item/generated\",\"textures\":{\"layer0\":\"mypack:item/ruby\"}}\n");
         write(new File(models, "sapphire.json"), "{\"parent\":\"minecraft:item/generated\",\"textures\":{\"layer0\":\"mypack:item/sapphire\"}}\n");
         write(new File(textures, "ruby.png"), "ruby-bytes");
@@ -62,18 +64,23 @@ public class JavaPackCompilerTest {
         String hoeDamage = zipText(damage, "assets/minecraft/models/item/diamond_hoe.json");
         assertTrue(hoeDamage.contains("\"damaged\": 0"));
         assertTrue(hoeDamage.contains("\"model\": \"mypack:item/ruby\""));
+        assertTrue(hoeDamage.contains("\"damage\": 0.0044843"));
+        assertTrue(hoeDamage.contains("\"damage\": 0.00704676"));
+        assertTrue(!hoeDamage.contains("1001"));
+        assertTrue(!hoeDamage.contains("1002"));
 
         String allocationText = new String(Files.readAllBytes(allocations), StandardCharsets.UTF_8);
         assertTrue(allocationText.contains("schema: 2"));
-        assertTrue(allocationText.contains("custom_model_data: 5"));
-        assertTrue(allocationText.contains("custom_model_data: 6"));
+        assertTrue(allocationText.contains("custom_model_data: 1001"));
+        assertTrue(allocationText.contains("custom_model_data: 1002"));
         assertTrue(!allocationText.contains("legacy_custom_model_data"));
 
         Path numeric = build.resolve("numeric.zip");
         compiler.compile(contentRoot.toPath(), numeric, allocations, JavaPackTarget.numericCmd("1.14-test", 4));
         String hoeNumeric = zipText(numeric, "assets/minecraft/models/item/diamond_hoe.json");
-        assertTrue(hoeNumeric.contains("\"custom_model_data\": 5"));
-        assertTrue(hoeNumeric.contains("\"custom_model_data\": 6"));
+        assertTrue(hoeNumeric.contains("\"custom_model_data\": 1001"));
+        assertTrue(hoeNumeric.contains("\"custom_model_data\": 1002"));
+        assertTrue(!hoeNumeric.contains("\"damage\": 0.0044843"));
 
         Path modern = build.resolve("modern.zip");
         compiler.compile(contentRoot.toPath(), modern, allocations, JavaPackTarget.modern("1.21.4-test", 46));
@@ -106,6 +113,27 @@ public class JavaPackCompilerTest {
         } catch (JavaPackCompileException exception) {
             assertTrue(exception.getMessage().contains("Structured custom_model_data requires a 1.21.4+"));
         }
+    }
+
+    @Test
+    public void ignoresStructuredCustomModelDataForLegacyDamageTarget() throws Exception {
+        File contentRoot = temporaryFolder.newFolder("legacy-content");
+        File pack = new File(contentRoot, "mypack");
+        assertTrue(new File(pack, "content").mkdirs());
+        assertTrue(new File(pack, "assets/mypack/models/item").mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: mypack\n");
+        write(new File(pack, "content/ruby.yml"),
+                "items:\n  ruby:\n    material: minecraft:diamond_hoe\n    render:\n      model: mypack:item/ruby\n" +
+                "      durability: 7\n      unbreakable: true\n" +
+                "      custom_model_data:\n        variant: ignored\n        powered: true\n");
+        write(new File(pack, "assets/mypack/models/item/ruby.json"), "{\"parent\":\"minecraft:item/generated\"}\n");
+        Path allocations = temporaryFolder.newFolder("legacy-build").toPath().resolve("allocations.yml");
+        Path legacy = temporaryFolder.newFile("legacy.zip").toPath();
+        new JavaPackCompiler().compile(contentRoot.toPath(), legacy, allocations,
+                JavaPackTarget.legacyDamage("legacy", 3));
+        String json = zipText(legacy, "assets/minecraft/models/item/diamond_hoe.json");
+        assertTrue(json.contains("\"damage\": 0.0044843"));
+        assertTrue(!json.contains("custom_model_data"));
     }
 
     @Test
