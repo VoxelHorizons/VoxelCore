@@ -1,0 +1,39 @@
+package org.voxelhorizons.pack;
+
+import org.voxelhorizons.platform.Version;
+
+import java.nio.file.Path;
+
+/** Owns live Java resource-pack validation/build lifecycle for the plugin data directory. */
+public final class PackManager {
+    private final JavaPackCompiler compiler;
+    private final Path contentRoot;
+    private final Path allocationManifest;
+    private final Path outputRoot;
+    private final Version serverVersion;
+
+    public PackManager(Path dataRoot, Path contentRoot, Version serverVersion) {
+        if (dataRoot == null || contentRoot == null || serverVersion == null) throw new IllegalArgumentException("Pack manager arguments cannot be null");
+        this.compiler = new JavaPackCompiler();
+        this.contentRoot = contentRoot;
+        this.allocationManifest = dataRoot.resolve("render-allocations.yml");
+        this.outputRoot = dataRoot.resolve("build").resolve("resource-packs");
+        this.serverVersion = serverVersion;
+    }
+
+    public JavaPackTarget currentTarget() { return JavaPackTarget.forVersion(serverVersion); }
+    public Path contentRoot() { return contentRoot; }
+    public Path allocationManifest() { return allocationManifest; }
+    public Path outputRoot() { return outputRoot; }
+
+    public JavaPackBuildResult validate(JavaPackTarget target) {
+        if (target == null) throw new IllegalArgumentException("Pack target cannot be null");
+        return compiler.validate(contentRoot, allocationManifest, target);
+    }
+
+    public JavaPackBuildResult build(JavaPackTarget target) {
+        if (target == null) throw new IllegalArgumentException("Pack target cannot be null");
+        Path output = outputRoot.resolve(target.id() + ".zip");
+        return compiler.compile(contentRoot, output, allocationManifest, target);
+    }
+}
