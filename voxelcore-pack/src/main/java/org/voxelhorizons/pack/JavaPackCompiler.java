@@ -78,8 +78,8 @@ public final class JavaPackCompiler {
             ItemRenderDefinition render = item.render();
             if (render == null) continue;
             if (render.model() == null || render.model().trim().isEmpty()) {
-                if (render.customModelData() != null) {
-                    throw new JavaPackCompileException("Item " + item.id() + " defines custom_model_data without render.model");
+                if (render.customModelData() != null || render.durability() != null) {
+                    throw new JavaPackCompileException("Item " + item.id() + " defines render predicates without render.model");
                 }
                 continue;
             }
@@ -91,7 +91,7 @@ public final class JavaPackCompiler {
             validateModelAsset(packsByNamespace, model, item.id());
 
             CustomModelDataDefinition authored = render.customModelData();
-            if (target.mode() != JavaPackMode.ITEM_MODEL_1_21_4_PLUS && authored != null && authored.isStructured()) {
+            if (target.mode() == JavaPackMode.NUMERIC_CUSTOM_MODEL_DATA && authored != null && authored.isStructured()) {
                 throw new JavaPackCompileException("Structured custom_model_data requires a 1.21.4+ Java pack target for " + item.id());
             }
             Integer explicit = authored != null && authored.isNumeric() ? authored.numeric() : null;
@@ -105,13 +105,18 @@ public final class JavaPackCompiler {
                         + json(model.toString()) + "\"\n  }\n}\n";
                 putEntry(entries, itemInfoPath, utf8(itemInfo));
             } else {
-                ResourceLocation material = ResourceLocation.parse(item.material(), "minecraft");
-                List<ModelOverride> materialOverrides = overrides.get(material);
-                if (materialOverrides == null) {
-                    materialOverrides = new ArrayList<ModelOverride>();
-                    overrides.put(material, materialOverrides);
+                Integer predicateValue = target.mode() == JavaPackMode.LEGACY_DAMAGE_UNBREAKABLE
+                        ? render.durability()
+                        : Integer.valueOf(allocation.customModelData);
+                if (predicateValue != null) {
+                    ResourceLocation material = ResourceLocation.parse(item.material(), "minecraft");
+                    List<ModelOverride> materialOverrides = overrides.get(material);
+                    if (materialOverrides == null) {
+                        materialOverrides = new ArrayList<ModelOverride>();
+                        overrides.put(material, materialOverrides);
+                    }
+                    materialOverrides.add(new ModelOverride(predicateValue.intValue(), model));
                 }
-                materialOverrides.add(new ModelOverride(allocation.customModelData, model));
             }
         }
 
@@ -149,9 +154,9 @@ public final class JavaPackCompiler {
             int max = bukkit.getMaxDurability();
             Collections.sort(entry.getValue(), byValue());
             for (ModelOverride override : entry.getValue()) {
-                if (override.value <= 0 || override.value >= max) {
-                    throw new JavaPackCompileException("custom_model_data " + override.value + " cannot be represented by "
-                            + material + " on 1.12; expected 1.." + (max - 1));
+                if (override.value < 0 || override.value >= max) {
+                    throw new JavaPackCompileException("durability " + override.value + " cannot be represented by "
+                            + material + " on 1.12; expected 0.." + (max - 1));
                 }
             }
             String path = "assets/minecraft/models/item/" + material.path + ".json";
