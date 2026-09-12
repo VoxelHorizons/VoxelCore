@@ -4,6 +4,7 @@ import org.bukkit.Color;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.components.CustomModelDataComponent;
 import org.bukkit.persistence.PersistentDataType;
@@ -11,6 +12,7 @@ import org.bukkit.plugin.Plugin;
 import org.voxelhorizons.content.ContentID;
 import org.voxelhorizons.content.item.CustomModelDataDefinition;
 import org.voxelhorizons.content.item.ItemDefinition;
+import org.voxelhorizons.platform.item.ItemMetadataSupport;
 import org.voxelhorizons.platform.item.ItemPlatformAdapter;
 
 import java.util.ArrayList;
@@ -32,8 +34,12 @@ public final class v1_21_4_ItemAdapter implements ItemPlatformAdapter {
         if (meta != null) {
             if (definition.displayName() != null) meta.setDisplayName(definition.displayName());
             if (!definition.lore().isEmpty()) meta.setLore(definition.lore());
+            ItemMetadataSupport.applyCommon(meta, definition.render());
 
             if (definition.render() != null) {
+                if (definition.render().durability() != null) {
+                    applyDurability(meta, material, definition.render().durability().intValue(), definition);
+                }
                 if (definition.render().model() != null && !definition.render().model().trim().isEmpty()) {
                     NamespacedKey model = NamespacedKey.fromString(definition.render().model());
                     if (model != null) meta.setItemModel(model);
@@ -47,6 +53,13 @@ public final class v1_21_4_ItemAdapter implements ItemPlatformAdapter {
             stack.setItemMeta(meta);
         }
         return stack;
+    }
+
+    private static void applyDurability(ItemMeta meta, Material material, int durability, ItemDefinition definition) {
+        int max = material.getMaxDurability();
+        if (!(meta instanceof Damageable) || max <= 0) throw new IllegalArgumentException("durability requires a damageable material for " + definition.id());
+        if (durability < 0 || durability >= max) throw new IllegalArgumentException("durability " + durability + " is invalid for " + definition.id() + "; expected 0.." + (max - 1));
+        ((Damageable) meta).setDamage(durability);
     }
 
     private static void applyCustomModelData(ItemMeta meta, CustomModelDataDefinition data) {
