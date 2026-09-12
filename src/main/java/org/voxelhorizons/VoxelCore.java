@@ -8,7 +8,6 @@ import org.voxelhorizons.command.CommandRegistry;
 import org.voxelhorizons.command.RootCommand;
 import org.voxelhorizons.command.commands.AdminCommand;
 import org.voxelhorizons.command.commands.BaseCommand;
-import org.voxelhorizons.debug.CIMode;
 
 import java.io.File;
 import java.io.IOException;
@@ -16,32 +15,27 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.logging.Logger;
 
-public final class PluginCore extends JavaPlugin {
+public final class VoxelCore extends JavaPlugin {
 
-    public static PluginCore instance;
+    public static VoxelCore instance;
     public Logger logger;
 
     private File configFile;
     public FileConfiguration config;
 
-    public static PluginCore getInstance() {
+    public static VoxelCore getInstance() {
         return instance;
     }
 
-    public PluginCore() {
+    public VoxelCore() {
         if(this.instance != null) {
-            throw new IllegalStateException(getName() + " already initialized!");
+            throw new IllegalStateException(this.getName() + " already initialized!");
         }
         this.instance = this;
     }
 
     @Override
     public void onEnable() {
-        // Instantiate and start CI-mode auto shutdown
-        // DO NOT REMOVE
-        // This helps prevent the Github Action from getting stuck
-        new CIMode(this).start();
-
         // Setup Logging
         this.logger = getLogger();
 

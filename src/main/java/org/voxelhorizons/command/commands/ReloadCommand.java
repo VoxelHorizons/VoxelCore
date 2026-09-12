@@ -1,7 +1,7 @@
 package org.voxelhorizons.command.commands;
 
 import org.bukkit.command.CommandSender;
-import org.voxelhorizons.PluginCore;
+import org.voxelhorizons.VoxelCore;
 import org.voxelhorizons.command.SubCommand;
 
 import java.util.List;
@@ -20,7 +20,7 @@ public class ReloadCommand implements SubCommand {
 
     @Override
     public String getPermission() {
-        return PluginCore.getInstance().getDescription().getName().toLowerCase() + ".admin.reload";
+        return VoxelCore.getInstance().getDescription().getName().toLowerCase() + ".admin.reload";
     }
 
     @Override
@@ -30,8 +30,8 @@ public class ReloadCommand implements SubCommand {
 
     @Override
     public void execute(CommandSender sender, String[] args) {
-        sender.sendMessage("Reloading " + PluginCore.getInstance().getDescription().getName() + "...");
-        PluginCore.getInstance().onReload();
-        sender.sendMessage("Reloaded " + PluginCore.getInstance().getDescription().getName() + " Successfully.");
+        sender.sendMessage("Reloading " + VoxelCore.getInstance().getDescription().getName() + "...");
+        VoxelCore.getInstance().onReload();
+        sender.sendMessage("Reloaded " + VoxelCore.getInstance().getDescription().getName() + " Successfully.");
     }
 }
