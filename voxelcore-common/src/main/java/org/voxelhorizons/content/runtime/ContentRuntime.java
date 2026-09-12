@@ -1,6 +1,7 @@
 package org.voxelhorizons.content.runtime;
 
 import org.voxelhorizons.content.item.ItemDefinitionRegistry;
+import org.voxelhorizons.content.render.RenderAllocationRegistry;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
@@ -13,18 +14,18 @@ public final class ContentRuntime {
         this.active = new AtomicReference<ContentSnapshot>(Objects.requireNonNull(initial, "initial"));
     }
 
-    public ContentSnapshot current() {
-        return active.get();
+    public ContentSnapshot current() { return active.get(); }
+
+    public synchronized ContentSnapshot publish(ItemDefinitionRegistry items) {
+        return publish(items, active.get().renderAllocations());
     }
 
-    /**
-     * Atomically publishes a fully compiled item registry as the next revision.
-     * The existing snapshot remains active until this method is called.
-     */
-    public synchronized ContentSnapshot publish(ItemDefinitionRegistry items) {
+    /** Atomically publishes definitions and the matching stable render allocations. */
+    public synchronized ContentSnapshot publish(ItemDefinitionRegistry items, RenderAllocationRegistry renderAllocations) {
         Objects.requireNonNull(items, "items");
+        Objects.requireNonNull(renderAllocations, "renderAllocations");
         ContentSnapshot current = active.get();
-        ContentSnapshot next = new ContentSnapshot(current.revision() + 1L, items);
+        ContentSnapshot next = new ContentSnapshot(current.revision() + 1L, items, renderAllocations);
         active.set(next);
         return next;
     }
