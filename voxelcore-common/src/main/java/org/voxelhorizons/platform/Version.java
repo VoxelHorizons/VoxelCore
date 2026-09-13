@@ -20,15 +20,32 @@ public final class Version implements Comparable<Version> {
             throw new IllegalArgumentException("Version cannot be null or empty.");
         }
 
-        String[] parts = version.split("\\.");
+        String normalized = version.trim();
+        String[] parts = normalized.split("\\.");
         try {
-            int major = Integer.parseInt(parts[0]);
-            int minor = parts.length > 1 ? Integer.parseInt(parts[1]) : 0;
-            int patch = parts.length > 2 ? Integer.parseInt(parts[2]) : 0;
+            int major = numericPart(parts, 0, true);
+            int minor = numericPart(parts, 1, false);
+            int patch = numericPart(parts, 2, false);
             return new Version(major, minor, patch);
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException("Invalid Minecraft version: " + version, exception);
         }
+    }
+
+    private static int numericPart(String[] parts, int index, boolean required) {
+        if (index >= parts.length) {
+            if (required) throw new NumberFormatException("Missing version component " + index);
+            return 0;
+        }
+
+        String part = parts[index];
+        int length = 0;
+        while (length < part.length() && Character.isDigit(part.charAt(length))) length++;
+        if (length == 0) {
+            if (required) throw new NumberFormatException("Version component is not numeric: " + part);
+            return 0;
+        }
+        return Integer.parseInt(part.substring(0, length));
     }
 
     public boolean atLeast(int major, int minor, int patch) {

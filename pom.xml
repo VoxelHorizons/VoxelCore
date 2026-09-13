@@ -20,6 +20,7 @@
         <module>voxelcore-v1_19_4</module>
         <module>voxelcore-v1_20_5</module>
         <module>voxelcore-v1_21_4</module>
+        <module>voxelcore-v26_2</module>
     </modules>
 
     <properties>
@@ -30,12 +31,17 @@
         <spigot.v1_19_4>1.19.4-R0.1-SNAPSHOT</spigot.v1_19_4>
         <spigot.v1_20_5>1.20.5-R0.1-SNAPSHOT</spigot.v1_20_5>
         <spigot.v1_21_4>1.21.4-R0.1-SNAPSHOT</spigot.v1_21_4>
+        <paper.v26_2>26.2.build.123-stable</paper.v26_2>
     </properties>
 
     <repositories>
         <repository>
             <id>spigot-repo</id>
             <url>https://hub.spigotmc.org/nexus/content/groups/public/</url>
+        </repository>
+        <repository>
+            <id>papermc</id>
+            <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
     </repositories>
 
@@ -53,7 +59,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-shade-plugin</artifactId>
-                    <version>3.6.0</version>
+                    <version>3.6.2</version>
                 </plugin>
             </plugins>
         </pluginManagement>
