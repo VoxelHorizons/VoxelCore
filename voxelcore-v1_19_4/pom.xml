@@ -12,6 +12,7 @@
     <artifactId>voxelcore-v1_19_4</artifactId>
 
     <properties>
+        <voxelcore.api.version>1.19</voxelcore.api.version>
         <maven.compiler.release>17</maven.compiler.release>
     </properties>
 
@@ -35,6 +36,15 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>${project.parent.basedir}/voxelcore-plugin/src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>plugin.yml</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
