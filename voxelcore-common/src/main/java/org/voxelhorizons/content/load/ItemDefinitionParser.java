@@ -23,7 +23,7 @@ import java.util.Set;
 
 public final class ItemDefinitionParser {
     private static final Set<String> ITEM_KEYS = new HashSet<String>(Arrays.asList(
-            "extends", "type", "material", "display_name", "lore", "bound", "render", "properties"
+            "extends", "type", "material", "display_name", "lore", "bound", "abstract", "render", "properties"
     ));
     private static final Set<String> RENDER_KEYS = new HashSet<String>(Arrays.asList(
             "model", "unbreakable", "durability", "attributes", "custom_model_data", "rule"
@@ -92,6 +92,8 @@ public final class ItemDefinitionParser {
             bound = (Boolean) value;
         }
 
+        Boolean abstractDefinition = booleanValue(map, "abstract", id, file);
+
         RawItemRenderDefinition render = null;
         if (map.containsKey("render")) {
             Object value = map.get("render");
@@ -121,7 +123,7 @@ public final class ItemDefinitionParser {
         }
 
         return new RawItemDefinition(id, parent, type, string(map, "material", file, false),
-                string(map, "display_name", file, false), lore, bound, render, properties);
+                string(map, "display_name", file, false), lore, bound, abstractDefinition, render, properties);
     }
 
     private static Boolean booleanValue(Map<?, ?> map, String key, ContentID id, Path file) {
