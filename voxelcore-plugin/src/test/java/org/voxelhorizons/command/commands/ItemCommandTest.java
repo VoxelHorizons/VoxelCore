@@ -18,14 +18,14 @@ import static org.junit.Assert.assertEquals;
 public final class ItemCommandTest {
 
     @Test
-    public void listableItemIdsExcludesUnboundDefinitionsAndSortsRemainingIds() {
-        ItemDefinition unboundBase = definition("voxelpack:economy_base", false);
-        ItemDefinition token = definition("voxelpack:token", true);
-        ItemDefinition coin = definition("voxelpack:coin", true);
+    public void listableItemIdsExcludesAbstractDefinitionsButIncludesUnboundItems() {
+        ItemDefinition abstractBase = definition("voxelpack:economy_base", false, true);
+        ItemDefinition token = definition("voxelpack:token", false, false);
+        ItemDefinition coin = definition("voxelpack:coin", true, false);
 
         Map<ContentID, ItemDefinition> definitions = new LinkedHashMap<ContentID, ItemDefinition>();
         definitions.put(token.id(), token);
-        definitions.put(unboundBase.id(), unboundBase);
+        definitions.put(abstractBase.id(), abstractBase);
         definitions.put(coin.id(), coin);
 
         List<ContentID> actual = ItemCommand.listableItemIds(new ItemDefinitionRegistry(definitions));
@@ -33,7 +33,7 @@ public final class ItemCommandTest {
         assertEquals(Arrays.asList(coin.id(), token.id()), actual);
     }
 
-    private static ItemDefinition definition(String id, boolean bound) {
+    private static ItemDefinition definition(String id, boolean bound, boolean abstractDefinition) {
         ContentID contentId = ContentID.parse(id, "voxelhorizons");
         return new ItemDefinition(
                 contentId,
@@ -42,6 +42,7 @@ public final class ItemCommandTest {
                 contentId.value(),
                 Collections.<String>emptyList(),
                 bound,
+                abstractDefinition,
                 Optional.<ContentID>empty(),
                 null,
                 Collections.<String, Object>emptyMap());
