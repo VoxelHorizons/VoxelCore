@@ -50,14 +50,15 @@ public final class ItemDefinitionCompiler {
     }
 
     private ItemDefinition compileResolved(RawItemDefinition raw) {
-        if (raw.material() == null || raw.material().trim().isEmpty()) {
+        boolean abstractDefinition = raw.abstractDefinition() != null && raw.abstractDefinition().booleanValue();
+        if (!abstractDefinition && (raw.material() == null || raw.material().trim().isEmpty())) {
             throw new ContentCompileException("Item " + raw.id() + " has no material after inheritance resolution");
         }
         ItemType type = raw.type() == null ? ItemType.ITEM : raw.type();
         boolean bound = raw.bound() != null && raw.bound().booleanValue();
         ItemRenderDefinition render = compileRender(raw.render());
         return new ItemDefinition(raw.id(), type, raw.material(), raw.displayName(),
-                raw.lore() == null ? Collections.<String>emptyList() : raw.lore(), bound,
+                raw.lore() == null ? Collections.<String>emptyList() : raw.lore(), bound, abstractDefinition,
                 Optional.ofNullable(raw.parent()), render,
                 raw.properties() == null ? Collections.<String, Object>emptyMap() : raw.properties());
     }
