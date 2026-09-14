@@ -29,6 +29,25 @@ jobs:
       - name: Build all distributions
         run: mvn -U clean package
 
+      - name: Verify distribution API metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          verify_api_version() {
+            local jar_pattern="$1"
+            local expected="$2"
+            local jar
+            jar=$(compgen -G "$jar_pattern" | head -n 1)
+            test -n "$jar"
+            unzip -p "$jar" plugin.yml | grep -Fx "api-version: '$expected'"
+          }
+          verify_api_version 'voxelcore-v1_12/target/VoxelCore-*.jar' '1.13'
+          verify_api_version 'voxelcore-v1_14/target/VoxelCore-*.jar' '1.14'
+          verify_api_version 'voxelcore-v1_19_4/target/VoxelCore-*.jar' '1.19'
+          verify_api_version 'voxelcore-v1_20_5/target/VoxelCore-*.jar' '1.20.5'
+          verify_api_version 'voxelcore-v1_21_4/target/VoxelCore-*.jar' '1.21.4'
+          verify_api_version 'voxelcore-v26_2/target/VoxelCore-*.jar' '26.2'
+
       - name: Upload Minecraft 1.12-1.13 artifact
         uses: actions/upload-artifact@v4
         with:
