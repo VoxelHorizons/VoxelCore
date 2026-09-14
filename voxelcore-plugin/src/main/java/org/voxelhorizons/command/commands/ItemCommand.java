@@ -47,16 +47,26 @@ public final class ItemCommand implements SubCommand {
         return ContentID.parse(value, "voxelhorizons");
     }
 
+    static List<ContentID> listableItemIds(ItemDefinitionRegistry registry) {
+        List<ContentID> ids = new ArrayList<ContentID>();
+        for (ItemDefinition definition : registry.entries().values()) {
+            if (definition.bound()) ids.add(definition.id());
+        }
+        Collections.sort(ids, new Comparator<ContentID>() {
+            @Override public int compare(ContentID left, ContentID right) {
+                return left.toString().compareTo(right.toString());
+            }
+        });
+        return ids;
+    }
+
     private static final class ListCommand implements SubCommand {
         @Override public String getName() { return "list"; }
         @Override public List<String> getAliases() { return Collections.emptyList(); }
         @Override public String getPermission() { return "voxelcore.admin.item.list"; }
         @Override public boolean playerOnly() { return false; }
         @Override public void execute(CommandSender sender, String[] args) {
-            List<ContentID> ids = new ArrayList<ContentID>(VoxelCore.getInstance().getItemRegistry().entries().keySet());
-            Collections.sort(ids, new Comparator<ContentID>() {
-                @Override public int compare(ContentID left, ContentID right) { return left.toString().compareTo(right.toString()); }
-            });
+            List<ContentID> ids = listableItemIds(VoxelCore.getInstance().getItemRegistry());
             sender.sendMessage("VoxelCore items (" + ids.size() + "): " + ids);
         }
     }
