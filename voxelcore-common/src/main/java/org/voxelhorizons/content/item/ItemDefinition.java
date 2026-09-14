@@ -15,6 +15,7 @@ public final class ItemDefinition {
     private final String displayName;
     private final List<String> lore;
     private final boolean bound;
+    private final boolean abstractDefinition;
     private final Optional<ContentID> parent;
     private final ItemRenderDefinition render;
     private final Map<String, Object> properties;
@@ -28,12 +29,26 @@ public final class ItemDefinition {
                           Optional<ContentID> parent,
                           ItemRenderDefinition render,
                           Map<String, Object> properties) {
+        this(id, type, material, displayName, lore, bound, false, parent, render, properties);
+    }
+
+    public ItemDefinition(ContentID id,
+                          ItemType type,
+                          String material,
+                          String displayName,
+                          List<String> lore,
+                          boolean bound,
+                          boolean abstractDefinition,
+                          Optional<ContentID> parent,
+                          ItemRenderDefinition render,
+                          Map<String, Object> properties) {
         this.id = id;
         this.type = type;
         this.material = material;
         this.displayName = displayName;
         this.lore = Collections.unmodifiableList(new ArrayList<String>(lore == null ? Collections.<String>emptyList() : lore));
         this.bound = bound;
+        this.abstractDefinition = abstractDefinition;
         this.parent = parent == null ? Optional.<ContentID>empty() : parent;
         this.render = render;
         this.properties = ImmutableData.map(properties);
@@ -45,6 +60,7 @@ public final class ItemDefinition {
     public String displayName() { return displayName; }
     public List<String> lore() { return lore; }
     public boolean bound() { return bound; }
+    public boolean abstractDefinition() { return abstractDefinition; }
     public Optional<ContentID> parent() { return parent; }
     public ItemRenderDefinition render() { return render; }
     public Map<String, Object> properties() { return properties; }
