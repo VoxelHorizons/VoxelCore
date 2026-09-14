@@ -1,0 +1,44 @@
+name: VoxelCore
+version: ${project.version}
+main: org.voxelhorizons.VoxelCore
+api-version: '1.20.5'
+
+commands:
+  voxelcore:
+    description: VoxelCore administrative and debug command
+    aliases: [vc]
+    permission: voxelcore.use
+
+permissions:
+  voxelcore.use:
+    default: op
+  voxelcore.admin:
+    default: op
+  voxelcore.admin.reload:
+    default: op
+  voxelcore.admin.content:
+    default: op
+  voxelcore.admin.content.info:
+    default: op
+  voxelcore.admin.content.reload:
+    default: op
+  voxelcore.admin.item:
+    default: op
+  voxelcore.admin.item.list:
+    default: op
+  voxelcore.admin.item.info:
+    default: op
+  voxelcore.admin.item.give:
+    default: op
+  voxelcore.admin.item.identify:
+    default: op
+  voxelcore.admin.item.verify:
+    default: op
+  voxelcore.admin.pack:
+    default: op
+  voxelcore.admin.pack.info:
+    default: op
+  voxelcore.admin.pack.validate:
+    default: op
+  voxelcore.admin.pack.build:
+    default: op
