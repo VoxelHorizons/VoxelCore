@@ -56,6 +56,14 @@
                         <configuration>
                             <finalName>VoxelCore-${project.version}-mc26.2</finalName>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <filters>
+                                <filter>
+                                    <artifact>org.voxelhorizons:voxelcore-plugin</artifact>
+                                    <excludes>
+                                        <exclude>plugin.yml</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                             <relocations>
                                 <relocation>
                                     <pattern>org.yaml.snakeyaml</pattern>
