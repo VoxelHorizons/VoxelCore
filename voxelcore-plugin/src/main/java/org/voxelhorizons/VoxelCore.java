@@ -25,6 +25,8 @@ import org.voxelhorizons.item.ItemManager;
 import org.voxelhorizons.pack.PackManager;
 import org.voxelhorizons.platform.VersionAdapter;
 import org.voxelhorizons.platform.VersionAdapterFactory;
+import org.voxelhorizons.platform.server.ServerPlatformCapabilities;
+import org.voxelhorizons.platform.server.ServerPlatformCapabilitiesFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -45,6 +47,7 @@ public final class VoxelCore extends JavaPlugin {
     public FileConfiguration config;
 
     private VersionAdapter versionAdapter;
+    private ServerPlatformCapabilities serverPlatformCapabilities;
     private ContentLoader contentLoader;
     private ContentRuntime contentRuntime;
     private ContentRuntimeReloader contentReloader;
@@ -79,6 +82,7 @@ public final class VoxelCore extends JavaPlugin {
         config = getConfig();
 
         try {
+            serverPlatformCapabilities = ServerPlatformCapabilitiesFactory.create(getServer());
             versionAdapter = VersionAdapterFactory.create(this);
         } catch (RuntimeException exception) {
             logger.log(Level.SEVERE, "VoxelCore does not support this Minecraft platform", exception);
@@ -120,7 +124,8 @@ public final class VoxelCore extends JavaPlugin {
 
         itemManager = new ItemManager(contentRuntime, versionAdapter);
 
-        logger.info("VoxelCore platform ready for Minecraft " + versionAdapter.version()
+        logger.info("VoxelCore platform ready on " + serverPlatformCapabilities.platformName()
+                + " for Minecraft " + versionAdapter.version()
                 + " with content revision " + contentRuntime.current().revision()
                 + " (" + contentRuntime.current().items().size() + " items)");
 
@@ -142,7 +147,8 @@ public final class VoxelCore extends JavaPlugin {
 
         logger.info("VOXELCORE_READY revision=" + contentRuntime.current().revision()
                 + " items=" + contentRuntime.current().items().size()
-                + " platform=" + versionAdapter.version());
+                + " platform=" + versionAdapter.version()
+                + " server=" + serverPlatformCapabilities.platformName());
     }
 
     @Override
@@ -161,6 +167,7 @@ public final class VoxelCore extends JavaPlugin {
     }
 
     public VersionAdapter getVersionAdapter() { return versionAdapter; }
+    public ServerPlatformCapabilities getServerPlatformCapabilities() { return serverPlatformCapabilities; }
     public ContentRuntime getContentRuntime() { return contentRuntime; }
     public ItemDefinitionRegistry getItemRegistry() { return contentRuntime.current().items(); }
     public ItemManager getItemManager() { return itemManager; }
