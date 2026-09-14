@@ -168,6 +168,7 @@ public final class VoxelCore extends JavaPlugin {
 
     private void validateForPlatform(ItemDefinitionRegistry items, RenderAllocationRegistry allocations) {
         for (ItemDefinition definition : items.entries().values()) {
+            if (definition.abstractDefinition()) continue;
             versionAdapter.items().validateDefinition(definition, allocations.get(definition.id()).orElse(null));
         }
     }
