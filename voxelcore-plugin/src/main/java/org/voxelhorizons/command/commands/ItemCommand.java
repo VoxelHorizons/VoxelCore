@@ -50,7 +50,7 @@ public final class ItemCommand implements SubCommand {
     static List<ContentID> listableItemIds(ItemDefinitionRegistry registry) {
         List<ContentID> ids = new ArrayList<ContentID>();
         for (ItemDefinition definition : registry.entries().values()) {
-            if (definition.bound()) ids.add(definition.id());
+            if (!definition.abstractDefinition()) ids.add(definition.id());
         }
         Collections.sort(ids, new Comparator<ContentID>() {
             @Override public int compare(ContentID left, ContentID right) {
@@ -90,7 +90,7 @@ public final class ItemCommand implements SubCommand {
             ItemDefinition item = definition.get();
             sender.sendMessage(item.id() + " type=" + item.type() + " material=" + item.material()
                     + " name=" + item.displayName() + " bound=" + item.bound()
-                    + " parent=" + (item.parent().isPresent() ? item.parent().get() : "none"));
+                    + " abstract=" + item.abstractDefinition() + " parent=" + (item.parent().isPresent() ? item.parent().get() : "none"));
         }
     }
 

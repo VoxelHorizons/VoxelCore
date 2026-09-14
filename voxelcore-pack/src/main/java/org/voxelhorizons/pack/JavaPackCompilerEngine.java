@@ -81,6 +81,7 @@ final class JavaPackCompilerEngine {
         int renderedItems = 0;
 
         for (ItemDefinition item : items) {
+            if (item.abstractDefinition()) continue;
             ItemRenderDefinition render = item.render();
             if (render == null) continue;
             if (render.model() == null || render.model().trim().isEmpty()) {

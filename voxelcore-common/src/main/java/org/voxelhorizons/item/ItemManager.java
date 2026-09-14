@@ -37,6 +37,9 @@ public final class ItemManager {
         ItemDefinition definition = snapshot.items().get(id).orElseThrow(() ->
                 new IllegalArgumentException("Unknown item: " + id)
         );
+        if (definition.abstractDefinition()) {
+            throw new IllegalArgumentException("Cannot create abstract item: " + id);
+        }
         RenderAllocation allocation = snapshot.renderAllocations().get(id).orElse(null);
         return platform.items().createItem(definition, quantity, allocation);
     }

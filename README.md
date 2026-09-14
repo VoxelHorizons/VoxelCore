@@ -124,6 +124,7 @@ A cross-pack inheritance or model reference is accepted only when the referenced
 ```yaml
 items:
   gem_base:
+    abstract: true
     material: minecraft:paper
     bound: false
     lore:
@@ -131,8 +132,9 @@ items:
 
   ruby:
     extends: gem_base
+    abstract: false
     display_name: Ruby
-    bound: true
+    bound: false
     render:
       model: mypack:item/ruby
       unbreakable: true
@@ -152,16 +154,19 @@ Supported item fields:
 - `display_name`
 - `lore`
 - `bound`
+- `abstract`
 - `render`
 - `properties`
 
 Unknown keys and malformed values are rejected rather than ignored.
 
-### Bound and list visibility
+### Abstract definitions and bound state
 
-`bound` is inherited like the other scalar fields. In the current implementation, `/voxelcore admin item list` shows only definitions whose resolved value is `bound: true`. This allows `bound: false` definitions to act as hidden inheritance bases while remaining available to the compiler and registry.
+`abstract` is an inherited scalar for reusable definitions that must not become game items. A resolved `abstract: true` definition remains available as an inheritance parent and through `item info`, but it is hidden from `item list`, cannot be created by `item give` or `item verify`, receives no active render allocation, and emits no generated item model. Abstract definitions may omit `material`; concrete definitions may not.
 
-This flag does **not yet enforce full soulbound inventory, drop, death, container, trade, or cross-server transfer rules**. Those mechanics remain a later item-behavior milestone.
+Because `abstract` is inherited, a concrete child of an abstract parent must explicitly set `abstract: false`.
+
+`bound` is independent of abstraction and visibility. It remains inherited item metadata intended for future ownership restrictions; full bound-item inventory, drop, death, container, trade, and cross-server transfer enforcement is not implemented yet.
 
 ### Identity
 
@@ -344,7 +349,7 @@ plugins/VoxelCore/build/resource-packs/<target>.zip
 
 When `[target]` is omitted, VoxelCore uses the current server version only when an exact validated pack profile exists. Otherwise specify a target explicitly.
 
-`item list` reports only resolved `bound: true` definitions. Hidden `bound: false` definitions can still be inspected directly with `item info` and used as inheritance parents.
+`item list` reports only concrete definitions. Abstract definitions can still be inspected directly with `item info` and used as inheritance parents; `bound` does not affect list visibility.
 
 ## Safe reloads
 
