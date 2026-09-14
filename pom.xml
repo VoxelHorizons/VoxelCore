@@ -26,6 +26,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>8</maven.compiler.release>
+        <voxelcore.api.version>1.13</voxelcore.api.version>
         <spigot.v1_12>1.12.2-R0.1-SNAPSHOT</spigot.v1_12>
         <spigot.v1_14>1.14.4-R0.1-SNAPSHOT</spigot.v1_14>
         <spigot.v1_19_4>1.19.4-R0.1-SNAPSHOT</spigot.v1_19_4>

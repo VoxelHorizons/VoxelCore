@@ -56,14 +56,16 @@ VoxelCore automatically detects Paper at startup and selects its Paper capabilit
 
 Install exactly one distribution jar matching the server family.
 
-| Minecraft | Module | Runtime path |
-|---|---|---|
-| 1.12.x–1.13.x | `voxelcore-v1_12` | legacy NBT identity, durability rendering |
-| 1.14–1.19.3 | `voxelcore-v1_14` | PDC identity, numeric Custom Model Data |
-| 1.19.4–1.20.4 | `voxelcore-v1_19_4` | PDC/CMD plus display-entity-era capability boundary |
-| 1.20.5–1.21.3 | `voxelcore-v1_20_5` | data-component-era family with scalar CMD compatibility |
-| 1.21.4 | `voxelcore-v1_21_4` | item-model component and structured Custom Model Data |
-| 26.2 | `voxelcore-v26_2` | Paper 26.2 item-model component and structured Custom Model Data |
+| Minecraft | Module | API version | Runtime path |
+|---|---|---:|---|
+| 1.12.x–1.13.x | `voxelcore-v1_12` | `1.13` | legacy NBT identity, durability rendering |
+| 1.14–1.19.3 | `voxelcore-v1_14` | `1.14` | PDC identity, numeric Custom Model Data |
+| 1.19.4–1.20.4 | `voxelcore-v1_19_4` | `1.19` | PDC/CMD plus display-entity-era capability boundary |
+| 1.20.5–1.21.3 | `voxelcore-v1_20_5` | `1.20.5` | data-component-era family with scalar CMD compatibility |
+| 1.21.4 | `voxelcore-v1_21_4` | `1.21.4` | item-model component and structured Custom Model Data |
+| 26.2 | `voxelcore-v26_2` | `26.2` | Paper 26.2 item-model component and structured Custom Model Data |
+
+Each shaded distribution embeds the corresponding `api-version` in `plugin.yml`; CI inspects the finished JARs to prevent legacy material compatibility from being enabled accidentally.
 
 The real-server matrix validates **1.12.2, 1.13.2, 1.14.4, 1.19.4, 1.20.5, 1.21.4, and 26.2**. Intermediate versions in the first four family ranges are selected by their providers but are not individually smoke-tested.
 
