@@ -70,6 +70,24 @@ public class ItemDefinitionCompilerTest {
         assertFalse(result.bound());
     }
 
+    @Test public void abstractDefinitionsMayOmitMaterialAndStateIsInherited() {
+        ContentID baseId = id("abstract_base"), childId = id("abstract_child");
+        RawItemDefinition base = new RawItemDefinition(baseId, null, null, null, null, null,
+                Boolean.FALSE, Boolean.TRUE, null, null);
+        RawItemDefinition child = new RawItemDefinition(childId, baseId, null, "minecraft:paper", null, null,
+                null, Boolean.FALSE, null, null);
+        ItemDefinitionRegistry registry = compiler.compile(Arrays.asList(base, child));
+        assertTrue(registry.get(baseId).get().abstractDefinition());
+        assertFalse(registry.get(childId).get().abstractDefinition());
+        assertFalse(registry.get(childId).get().bound());
+    }
+
+    @Test public void concreteDefinitionsStillRequireMaterial() {
+        RawItemDefinition definition = new RawItemDefinition(id("concrete_no_material"), null, null, null,
+                null, null, null, Boolean.FALSE, null, null);
+        expectCompileFailure(Collections.singletonList(definition), "has no material");
+    }
+
     @Test public void childListReplacesParentList() {
         ContentID baseId = id("base_lore"), childId = id("child_lore");
         RawItemDefinition base = raw(baseId, null, null, "minecraft:paper", null, Arrays.asList("one", "two"), null, null, null);
