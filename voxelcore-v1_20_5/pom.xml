@@ -38,8 +38,8 @@
     <build>
         <resources>
             <resource>
-                <directory>${project.parent.basedir}/voxelcore-plugin/src/main/resources</directory>
-                <filtering>true</filtering>
+                <directory>${project.basedir}/src/main/resources</directory>
+                <filtering>false</filtering>
                 <includes>
                     <include>plugin.yml</include>
                 </includes>
