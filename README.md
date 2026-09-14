@@ -9,6 +9,7 @@ Higher-level gameplay systems such as placed blocks, furniture, vehicles, crops,
 The repository has completed the roadmap's foundation, content/item, and minimal Java pack milestones (phases 0, 1, and 2a):
 
 - multi-module Maven build with per-version shaded distributions
+- automatic Paper capability detection with a Bukkit-compatible fallback
 - schema-validated content packs and deterministic inheritance
 - immutable item registry and atomic reload rollback
 - persistent ContentID storage and version-aware item creation
@@ -46,6 +47,10 @@ deterministic Java resource-pack compiler
 ```
 
 Failed startup validation aborts plugin enable. Failed reload validation leaves the previous content revision and allocation state active.
+
+### Server software capabilities
+
+VoxelCore automatically detects Paper at startup and selects its Paper capability provider. Other supported Bukkit-compatible servers use the fallback provider, so no configuration toggle or separate plugin JAR is required. The server-software capability layer is independent of the Minecraft version adapter and is the extension point for future Paper-specific implementations.
 
 ## Runtime version families
 
