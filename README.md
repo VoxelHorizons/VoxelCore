@@ -4,6 +4,21 @@ VoxelCore is the version-aware content foundation for Voxel Horizons. The curren
 
 Higher-level gameplay systems such as placed blocks, furniture, vehicles, crops, GUIs, Bedrock/Geyser presentation, and legacy HavenCore migration are deliberately outside this MVP.
 
+## Current implementation status
+
+The repository has completed the roadmap's foundation, content/item, and minimal Java pack milestones (phases 0, 1, and 2a):
+
+- multi-module Maven build with per-version shaded distributions
+- schema-validated content packs and deterministic inheritance
+- immutable item registry and atomic reload rollback
+- persistent ContentID storage and version-aware item creation
+- stable numeric and structured render allocations
+- deterministic Java resource-pack validation and compilation
+- exact real-server smoke coverage from Minecraft 1.12.2 through Minecraft 26.2
+- snapshot JAR publication from `main`
+
+Bedrock items/mappings, action and menu sessions, richer item metadata and behavior, placed blocks, furniture, crops, skills, NPCs, vehicles, and network persistence have not been implemented yet.
+
 ## Item MVP
 
 ```text
@@ -43,12 +58,15 @@ Install exactly one distribution jar matching the server family.
 | 1.19.4–1.20.4 | `voxelcore-v1_19_4` | PDC/CMD plus display-entity-era capability boundary |
 | 1.20.5–1.21.3 | `voxelcore-v1_20_5` | data-component-era family with scalar CMD compatibility |
 | 1.21.4 | `voxelcore-v1_21_4` | item-model component and structured Custom Model Data |
+| 26.2 | `voxelcore-v26_2` | Paper 26.2 item-model component and structured Custom Model Data |
 
-The MVP real-server matrix validates **1.12.2, 1.13.2, 1.14.4, 1.19.4, 1.20.5, and 1.21.4**. Intermediate versions are selected by the version-family providers but are not individually smoke-tested.
+The real-server matrix validates **1.12.2, 1.13.2, 1.14.4, 1.19.4, 1.20.5, 1.21.4, and 26.2**. Intermediate versions in the first four family ranges are selected by their providers but are not individually smoke-tested.
 
-`voxelcore-v1_21_4` intentionally accepts 1.21.4 only. Newer Minecraft releases must receive an explicit validated adapter/pack profile instead of silently inheriting a compatibility claim.
+`voxelcore-v1_21_4` and `voxelcore-v26_2` intentionally accept only their exact validated versions. VoxelCore does not treat the gap between 1.21.4 and 26.2, or a future version after 26.2, as compatible without a dedicated adapter and pack profile.
 
 ## Build
+
+Building the complete reactor requires **JDK 25** because the Minecraft 26.2/Paper module targets Java 25. Older distribution modules still emit bytecode for their own required Java level.
 
 Build every distribution:
 
@@ -61,6 +79,8 @@ Or one family and its dependencies:
 ```bash
 mvn -pl voxelcore-v1_21_4 -am clean package
 ```
+
+Every successful push to `main` updates the prerelease tag `v1.0-SNAPSHOT` with all six version-family JARs. Pull-request builds also upload each distribution as a workflow artifact.
 
 ## Runtime directory
 
@@ -105,13 +125,14 @@ A cross-pack inheritance or model reference is accepted only when the referenced
 items:
   gem_base:
     material: minecraft:paper
+    bound: false
     lore:
-      - A VoxelCore item
+      - Shared values for inherited gemstone definitions
 
   ruby:
     extends: gem_base
     display_name: Ruby
-    bound: false
+    bound: true
     render:
       model: mypack:item/ruby
       unbreakable: true
@@ -135,6 +156,12 @@ Supported item fields:
 - `properties`
 
 Unknown keys and malformed values are rejected rather than ignored.
+
+### Bound and list visibility
+
+`bound` is inherited like the other scalar fields. In the current implementation, `/voxelcore admin item list` shows only definitions whose resolved value is `bound: true`. This allows `bound: false` definitions to act as hidden inheritance bases while remaining available to the compiler and registry.
+
+This flag does **not yet enforce full soulbound inventory, drop, death, container, trade, or cross-server transfer rules**. Those mechanics remain a later item-behavior milestone.
 
 ### Identity
 
@@ -285,6 +312,9 @@ The MVP compiler intentionally exposes exact validated profiles instead of prete
 | `mc-1.19.4` | numeric Custom Model Data | 13 |
 | `mc-1.20.5` | numeric Custom Model Data | 32 |
 | `mc-1.21.4` | item-model / structured CMD | 46 |
+| `mc-26.2` | item-model / structured CMD | 88.0 |
+
+Minecraft 26.2 uses modern `min_format`/`max_format` pack metadata. Earlier targets retain the legacy `pack_format` field.
 
 Pack output is deterministic and stored below:
 
@@ -314,6 +344,8 @@ plugins/VoxelCore/build/resource-packs/<target>.zip
 
 When `[target]` is omitted, VoxelCore uses the current server version only when an exact validated pack profile exists. Otherwise specify a target explicitly.
 
+`item list` reports only resolved `bound: true` definitions. Hidden `bound: false` definitions can still be inspected directly with `item info` and used as inheritance parents.
+
 ## Safe reloads
 
 Reload builds the candidate revision in isolation:
@@ -340,7 +372,7 @@ GitHub Actions performs:
 
 - full Maven build of all distribution jars
 - unit tests for parsing, inheritance, immutable snapshots, allocation persistence/tombstones, structured indices, modern rule generation, and reload rollback
-- real-server smoke tests for 1.12.2, 1.13.2, 1.14.4, 1.19.4, 1.20.5, and 1.21.4
+- real-server smoke tests for 1.12.2, 1.13.2, 1.14.4, 1.19.4, 1.20.5, 1.21.4, and 26.2
 - item create/identify verification
 - exact-target pack validate/build
 - failed reload preservation followed by successful reload
@@ -359,6 +391,6 @@ These are next systems, not blockers for the item/content MVP:
 - richer potion/skull/book/map/firework metadata
 - generic low-level post-1.20.5 component escape hatches
 - HavenCore backward-compatibility/import aliases
-- support for newer Minecraft families beyond the explicit validated adapters
+- support for additional Minecraft families beyond the explicit validated adapters
 
-See `Migration-Roadmap.md` for the broader rebuild plan and architectural rationale.
+See `Migration-Roadmap.md` for the broader rebuild plan and architectural rationale. Its repository review appendices describe the original audited snapshots; the implementation-status section in this README is the canonical description of current VoxelCore functionality.
