@@ -20,6 +20,7 @@ public final class RawItemDefinition {
     private final String displayName;
     private final List<String> lore;
     private final Boolean bound;
+    private final Boolean abstractDefinition;
     private final RawItemRenderDefinition render;
     private final Map<String, Object> properties;
 
@@ -32,6 +33,19 @@ public final class RawItemDefinition {
                              Boolean bound,
                              RawItemRenderDefinition render,
                              Map<String, Object> properties) {
+        this(id, parent, type, material, displayName, lore, bound, null, render, properties);
+    }
+
+    public RawItemDefinition(ContentID id,
+                             ContentID parent,
+                             ItemType type,
+                             String material,
+                             String displayName,
+                             List<String> lore,
+                             Boolean bound,
+                             Boolean abstractDefinition,
+                             RawItemRenderDefinition render,
+                             Map<String, Object> properties) {
         this.id = id;
         this.parent = parent;
         this.type = type;
@@ -39,6 +53,7 @@ public final class RawItemDefinition {
         this.displayName = displayName;
         this.lore = lore == null ? null : Collections.unmodifiableList(new ArrayList<String>(lore));
         this.bound = bound;
+        this.abstractDefinition = abstractDefinition;
         this.render = render;
         this.properties = properties == null ? null : Collections.unmodifiableMap(new HashMap<String, Object>(properties));
     }
@@ -50,6 +65,7 @@ public final class RawItemDefinition {
     public String displayName() { return displayName; }
     public List<String> lore() { return lore; }
     public Boolean bound() { return bound; }
+    public Boolean abstractDefinition() { return abstractDefinition; }
     public RawItemRenderDefinition render() { return render; }
     public Map<String, Object> properties() { return properties; }
 }
