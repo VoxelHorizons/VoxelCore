@@ -11,6 +11,10 @@
 
     <artifactId>voxelcore-v1_14</artifactId>
 
+    <properties>
+        <voxelcore.api.version>1.14</voxelcore.api.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.voxelhorizons</groupId>
@@ -31,6 +35,15 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>${project.parent.basedir}/voxelcore-plugin/src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>plugin.yml</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
