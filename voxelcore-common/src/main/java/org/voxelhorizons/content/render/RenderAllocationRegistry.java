@@ -153,7 +153,7 @@ public final class RenderAllocationRegistry {
     }
 
     private static String modelOf(ItemDefinition definition) {
-        if (definition == null) return null;
+        if (definition == null || definition.abstractDefinition()) return null;
         ItemRenderDefinition render = definition.render();
         if (render == null || render.model() == null || render.model().trim().isEmpty()) return null;
         return normalizeModel(render.model());
