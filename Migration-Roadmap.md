@@ -1,5 +1,7 @@
 # VoxelCore migration and optimization roadmap
 
+> **Implementation status (September 2026):** Roadmap phases 0, 1, and 2a are implemented on `main`, including the hardened item/content pipeline, exact Java resource-pack profiles, and real-server validation through Minecraft 26.2. This document preserves the original architecture audit and source evidence; use the README for the canonical current feature and compatibility summary.
+
 Prepared for Voxel Horizons · 12 September 2026 · Planning only
 
 ## 1. Recommendation and scope
@@ -329,7 +331,7 @@ The first reviewable deliverable should contain: schema v1; canonical IDs; legac
 
 Before coding the renderer, record the chosen oldest backend and oldest Java client separately, whether Geyser runs on proxy/backend/standalone, and whether the first release must include older backend support or only older clients. The roadmap above remains useful without those answers; they determine which adapters we implement first.
 
-No migration or merge has been initiated by this review.
+This was the original recommended first migration unit. It is now implemented on `main`; the remaining rows in the mechanics migration backlog describe future slices.
 
 ## Appendix A. Reviewed snapshots
 
