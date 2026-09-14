@@ -1,7 +1,7 @@
 name: VoxelCore
 version: ${project.version}
 main: org.voxelhorizons.VoxelCore
-api-version: '${voxelcore.api.version}'
+api-version: '1.19'
 
 commands:
   voxelcore:

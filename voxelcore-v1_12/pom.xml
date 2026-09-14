@@ -11,6 +11,10 @@
 
     <artifactId>voxelcore-v1_12</artifactId>
 
+    <properties>
+        <voxelcore.api.version>1.13</voxelcore.api.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.voxelhorizons</groupId>
@@ -31,6 +35,15 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>${project.basedir}/src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>plugin.yml</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -42,6 +55,14 @@
                         <configuration>
                             <finalName>VoxelCore-${project.version}-mc1.12-1.13</finalName>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <filters>
+                                <filter>
+                                    <artifact>org.voxelhorizons:voxelcore-plugin</artifact>
+                                    <excludes>
+                                        <exclude>plugin.yml</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                             <relocations>
                                 <relocation>
                                     <pattern>org.yaml.snakeyaml</pattern>
