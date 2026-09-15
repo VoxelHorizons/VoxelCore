@@ -358,9 +358,9 @@ ui:
       ascent: auto
 ```
 
-The row count controls vertical placement only. Whether the artwork visually covers seven, nine, or any other subset of the row's slots is encoded in the texture and must not be inferred by pixel scanning. `ascent: auto` is the default; a numeric value is an explicit override.
+The row count declares the target inventory height. Whether the artwork visually covers seven, nine, or any other subset of the row's slots is encoded in the texture and is not inferred. `ascent: auto` is the default: the compiler preserves the full canvas, scales its first visible alpha row by the configured font height, and aligns it to the vanilla first-slot offset. A numeric value is an explicit override.
 
-The three-row network-exchange artwork is one fixture, not a fixed layout contract. UI definitions must support inventories from one through six rows. An author may provide an explicit `ascent` for exceptional artwork; otherwise the compiler must derive a deterministic ascent from the definition's row count and positioning metadata. Derivation must be tested for every supported row count and must not infer placement by trimming or scanning transparent pixels.
+The three-row network-exchange artwork is one fixture, not a fixed layout contract. UI definitions must support inventories from one through six rows. An author may provide an explicit `ascent` for exceptional artwork; otherwise the compiler must derive a deterministic ascent from the definition's row count and positioning metadata. Derivation must be tested across supported row counts and must never trim or rewrite the transparent positioning canvas.
 
 The supplied historical `default.json` is migration evidence, not a file to copy wholesale: it combines hundreds of unrelated providers and contains duplicate character assignments. The supplied spacing TTF should likewise be treated as an input to validate per target; if a target cannot safely load it, pack compilation must omit or reject that capability explicitly rather than producing a nominally successful but broken pack.
 
