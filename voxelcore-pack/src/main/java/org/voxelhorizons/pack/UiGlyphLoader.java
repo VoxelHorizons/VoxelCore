@@ -73,7 +73,7 @@ public final class UiGlyphLoader {
         Map<ContentID, UiGlyphDefinition> resolved = new LinkedHashMap<ContentID, UiGlyphDefinition>();
         for (ContentID id : ids) {
             RawGlyph glyph = raw.get(id);
-            int ascent = glyph.ascent == null ? glyph.height : glyph.ascent.intValue();
+            int ascent = glyph.ascent == null ? glyph.automaticAscent : glyph.ascent.intValue();
             if (ascent > glyph.height) throw new ContentLoadException("UI glyph " + id + " ascent cannot exceed height");
             resolved.put(id, new UiGlyphDefinition(id, glyph.texture, glyph.rows, glyph.height, ascent,
                     active.get(id).intValue()));
@@ -129,8 +129,9 @@ public final class UiGlyphLoader {
             throw new ContentLoadException("UI glyph " + id + " references missing texture " + texture
                     + ". Expected " + textureFile);
         }
+        final BufferedImage image;
         try {
-            BufferedImage image = ImageIO.read(textureFile.toFile());
+            image = ImageIO.read(textureFile.toFile());
             if (image == null || image.getWidth() < 1 || image.getHeight() < 1) {
                 throw new ContentLoadException("UI glyph texture is not a readable PNG: " + textureFile);
             }
@@ -165,7 +166,18 @@ public final class UiGlyphLoader {
             explicit = Integer.valueOf(character.codePointAt(0));
             requirePrivateUse(explicit.intValue(), id);
         }
-        return new RawGlyph(textureResource.toString(), rows, height, ascent, explicit);
+        int firstVisibleRow = firstVisibleRow(image, id);
+        int automaticAscent = (int) Math.round(firstVisibleRow * ((double) height / image.getHeight())) - 5;
+        return new RawGlyph(textureResource.toString(), rows, height, ascent, automaticAscent, explicit);
+    }
+
+    private static int firstVisibleRow(BufferedImage image, ContentID id) {
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                if (((image.getRGB(x, y) >>> 24) & 0xFF) != 0) return y;
+            }
+        }
+        throw new ContentLoadException("UI glyph " + id + " texture is fully transparent");
     }
 
     private static AllocationState readAllocations(Path file) {
@@ -297,10 +309,11 @@ public final class UiGlyphLoader {
         private final int rows;
         private final int height;
         private final Integer ascent;
+        private final int automaticAscent;
         private final Integer explicitCodePoint;
-        private RawGlyph(String texture, int rows, int height, Integer ascent, Integer explicitCodePoint) {
+        private RawGlyph(String texture, int rows, int height, Integer ascent, int automaticAscent, Integer explicitCodePoint) {
             this.texture = texture; this.rows = rows; this.height = height;
-            this.ascent = ascent; this.explicitCodePoint = explicitCodePoint;
+            this.ascent = ascent; this.automaticAscent = automaticAscent; this.explicitCodePoint = explicitCodePoint;
         }
     }
 
