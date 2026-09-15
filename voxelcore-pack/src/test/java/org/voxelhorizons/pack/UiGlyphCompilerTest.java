@@ -3,6 +3,7 @@ package org.voxelhorizons.pack;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.voxelhorizons.content.ContentID;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -23,23 +24,17 @@ public class UiGlyphCompilerTest {
     @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
     @Test
-    public void compilesOneRowUiWithStableAutomaticGlyphAndSpacing() throws Exception {
+    public void compilesCroppedUiWithStableAutomaticGlyphAndSpacing() throws Exception {
         File contentRoot = temporaryFolder.newFolder("content");
         File pack = new File(contentRoot, "voxel");
         assertTrue(new File(pack, "content").mkdirs());
         File texture = new File(pack, "assets/voxel/textures/ui/npc/warps_menu.png");
         assertTrue(texture.getParentFile().mkdirs());
-        writePng(texture, 256, 256, 167);
+        writePng(texture, 176, 18);
         write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
         write(new File(pack, "content/ui.yml"),
-                "ui:\n" +
-                "  npc_warps:\n" +
-                "    texture: voxel:ui/npc/warps_menu\n" +
-                "    inventory:\n" +
-                "      rows: 1\n" +
-                "    font:\n" +
-                "      height: 256\n" +
-                "      ascent: auto\n");
+                "ui:\n  warps_menu:\n    path: ui/npc/warps_menu.png\n" +
+                "    scale_ratio: 18\n    y_position: 8\n");
 
         Path build = temporaryFolder.newFolder("build").toPath();
         Path renderAllocations = build.resolve("render-allocations.yml");
@@ -49,17 +44,19 @@ public class UiGlyphCompilerTest {
 
         UiGlyphRegistry registry = compiler.loadUiGlyphs(contentRoot.toPath(),
                 build.resolve("glyph-allocations.yml"), false);
-        UiGlyphDefinition glyph = registry.get(org.voxelhorizons.content.ContentID.of("voxel", "npc_warps")).get();
-        assertEquals(1, glyph.rows());
-        assertEquals(256, glyph.height());
-        assertEquals(162, glyph.ascent());
+        UiGlyphDefinition glyph = registry.get(ContentID.of("voxel", "warps_menu")).get();
+        assertEquals(18, glyph.scaleRatio());
+        assertEquals(8, glyph.yPosition());
         assertEquals(0xE000, glyph.codePoint());
+        assertEquals(glyph.character(), registry.resolveAliases(":warps_menu:"));
+        assertEquals(glyph.character(), registry.resolveAliases(":voxel/warps_menu:"));
 
         String font = zipText(output, "assets/minecraft/font/default.json");
         assertTrue(font.contains("\"type\":\"space\""));
         assertTrue(font.contains("\"type\":\"bitmap\""));
         assertTrue(font.contains("\"file\":\"voxel:ui/npc/warps_menu.png\""));
-        assertTrue(font.contains("\"ascent\":162"));
+        assertTrue(font.contains("\"height\":18"));
+        assertTrue(font.contains("\"ascent\":8"));
         assertTrue(font.contains(glyph.character()));
 
         String firstManifest = new String(Files.readAllBytes(build.resolve("glyph-allocations.yml")), StandardCharsets.UTF_8);
@@ -68,57 +65,51 @@ public class UiGlyphCompilerTest {
     }
 
     @Test
-    public void supportsExplicitAscentAndRejectsInvalidRows() throws Exception {
+    public void defaultsScaleAndPositionAndRejectsInvalidPosition() throws Exception {
         File contentRoot = temporaryFolder.newFolder("explicit-content");
         File pack = new File(contentRoot, "voxel");
         assertTrue(new File(pack, "content").mkdirs());
         File texture = new File(pack, "assets/voxel/textures/ui/overlay.png");
         assertTrue(texture.getParentFile().mkdirs());
-        writePng(texture, 256, 256, 0);
+        writePng(texture, 40, 18);
         write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
         File definition = new File(pack, "content/ui.yml");
-        write(definition,
-                "ui:\n  overlay:\n    texture: voxel:ui/overlay\n    inventory:\n      rows: 6\n" +
-                "    font:\n      height: 40\n      ascent: 31\n");
+        write(definition, "ui:\n  overlay:\n    path: ui/overlay.png\n");
 
         UiGlyphDefinition glyph = new UiGlyphLoader().load(contentRoot.toPath(),
                 temporaryFolder.newFolder("explicit-build").toPath().resolve("glyphs.yml"), false)
-                .get(org.voxelhorizons.content.ContentID.of("voxel", "overlay")).get();
-        assertEquals(6, glyph.rows());
-        assertEquals(31, glyph.ascent());
+                .get(ContentID.of("voxel", "overlay")).get();
+        assertEquals(18, glyph.scaleRatio());
+        assertEquals(8, glyph.yPosition());
 
-        write(definition,
-                "ui:\n  overlay:\n    texture: voxel:ui/overlay\n    inventory:\n      rows: 7\n" +
-                "    font:\n      height: 40\n");
+        write(definition, "ui:\n  overlay:\n    path: ui/overlay.png\n    scale_ratio: 18\n    y_position: 19\n");
         try {
-            new UiGlyphLoader().load(contentRoot.toPath(), temporaryFolder.newFolder("invalid-build").toPath().resolve("bad-glyphs.yml"), false);
-            fail("Expected invalid row count to fail");
+            new UiGlyphLoader().load(contentRoot.toPath(),
+                    temporaryFolder.newFolder("invalid-build").toPath().resolve("bad-glyphs.yml"), false);
+            fail("Expected invalid y_position to fail");
         } catch (RuntimeException exception) {
-            assertTrue(exception.getMessage().contains("between 1 and 6"));
+            assertTrue(exception.getMessage().contains("must not exceed scale_ratio"));
         }
     }
 
     @Test
-    public void rejectsDuplicateExplicitCharacters() throws Exception {
+    public void rejectsDuplicateExplicitSymbols() throws Exception {
         File contentRoot = temporaryFolder.newFolder("collision-content");
         File pack = new File(contentRoot, "voxel");
         assertTrue(new File(pack, "content").mkdirs());
         File first = new File(pack, "assets/voxel/textures/ui/first.png");
         File second = new File(pack, "assets/voxel/textures/ui/second.png");
         assertTrue(first.getParentFile().mkdirs());
-        writePng(first, 16, 16, 0);
-        writePng(second, 16, 16, 0);
+        writePng(first, 16, 16);
+        writePng(second, 16, 16);
         write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
         write(new File(pack, "content/ui.yml"),
-                "ui:\n" +
-                "  first:\n    texture: voxel:ui/first\n    inventory: {rows: 1}\n" +
-                "    font: {height: 16, character: '\uE100'}\n" +
-                "  second:\n    texture: voxel:ui/second\n    inventory: {rows: 1}\n" +
-                "    font: {height: 16, character: '\uE100'}\n");
+                "ui:\n  first:\n    path: ui/first.png\n    symbol: '\uE100'\n" +
+                "  second:\n    path: ui/second.png\n    symbol: '\uE100'\n");
         try {
             new UiGlyphLoader().load(contentRoot.toPath(),
                     temporaryFolder.newFolder("collision-build").toPath().resolve("glyphs.yml"), false);
-            fail("Expected duplicate character rejection");
+            fail("Expected duplicate symbol rejection");
         } catch (RuntimeException exception) {
             assertTrue(exception.getMessage().contains("Duplicate UI glyph codepoint"));
         }
@@ -131,11 +122,9 @@ public class UiGlyphCompilerTest {
         assertTrue(new File(pack, "content").mkdirs());
         File texture = new File(pack, "assets/voxel/textures/ui/overlay.png");
         assertTrue(texture.getParentFile().mkdirs());
-        writePng(texture, 16, 16, 0);
+        writePng(texture, 16, 16);
         write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
-        write(new File(pack, "content/ui.yml"),
-                "ui:\n  overlay:\n    texture: voxel:ui/overlay\n    inventory:\n      rows: 1\n" +
-                "    font:\n      height: 16\n");
+        write(new File(pack, "content/ui.yml"), "ui:\n  overlay:\n    path: ui/overlay.png\n");
         try {
             new JavaPackCompiler().compile(contentRoot.toPath(), temporaryFolder.newFile("legacy.zip").toPath(),
                     temporaryFolder.newFolder("legacy-build").toPath().resolve("render.yml"), JavaPackTarget.MC_1_12_2);
@@ -149,9 +138,9 @@ public class UiGlyphCompilerTest {
         Files.write(file.toPath(), content.getBytes(StandardCharsets.UTF_8));
     }
 
-    private static void writePng(File file, int width, int height, int visibleTop) throws Exception {
+    private static void writePng(File file, int width, int height) throws Exception {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-        for (int y = visibleTop; y < height; y++) {
+        for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) image.setRGB(x, y, 0xFFFFFFFF);
         }
         assertTrue(ImageIO.write(image, "png", file));
