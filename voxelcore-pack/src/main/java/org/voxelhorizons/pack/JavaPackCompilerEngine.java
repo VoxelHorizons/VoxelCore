@@ -57,6 +57,13 @@ final class JavaPackCompilerEngine {
         List<ContentPack> packs = packDiscovery.discover(contentRoot);
         Map<String, ContentPack> packsByNamespace = indexPacks(packs);
         ItemDefinitionRegistry registry = contentLoader.load(contentRoot);
+        Path glyphAllocationPath = allocationManifestPath.resolveSibling("glyph-allocations.yml");
+        UiGlyphLoader glyphLoader = new UiGlyphLoader();
+        UiGlyphRegistry glyphs = glyphLoader.load(contentRoot, glyphAllocationPath, false);
+        if (!target.supportsUiFonts() && glyphs.size() > 0) {
+            throw new JavaPackCompileException("Java pack target " + target.id()
+                    + " does not support custom UI fonts");
+        }
 
         RenderAllocationStore allocationStore = new RenderAllocationStore(allocationManifestPath);
         RenderAllocationRegistry allocations;
@@ -70,6 +77,7 @@ final class JavaPackCompilerEngine {
         putEntry(entries, "pack.mcmeta", utf8(packMeta(target)));
         int copiedAssets = copyAuthoredAssets(packs, entries);
         writeCustomTextureAtlas(packs, target, entries);
+        if (target.supportsUiFonts()) writeUiFont(entries, glyphs);
 
         List<ItemDefinition> items = new ArrayList<ItemDefinition>(registry.entries().values());
         Collections.sort(items, new Comparator<ItemDefinition>() {
@@ -143,6 +151,7 @@ final class JavaPackCompilerEngine {
             } catch (RuntimeException exception) {
                 throw new JavaPackCompileException("Unable to persist render allocations: " + exception.getMessage(), exception);
             }
+            glyphLoader.load(contentRoot, glyphAllocationPath, true);
             writeDeterministicZip(outputZip, entries);
         }
         return new JavaPackBuildResult(outputZip, allocationManifestPath, renderedItems, copiedAssets);
@@ -418,16 +427,52 @@ final class JavaPackCompilerEngine {
         }
         if (directories.isEmpty()) return;
 
-        StringBuilder json = new StringBuilder("{\n  \"sources\": [\n");
+        StringBuilder atlas = new StringBuilder("{\n  \"sources\": [\n");
         int index = 0;
         for (String directory : directories) {
-            if (index++ > 0) json.append(",\n");
-            json.append("    {\"type\": \"directory\", \"source\": \"")
+            if (index++ > 0) atlas.append(",\n");
+            atlas.append("    {\"type\": \"directory\", \"source\": \"")
                     .append(json(directory)).append("\", \"prefix\": \"")
                     .append(json(directory)).append("/\"}");
         }
-        json.append("\n  ]\n}\n");
-        putEntry(entries, atlasPath, utf8(json.toString()));
+        atlas.append("\n  ]\n}\n");
+        putEntry(entries, atlasPath, utf8(atlas.toString()));
+    }
+
+    private static void writeUiFont(Map<String, byte[]> entries, UiGlyphRegistry glyphs) {
+        StringBuilder out = new StringBuilder("{\n  \"providers\": [\n");
+        out.append("    {\"type\":\"space\",\"advances\":{");
+        int codePoint = 0xF800;
+        boolean firstAdvance = true;
+        for (int distance = -1024; distance <= 1024; distance = nextSpacing(distance)) {
+            if (distance == 0) continue;
+            if (!firstAdvance) out.append(',');
+            firstAdvance = false;
+            out.append('\"').append(new String(Character.toChars(codePoint++))).append("\":").append(distance);
+        }
+        out.append("}}");
+
+        List<UiGlyphDefinition> definitions = new ArrayList<UiGlyphDefinition>(glyphs.entries().values());
+        Collections.sort(definitions, new Comparator<UiGlyphDefinition>() {
+            @Override public int compare(UiGlyphDefinition left, UiGlyphDefinition right) {
+                return left.id().toString().compareTo(right.id().toString());
+            }
+        });
+        for (UiGlyphDefinition glyph : definitions) {
+            out.append(",\n    {\"type\":\"bitmap\",\"file\":\"")
+                    .append(json(glyph.texture())).append(".png\",\"ascent\":")
+                    .append(glyph.ascent()).append(",\"height\":").append(glyph.height())
+                    .append(",\"chars\":[\"").append(glyph.character()).append("\"]}");
+        }
+        out.append("\n  ]\n}\n");
+        putEntry(entries, "assets/minecraft/font/default.json", utf8(out.toString()));
+    }
+
+    private static int nextSpacing(int value) {
+        if (value == -1) return 0;
+        if (value == 0) return 1;
+        if (value < 0) return value / 2;
+        return value * 2;
     }
 
     private static int copyAuthoredAssets(List<ContentPack> packs, Map<String, byte[]> entries) {

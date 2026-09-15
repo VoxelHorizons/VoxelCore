@@ -108,6 +108,7 @@ public final class VoxelCore extends JavaPlugin {
                         }
                     });
             packManager = new PackManager(getDataFolder().toPath(), contentRoot, versionAdapter.version());
+            packManager.uiGlyphs(true);
         } catch (IOException exception) {
             logger.log(Level.SEVERE, "Unable to create VoxelCore content directory " + contentRoot, exception);
             getServer().getPluginManager().disablePlugin(this);
@@ -159,10 +160,24 @@ public final class VoxelCore extends JavaPlugin {
     }
 
     public ContentReloadResult onReload() {
-        if (contentReloader == null || contentRuntime == null) throw new IllegalStateException("VoxelCore content runtime is not initialized");
+        if (contentReloader == null || contentRuntime == null || packManager == null) {
+            throw new IllegalStateException("VoxelCore content runtime is not initialized");
+        }
+        try {
+            packManager.uiGlyphs(false);
+        } catch (RuntimeException exception) {
+            ContentReloadResult failure = ContentReloadResult.failure(contentRuntime.current(),
+                    "UI content validation failed: " + exception.getMessage());
+            logger.warning("Content reload failed; revision " + failure.activeRevision() + " remains active. " + failure.message());
+            return failure;
+        }
         ContentReloadResult result = contentReloader.reload();
-        if (result.success()) logger.info("Published content revision " + result.activeRevision() + " (" + result.itemCount() + " items)");
-        else logger.warning("Content reload failed; revision " + result.activeRevision() + " remains active. " + result.message());
+        if (result.success()) {
+            packManager.uiGlyphs(true);
+            logger.info("Published content revision " + result.activeRevision() + " (" + result.itemCount() + " items)");
+        } else {
+            logger.warning("Content reload failed; revision " + result.activeRevision() + " remains active. " + result.message());
+        }
         return result;
     }
 
