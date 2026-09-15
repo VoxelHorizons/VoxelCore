@@ -31,10 +31,13 @@ public class UiGlyphCompilerTest {
         File texture = new File(pack, "assets/voxel/textures/ui/npc/warps_menu.png");
         assertTrue(texture.getParentFile().mkdirs());
         writePng(texture, 176, 18);
+        File inlineTexture = new File(pack, "assets/voxel/textures/ui/smile.png");
+        writePng(inlineTexture, 18, 18);
         write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
         write(new File(pack, "content/ui.yml"),
                 "ui:\n  warps_menu:\n    path: ui/npc/warps_menu.png\n" +
-                "    scale_ratio: 18\n    y_position: 8\n    gui: true\n");
+                "    scale_ratio: 18\n    y_position: 8\n    gui: true\n" +
+                "  z_smile:\n    path: ui/smile.png\n    scale_ratio: 18\n");
 
         Path build = temporaryFolder.newFolder("build").toPath();
         Path renderAllocations = build.resolve("render-allocations.yml");
@@ -60,6 +63,16 @@ public class UiGlyphCompilerTest {
         assertEquals(UiSpacingGlyphs.charactersForOffset(-17), resolver.resolve(":offset_-17:"));
         assertEquals("", resolver.resolve(":offset_0:"));
         assertEquals(":offset_-2048:", resolver.resolve(":offset_-2048:"));
+
+        UiGlyphDefinition inline = registry.get(ContentID.of("voxel", "z_smile")).get();
+        assertTrue(!inline.gui());
+        String permissionSample = ":z_smile::warps_menu::offset_-16:";
+        assertEquals("\u00A7f" + inline.character() + ":warps_menu::offset_-16:",
+                resolver.resolve(permissionSample, true, false));
+        assertEquals(":z_smile:\u00A7f" + glyph.character()
+                        + UiSpacingGlyphs.charactersForOffset(-177) + UiSpacingGlyphs.charactersForOffset(-16),
+                resolver.resolve(permissionSample, false, true));
+        assertEquals(permissionSample, resolver.resolve(permissionSample, false, false));
 
         String font = zipText(output, "assets/minecraft/font/default.json");
         assertTrue(font.contains("\"type\":\"space\""));
