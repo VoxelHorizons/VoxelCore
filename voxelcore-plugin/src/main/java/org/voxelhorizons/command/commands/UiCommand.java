@@ -51,12 +51,14 @@ public final class UiCommand implements SubCommand {
 
     private static List<String> ids(String prefix) {
         final String normalized = prefix == null ? "" : prefix.toLowerCase(java.util.Locale.ROOT);
-        List<String> ids = new ArrayList<String>();
-        for (ContentID id : registry(false).entries().keySet()) {
-            if (id.toString().startsWith(normalized)) ids.add(id.toString());
+        UiGlyphRegistry registry = registry(false);
+        List<String> suggestions = new ArrayList<String>();
+        for (ContentID id : registry.entries().keySet()) {
+            String suggestion = normalized.startsWith(":") ? ":" + id.value() + ":" : id.toString();
+            if (suggestion.startsWith(normalized) && !suggestions.contains(suggestion)) suggestions.add(suggestion);
         }
-        Collections.sort(ids);
-        return ids;
+        Collections.sort(suggestions);
+        return suggestions;
     }
 
     private static UiGlyphDefinition find(CommandSender sender, String[] args, boolean persist) {
