@@ -334,7 +334,7 @@ The implemented slice includes:
 
 - compiler-owned positive and negative spacing providers
 - namespaced `ui:` definitions with stable private-use codepoint allocation and tombstones
-- compact cropped-image metadata: `path`, optional `scale_ratio`, optional `y_position`, and optional explicit `symbol`
+- compact cropped-image metadata: `path`, optional `scale_ratio`, optional `y_position`, optional `gui`, and optional explicit `symbol`
 - deterministic bitmap provider generation and merged `minecraft:default` output
 - validation for duplicate symbols, missing textures, unsafe paths, dimensions, properties, and incompatible targets
 - white-safe `:name:` and `:namespace/name:` alias resolution plus exact `:offset_<pixels>:` spacing placeholders for VoxelCore-owned text
@@ -350,7 +350,7 @@ ui:
     y_position: 8
 ```
 
-The path is relative to the pack namespace's texture root. The scale defaults to the PNG height and the position defaults to `min(8, scale_ratio)`. Neither inventory row count nor transparent padding is required; authors can crop artwork to its visible pixels and tune its rendered size and baseline directly.
+The path is relative to the pack namespace's texture root. The scale defaults to the PNG height and the position defaults to `min(8, scale_ratio)`. `gui: true` appends an automatically calculated negative bitmap advance during placeholder resolution, while inline images keep normal text flow. Neither inventory row count nor transparent padding is required.
 
 Colon aliases are runtime placeholder syntax, not a resource-pack feature. UI aliases are prefixed with white to prevent title tinting, and offset aliases resolve to compiler-owned spacing characters. VoxelCore resolves them in permitted player chat and exposes a reload-safe service for text it owns. Third-party menu plugins must call that service through an integration or use the literal character from `ui copy`.
 
