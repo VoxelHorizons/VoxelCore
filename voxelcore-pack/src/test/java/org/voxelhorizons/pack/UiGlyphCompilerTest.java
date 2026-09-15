@@ -29,7 +29,7 @@ public class UiGlyphCompilerTest {
         assertTrue(new File(pack, "content").mkdirs());
         File texture = new File(pack, "assets/voxel/textures/ui/npc/warps_menu.png");
         assertTrue(texture.getParentFile().mkdirs());
-        writePng(texture, 256, 256);
+        writePng(texture, 256, 256, 167);
         write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
         write(new File(pack, "content/ui.yml"),
                 "ui:\n" +
@@ -52,14 +52,14 @@ public class UiGlyphCompilerTest {
         UiGlyphDefinition glyph = registry.get(org.voxelhorizons.content.ContentID.of("voxel", "npc_warps")).get();
         assertEquals(1, glyph.rows());
         assertEquals(256, glyph.height());
-        assertEquals(256, glyph.ascent());
+        assertEquals(162, glyph.ascent());
         assertEquals(0xE000, glyph.codePoint());
 
         String font = zipText(output, "assets/minecraft/font/default.json");
         assertTrue(font.contains("\"type\":\"space\""));
         assertTrue(font.contains("\"type\":\"bitmap\""));
         assertTrue(font.contains("\"file\":\"voxel:ui/npc/warps_menu.png\""));
-        assertTrue(font.contains("\"ascent\":256"));
+        assertTrue(font.contains("\"ascent\":162"));
         assertTrue(font.contains(glyph.character()));
 
         String firstManifest = new String(Files.readAllBytes(build.resolve("glyph-allocations.yml")), StandardCharsets.UTF_8);
@@ -105,7 +105,7 @@ public class UiGlyphCompilerTest {
         assertTrue(new File(pack, "content").mkdirs());
         File texture = new File(pack, "assets/voxel/textures/ui/overlay.png");
         assertTrue(texture.getParentFile().mkdirs());
-        writePng(texture, 16, 16);
+        writePng(texture, 16, 16, 0);
         write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
         write(new File(pack, "content/ui.yml"),
                 "ui:\n  overlay:\n    texture: voxel:ui/overlay\n    inventory:\n      rows: 1\n" +
@@ -123,8 +123,12 @@ public class UiGlyphCompilerTest {
         Files.write(file.toPath(), content.getBytes(StandardCharsets.UTF_8));
     }
 
-    private static void writePng(File file, int width, int height) throws Exception {
-        assertTrue(ImageIO.write(new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB), "png", file));
+    private static void writePng(File file, int width, int height, int visibleTop) throws Exception {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        for (int y = visibleTop; y < height; y++) {
+            for (int x = 0; x < width; x++) image.setRGB(x, y, 0xFFFFFFFF);
+        }
+        assertTrue(ImageIO.write(image, "png", file));
     }
 
     private static String zipText(Path zip, String name) throws Exception {
