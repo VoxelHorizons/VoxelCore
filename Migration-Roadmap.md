@@ -280,7 +280,7 @@ Each row is a separately reviewable feature slice. Dependencies should be satisf
 | 1 | Content IDs, inheritance, registry and item factory — HavenCore | Implemented core; legacy aliases deferred | Keep deterministic inheritance, immutable registries, isolated stacks, and failed-reload rollback; add legacy aliases only with the migration slice |
 | 2a | Minimal Java pack compiler — new | Implemented | Maintain stable allocations and exact validated legacy/modern pack profiles |
 | 2b | Bedrock items, pack and mappings — new/integrations | Planned | Same item behaves correctly in hand, inventory, drop and equip contexts; pack/reconnect lifecycle documented |
-| 2c | Java UI font content and stable glyph allocation — new/HavenCore assets | **Next** | Shared spacing resources, namespaced bitmap definitions, collision-free stable codepoints, deterministic merged font output, target capability checks, and a three-row overlay fixture |
+| 2c | Java UI font content and stable glyph allocation — new/HavenCore assets | **Next** | Shared spacing resources, namespaced bitmap definitions, collision-free stable codepoints, deterministic merged font output, target capability checks, and dynamic 1–6 row overlay fixtures with explicit/derived ascent |
 | 3a | Java item actions and interaction dispatch — HavenCore | Planned after 2c | Typed triggers, immutable compiled actions, central context/result dispatch, execution-time validation, reload safety, and legacy/modern smoke coverage |
 | 3b | Menus and session lifecycle — HavenCore | Planned after 3a | Presentation-independent actions, deterministic close/disconnect cleanup, and duplicate/stale action rejection before adding alternate frontends |
 | 4a | Basic items, books, heads, prefixes and bound rules — HavenCore | Planned | Correct cloning and metadata; optional permission integration; bound semantics cover all intended transfer paths |
@@ -337,12 +337,14 @@ The first reviewable slice should include:
 - built-in positive and negative spacing resources injected into every compatible generated Java pack
 - an authored `ui`/glyph definition keyed by stable namespaced `ContentID`
 - stable codepoint allocation with persisted tombstones, separate from item render allocation
-- bitmap provider compilation with explicit texture, height, and ascent
+- bitmap provider compilation with explicit texture and height, a validated 1–6 inventory row count, and per-UI ascent resolution
 - preservation of transparent positioning canvas for overlay textures
 - deterministic merging and ordering of generated font providers
 - validation for duplicate explicit characters, missing textures, invalid paths/dimensions, unsupported provider properties, and incompatible target profiles
 - a generated manifest that maps UI IDs to characters for later menu-title rendering
-- a three-row inventory overlay fixture based on the supplied network-exchange artwork
+- fixtures spanning different inventory heights and artwork offsets, including the supplied network-exchange and selector examples
+
+The three-row network-exchange artwork is one fixture, not a fixed layout contract. UI definitions must support inventories from one through six rows. An author may provide an explicit `ascent` for exceptional artwork; otherwise the compiler must derive a deterministic ascent from the definition's row count and positioning metadata. Derivation must be tested for every supported row count and must not infer placement by trimming or scanning transparent pixels.
 
 The supplied historical `default.json` is migration evidence, not a file to copy wholesale: it combines hundreds of unrelated providers and contains duplicate character assignments. The supplied spacing TTF should likewise be treated as an input to validate per target; if a target cannot safely load it, pack compilation must omit or reject that capability explicitly rather than producing a nominally successful but broken pack.
 
