@@ -63,22 +63,37 @@ public final class RenderAllocationRegistry {
         Map<String, StructuredModelDataAllocation> nextStructured =
                 new LinkedHashMap<String, StructuredModelDataAllocation>(previous.structuredModels);
 
+        // Automatic values remain globally monotonic for stable allocation manifests, but explicit
+        // custom_model_data collisions are only meaningful for the same base material. Minecraft
+        // evaluates numeric model predicates from the item's own material model, so PAPER/CMD 1 and
+        // GLASS_PANE/CMD 1 are independent render slots.
         Set<Integer> reserved = new HashSet<Integer>();
         for (RenderAllocation allocation : previous.allocations.values()) reserved.add(allocation.customModelData());
         int nextValue = previous.nextCustomModelData;
 
-        Map<Integer, String> activeClaims = new HashMap<Integer, String>();
+        // Historical allocations do not currently persist their base material. Keep removed entries
+        // conservatively reserved so a deleted content ID cannot silently hand its value to a new
+        // item whose old material is unknown.
+        Set<Integer> tombstonedValues = new HashSet<Integer>();
+        for (Map.Entry<ContentID, RenderAllocation> entry : previous.allocations.entrySet()) {
+            ItemDefinition definition = items.entries().get(entry.getKey());
+            if (modelOf(definition) == null) tombstonedValues.add(Integer.valueOf(entry.getValue().customModelData()));
+        }
+
+        Map<String, String> activeClaims = new HashMap<String, String>();
         for (Map.Entry<ContentID, RenderAllocation> entry : previous.allocations.entrySet()) {
             ItemDefinition definition = items.entries().get(entry.getKey());
             String currentModel = modelOf(definition);
-            if (currentModel == null) continue;
+            String material = materialOf(definition);
+            if (currentModel == null || material == null) continue;
             int value = entry.getValue().customModelData();
-            String claimedModel = activeClaims.get(Integer.valueOf(value));
+            String scope = claimKey(material, value);
+            String claimedModel = activeClaims.get(scope);
             if (claimedModel != null && !claimedModel.equals(currentModel)) {
-                throw new IllegalArgumentException("Custom model data " + value
+                throw new IllegalArgumentException("Custom model data " + value + " on " + material
                         + " is claimed by multiple active render models: " + claimedModel + " and " + currentModel);
             }
-            activeClaims.put(Integer.valueOf(value), currentModel);
+            activeClaims.put(scope, currentModel);
         }
 
         List<ItemDefinition> definitions = new ArrayList<ItemDefinition>(items.entries().values());
@@ -91,6 +106,7 @@ public final class RenderAllocationRegistry {
         for (ItemDefinition definition : definitions) {
             String model = modelOf(definition);
             if (model == null) continue;
+            String material = materialOf(definition);
 
             ItemRenderDefinition render = definition.render();
             CustomModelDataDefinition authored = render.customModelData();
@@ -108,12 +124,13 @@ public final class RenderAllocationRegistry {
                     throw new IllegalArgumentException("Item " + definition.id() + " requests custom_model_data " + explicit
                             + " but stable allocation manifest already reserves " + existing.customModelData());
                 }
-                String claimedModel = activeClaims.get(Integer.valueOf(existing.customModelData()));
+                String scope = claimKey(material, existing.customModelData());
+                String claimedModel = activeClaims.get(scope);
                 if (claimedModel != null && !claimedModel.equals(model)) {
-                    throw new IllegalArgumentException("Custom model data " + existing.customModelData()
+                    throw new IllegalArgumentException("Custom model data " + existing.customModelData() + " on " + material
                             + " cannot render both " + claimedModel + " and " + model);
                 }
-                activeClaims.put(Integer.valueOf(existing.customModelData()), model);
+                activeClaims.put(scope, model);
                 next.put(definition.id(), existing.withModelAndActive(model, true));
                 continue;
             }
@@ -122,20 +139,25 @@ public final class RenderAllocationRegistry {
             if (explicit != null) {
                 if (explicit.intValue() < 0) throw new IllegalArgumentException("Custom model data cannot be negative for " + definition.id());
                 allocated = explicit.intValue();
-                if (reserved.contains(Integer.valueOf(allocated))) {
-                    String claimedModel = activeClaims.get(Integer.valueOf(allocated));
-                    if (claimedModel == null || !claimedModel.equals(model)) {
-                        throw new IllegalArgumentException("Custom model data " + allocated + " is already reserved by another content ID");
-                    }
-                } else {
-                    reserved.add(Integer.valueOf(allocated));
+                String scope = claimKey(material, allocated);
+                String claimedModel = activeClaims.get(scope);
+                if (claimedModel != null && !claimedModel.equals(model)) {
+                    throw new IllegalArgumentException("Custom model data " + allocated + " on " + material
+                            + " cannot render both " + claimedModel + " and " + model);
                 }
-                activeClaims.put(Integer.valueOf(allocated), model);
+
+                if (reserved.contains(Integer.valueOf(allocated)) && claimedModel == null
+                        && tombstonedValues.contains(Integer.valueOf(allocated))) {
+                    throw new IllegalArgumentException("Custom model data " + allocated
+                            + " is reserved by an inactive content ID whose material is unknown");
+                }
+                reserved.add(Integer.valueOf(allocated));
+                activeClaims.put(scope, model);
             } else {
                 allocated = Math.max(FIRST_AUTO_CUSTOM_MODEL_DATA, nextValue);
                 while (reserved.contains(Integer.valueOf(allocated))) allocated++;
                 reserved.add(Integer.valueOf(allocated));
-                activeClaims.put(Integer.valueOf(allocated), model);
+                activeClaims.put(claimKey(material, allocated), model);
             }
 
             nextValue = Math.max(nextValue, allocated + 1);
@@ -157,6 +179,17 @@ public final class RenderAllocationRegistry {
         ItemRenderDefinition render = definition.render();
         if (render == null || render.model() == null || render.model().trim().isEmpty()) return null;
         return normalizeModel(render.model());
+    }
+
+    private static String materialOf(ItemDefinition definition) {
+        if (definition == null || definition.abstractDefinition() || definition.material() == null) return null;
+        String material = definition.material().trim().toLowerCase(java.util.Locale.ROOT);
+        if (material.isEmpty()) return null;
+        return material.indexOf(':') < 0 ? "minecraft:" + material : material;
+    }
+
+    private static String claimKey(String material, int customModelData) {
+        return material + "\u0000" + customModelData;
     }
 
     private static String normalizeModel(String model) {
