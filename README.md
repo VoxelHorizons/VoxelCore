@@ -22,16 +22,21 @@ Bedrock items/mappings, item actions and menu sessions, richer item metadata and
 
 ## Next development milestone
 
-The next recommended slice is **phase 3a: Java item actions and interaction dispatch**. The item pipeline can already define, render, create, identify, and reload custom items, but custom items cannot yet perform gameplay behavior. This slice should add:
+The next recommended slice is **phase 2c: Java UI font-content foundation**. Before runtime menu behavior is added, VoxelCore should be able to compile shared spacing glyphs and namespaced bitmap UI definitions into every compatible generated Java pack.
 
-- typed item triggers for a deliberately small first set of interactions, beginning with right-click air/block and right-click entity
-- an immutable action definition compiled with the content snapshot
-- one central dispatcher with an explicit action context and result
-- a thin Bukkit event bridge that resolves the held item's `ContentID` before dispatch
-- execution-time permission, cooldown, cancellation, consumption, and durability checks
-- reload-safe tests and real-server smoke coverage on representative legacy and modern targets
+This slice should add:
 
-This milestone is intentionally Java-first and does not introduce inventory menus, custom UI assets, Bedrock forms, placed blocks, or addon-specific mechanics. It establishes the shared gameplay boundary those later systems can call without putting their rules into Bukkit listeners.
+- compiler-owned positive and negative spacing glyph resources
+- namespaced UI glyph definitions keyed by stable `ContentID`, with centrally allocated Unicode codepoints
+- bitmap-provider metadata for texture, height, and ascent without trimming positioning canvas
+- deterministic merging into the generated font JSON so packs cannot overwrite one another
+- duplicate codepoint, missing texture, unsafe path, invalid dimension, and incompatible-target validation
+- a generated glyph manifest/report that later menu-title code can resolve without hard-coded Unicode values
+- compiler tests using a three-row inventory overlay fixture
+
+Unicode codepoints themselves are global within a font and are not made collision-safe by resource namespaces. VoxelCore must therefore own allocation and final font composition, while authored textures remain under their pack namespaces.
+
+This milestone adds resource-pack content only. It does not yet open inventories, handle clicks, introduce runtime menu sessions, or add alternate-client UI. Java item actions move back one place and follow after the UI content contract is proven.
 
 ## Item MVP
 
