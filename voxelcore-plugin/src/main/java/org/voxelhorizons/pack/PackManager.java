@@ -10,6 +10,7 @@ public final class PackManager {
     private final Path contentRoot;
     private final Path allocationManifest;
     private final Path outputRoot;
+    private final Path glyphAllocationManifest;
     private final Version serverVersion;
 
     public PackManager(Path dataRoot, Path contentRoot, Version serverVersion) {
@@ -18,6 +19,7 @@ public final class PackManager {
         this.contentRoot = contentRoot;
         this.allocationManifest = dataRoot.resolve("render-allocations.yml");
         this.outputRoot = dataRoot.resolve("build").resolve("resource-packs");
+        this.glyphAllocationManifest = dataRoot.resolve("glyph-allocations.yml");
         this.serverVersion = serverVersion;
     }
 
@@ -25,6 +27,10 @@ public final class PackManager {
     public Path contentRoot() { return contentRoot; }
     public Path allocationManifest() { return allocationManifest; }
     public Path outputRoot() { return outputRoot; }
+    public Path glyphAllocationManifest() { return glyphAllocationManifest; }
+    public UiGlyphRegistry uiGlyphs(boolean persist) {
+        return compiler.loadUiGlyphs(contentRoot, glyphAllocationManifest, persist);
+    }
 
     public JavaPackBuildResult validate(JavaPackTarget target) {
         if (target == null) throw new IllegalArgumentException("Pack target cannot be null");

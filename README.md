@@ -1,12 +1,12 @@
 # VoxelCore
 
-VoxelCore is the version-aware content foundation for Voxel Horizons. The current MVP covers the complete custom-item pipeline: deterministic YAML pack discovery, inheritance compilation, immutable runtime snapshots, stable content identity, version-specific `ItemStack` creation, stable render allocations, deterministic Java resource-pack compilation, and safe atomic reloads.
+VoxelCore is the version-aware content foundation for Voxel Horizons. The current MVP covers the complete custom-item pipeline: deterministic YAML pack discovery, inheritance compilation, immutable runtime snapshots, stable content identity, version-specific `ItemStack` creation, stable render allocations, deterministic Java resource-pack compilation, stable UI glyph/font compilation, and safe atomic reloads.
 
 Higher-level gameplay systems such as placed blocks, furniture, vehicles, crops, GUIs, Bedrock/Geyser presentation, and legacy HavenCore migration are deliberately outside this MVP.
 
 ## Current implementation status
 
-The repository has completed the roadmap's foundation, content/item, and minimal Java pack milestones (phases 0, 1, and 2a):
+The repository has completed the roadmap's foundation, content/item, minimal Java pack, and Java UI font-content milestones (phases 0, 1, 2a, and 2c):
 
 - multi-module Maven build with per-version shaded distributions
 - automatic Paper capability detection with a Bukkit-compatible fallback
@@ -15,23 +15,46 @@ The repository has completed the roadmap's foundation, content/item, and minimal
 - persistent ContentID storage and version-aware item creation
 - stable numeric and structured render allocations
 - deterministic Java resource-pack validation and compilation
+- compact cropped UI glyph definitions, stable private-use codepoints, generated bitmap/spacing font providers, aliases, and admin glyph lookup/copy commands
 - exact real-server smoke coverage from Minecraft 1.12.2 through Minecraft 26.2
 - snapshot JAR publication from `main`
 
 Bedrock items/mappings, item actions and menu sessions, richer item metadata and behavior, placed blocks, furniture, crops, skills, NPCs, vehicles, and network persistence have not been implemented yet.
 
+## Java UI font content
+
+Phase 2c compiles shared spacing glyphs and namespaced bitmap UI definitions into every compatible generated Java pack. Textures can be tightly cropped: transparent padding is neither required nor used for positioning.
+
+Use the compact ItemsAdder-style authoring shape:
+
+```yaml
+ui:
+  warps_menu:
+    path: ui/npc/warps_menu.png
+    scale_ratio: 18
+    y_position: 8
+```
+
+`path` is relative to `assets/<pack namespace>/textures/`. `scale_ratio` becomes the bitmap provider height and defaults to the PNG height. `y_position` becomes its ascent, defaults to `min(8, scale_ratio)`, may be negative, and cannot exceed `scale_ratio`. PNG dimensions and the scale ratio are limited to 256. An optional `symbol` may assign one private-use Unicode character; otherwise VoxelCore allocates a stable character and preserves the allocation in `glyph-allocations.yml`.
+
+Menu rows are deliberately not configuration data. The same cropped overlay can cover any subset of slots in a 1–6 row inventory; its vertical placement is controlled only by `scale_ratio` and `y_position`.
+
+VoxelCore generates the final `assets/minecraft/font/default.json`, including positive/negative spacing providers and all bitmap providers, so individual packs cannot overwrite the shared font or collide silently. Missing textures, unsafe paths, invalid dimensions, duplicate explicit symbols, and incompatible targets fail validation. Minecraft 1.12.2 is rejected because it predates resource-pack bitmap fonts.
+
+Each definition has a readable alias such as `:warps_menu:` and an unambiguous full alias such as `:voxel/warps_menu:`. VoxelCore can resolve these aliases in VoxelCore-owned text, but a resource pack cannot rewrite arbitrary third-party plugin titles. For DeluxeMenus, use the literal allocated character returned by:
+
+```text
+/voxelcore admin ui copy voxel:warps_menu
+/voxelcore admin ui copy :warps_menu:
+```
+
+Both forms have tab completion. `ui list` and `ui info <content-id-or-alias>` expose the available definitions and resolved metadata. On capable clients, `ui copy` sends a clickable copy-to-clipboard component; legacy clients receive the literal character and codepoint.
+
 ## Next development milestone
 
-The next recommended slice is **phase 3a: Java item actions and interaction dispatch**. The item pipeline can already define, render, create, identify, and reload custom items, but custom items cannot yet perform gameplay behavior. This slice should add:
+The next recommended slice is **phase 3a: Java item actions and interaction dispatch**. It should add typed triggers and immutable compiled actions behind a central dispatcher while keeping menu session lifecycle in phase 3b.
 
-- typed item triggers for a deliberately small first set of interactions, beginning with right-click air/block and right-click entity
-- an immutable action definition compiled with the content snapshot
-- one central dispatcher with an explicit action context and result
-- a thin Bukkit event bridge that resolves the held item's `ContentID` before dispatch
-- execution-time permission, cooldown, cancellation, consumption, and durability checks
-- reload-safe tests and real-server smoke coverage on representative legacy and modern targets
-
-This milestone is intentionally Java-first and does not introduce inventory menus, custom UI assets, Bedrock forms, placed blocks, or addon-specific mechanics. It establishes the shared gameplay boundary those later systems can call without putting their rules into Bukkit listeners.
+This milestone adds resource-pack content only. It does not yet open inventories, handle clicks, introduce runtime menu sessions, or add alternate-client UI. Java item actions move back one place and follow after the UI content contract is proven.
 
 ## Item MVP
 

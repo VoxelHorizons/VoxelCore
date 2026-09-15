@@ -1,6 +1,6 @@
 # VoxelCore migration and optimization roadmap
 
-> **Implementation status (September 2026):** The foundation, item/content pipeline, and minimal Java resource-pack compiler (phases 0, 1, and 2a) are implemented on `main`, with exact real-server validation from Minecraft 1.12.2 through 26.2. Legacy HavenCore aliases from the original phase-1 acceptance criteria remain deferred migration work. The next recommended implementation slice is phase 3a: Java item actions and interaction dispatch. The README remains the canonical feature and compatibility reference.
+> **Implementation status (September 2026):** The foundation, item/content pipeline, and minimal Java resource-pack compiler (phases 0, 1, and 2a) are implemented on `main`, with exact real-server validation from Minecraft 1.12.2 through 26.2. Legacy HavenCore aliases from the original phase-1 acceptance criteria remain deferred migration work. Java UI font-content compilation (phase 2c) is implemented by this change. The next recommended implementation slice is phase 3a: Java item actions and interaction dispatch. The README remains the canonical feature and compatibility reference.
 
 Prepared for Voxel Horizons · 12 September 2026 · Living implementation plan
 
@@ -182,6 +182,7 @@ Implemented Java MVP layout:
 - `plugins/VoxelCore/content/<pack>/pack.yml`: schema, namespace and dependencies.
 - `content/**/*.yml`: recursively discovered item definitions; paths are organizational and IDs come from item keys.
 - `assets/<namespace>/models` and `assets/<namespace>/textures`: authored Java item assets copied into target packs.
+- UI font definitions use compact cropped-image metadata while final font composition remains compiler-owned.
 - `build/resource-packs/<target>.zip`: deterministic generated output, separate from authored assets.
 
 Pack priorities, blocks, furniture, crops, vehicles, menus, Java fonts/sounds, and Bedrock-specific asset trees remain planned extensions rather than accepted input in the current compiler.
@@ -279,6 +280,7 @@ Each row is a separately reviewable feature slice. Dependencies should be satisf
 | 1 | Content IDs, inheritance, registry and item factory — HavenCore | Implemented core; legacy aliases deferred | Keep deterministic inheritance, immutable registries, isolated stacks, and failed-reload rollback; add legacy aliases only with the migration slice |
 | 2a | Minimal Java pack compiler — new | Implemented | Maintain stable allocations and exact validated legacy/modern pack profiles |
 | 2b | Bedrock items, pack and mappings — new/integrations | Planned | Same item behaves correctly in hand, inventory, drop and equip contexts; pack/reconnect lifecycle documented |
+| 2c | Java UI font content and stable glyph allocation — new/HavenCore assets | Implemented | Cropped bitmap definitions, compact scale/position metadata, collision-free stable codepoints, deterministic merged font output, aliases, and target capability checks |
 | 3a | Java item actions and interaction dispatch — HavenCore | **Next** | Typed triggers, immutable compiled actions, central context/result dispatch, execution-time validation, reload safety, and legacy/modern smoke coverage |
 | 3b | Menus and session lifecycle — HavenCore | Planned after 3a | Presentation-independent actions, deterministic close/disconnect cleanup, and duplicate/stale action rejection before adding alternate frontends |
 | 4a | Basic items, books, heads, prefixes and bound rules — HavenCore | Planned | Correct cloning and metadata; optional permission integration; bound semantics cover all intended transfer paths |
@@ -326,13 +328,33 @@ Each feature's test fixture should cover every frontend and runtime combination 
 
 ## 13. Next implementation unit
 
-Implement **phase 3a: Java item actions and interaction dispatch**. The existing MVP proves authored item definition through runtime identity and generated Java packs; the next useful vertical slice is making those items perform controlled gameplay behavior.
+Phase 2c implements **Java UI font-content compilation** before runtime menu functionality. VoxelCore owns final font composition because namespaces disambiguate texture paths but Unicode codepoints remain global within a font.
 
-Keep the first PR narrow: add typed right-click-air/block and right-click-entity triggers; compile action definitions into the immutable content snapshot; resolve the held item's `ContentID` in a thin Bukkit listener; dispatch through a central action context/result API; and validate cancellation, permissions, cooldowns, consumption, and durability at execution time. Failed action compilation must preserve the active content revision just like other reload failures.
+The implemented slice includes:
 
-Start with test/debug actions that prove dispatch and state handling rather than migrating addon-specific mechanics. Add unit tests for parsing, inheritance, validation, and dispatch, plus representative legacy and modern real-server smoke assertions. Inventory menus and other presentation systems belong in phase 3b after the action boundary is stable.
+- compiler-owned positive and negative spacing providers
+- namespaced `ui:` definitions with stable private-use codepoint allocation and tombstones
+- compact cropped-image metadata: `path`, optional `scale_ratio`, optional `y_position`, and optional explicit `symbol`
+- deterministic bitmap provider generation and merged `minecraft:default` output
+- validation for duplicate symbols, missing textures, unsafe paths, dimensions, properties, and incompatible targets
+- `:name:` and `:namespace/name:` alias resolution for VoxelCore-owned text
+- admin `ui list`, `ui info`, and `ui copy` commands with ID/alias completion and clickable clipboard output where supported
 
-Legacy HavenCore ID/material aliases remain a separate migration concern and should be implemented only alongside representative old content and an explicit compatibility report.
+Example:
+
+```yaml
+ui:
+  warps_menu:
+    path: ui/npc/warps_menu.png
+    scale_ratio: 18
+    y_position: 8
+```
+
+The path is relative to the pack namespace's texture root. The scale defaults to the PNG height and the position defaults to `min(8, scale_ratio)`. Neither inventory row count nor transparent padding is required; authors can crop artwork to its visible pixels and tune its rendered size and baseline directly.
+
+Colon aliases are runtime placeholder syntax, not a resource-pack feature. VoxelCore resolves them in text it owns. Third-party menu plugins must use the literal character from `ui copy` unless a future integration explicitly resolves VoxelCore aliases.
+
+This phase is resource-pack content only. It does not open inventories, dispatch clicks, or introduce menu sessions. Phase 3a remains the next recommended implementation slice.
 
 ## Appendix A. Reviewed snapshots
 
