@@ -342,7 +342,23 @@ The first reviewable slice should include:
 - deterministic merging and ordering of generated font providers
 - validation for duplicate explicit characters, missing textures, invalid paths/dimensions, unsupported provider properties, and incompatible target profiles
 - a generated manifest that maps UI IDs to characters for later menu-title rendering
+- admin `ui list`, `ui info <content-id>`, and `ui copy <content-id>` commands with ContentID completion; `copy` emits a clickable clipboard component where supported and a selectable character/codepoint fallback on legacy clients
 - fixtures spanning different inventory heights and artwork offsets, including the supplied network-exchange and selector examples
+
+An initial one-row fixture may be authored as:
+
+```yaml
+ui:
+  npc_warps:
+    texture: voxel:ui/npc/warps_menu
+    inventory:
+      rows: 1
+    font:
+      height: 256
+      ascent: auto
+```
+
+The row count controls vertical placement only. Whether the artwork visually covers seven, nine, or any other subset of the row's slots is encoded in the texture and must not be inferred by pixel scanning. `ascent: auto` is the default; a numeric value is an explicit override.
 
 The three-row network-exchange artwork is one fixture, not a fixed layout contract. UI definitions must support inventories from one through six rows. An author may provide an explicit `ascent` for exceptional artwork; otherwise the compiler must derive a deterministic ascent from the definition's row count and positioning metadata. Derivation must be tested for every supported row count and must not infer placement by trimming or scanning transparent pixels.
 
