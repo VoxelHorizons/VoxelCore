@@ -204,6 +204,41 @@ public class JavaPackCompilerTest {
         }
     }
 
+    @Test
+    public void generatesCustomTextureAtlasOnlyForApplicableTargets() throws Exception {
+        File contentRoot = temporaryFolder.newFolder("atlas-content");
+        File pack = new File(contentRoot, "mypack");
+        assertTrue(new File(pack, "content").mkdirs());
+        assertTrue(new File(pack, "assets/mypack/textures/ui").mkdirs());
+        assertTrue(new File(pack, "assets/mypack/textures/item").mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: mypack\n");
+        write(new File(pack, "assets/mypack/textures/ui/blank.png"), "ui-bytes");
+        write(new File(pack, "assets/mypack/textures/item/normal.png"), "item-bytes");
+
+        Path build = temporaryFolder.newFolder("atlas-build").toPath();
+        Path allocations = build.resolve("allocations.yml");
+        JavaPackCompiler compiler = new JavaPackCompiler();
+
+        Path combined = build.resolve("mc-1.21.4.zip");
+        compiler.compile(contentRoot.toPath(), combined, allocations, JavaPackTarget.MC_1_21_4);
+        String blocksAtlas = zipText(combined, "assets/minecraft/atlases/blocks.json");
+        assertTrue(blocksAtlas.contains("\"source\": \"ui\""));
+        assertTrue(blocksAtlas.contains("\"prefix\": \"ui/\""));
+        assertTrue(!blocksAtlas.contains("\"source\": \"item\""));
+        assertTrue(!hasEntry(combined, "assets/minecraft/atlases/items.json"));
+
+        Path split = build.resolve("mc-26.2.zip");
+        compiler.compile(contentRoot.toPath(), split, allocations, JavaPackTarget.MC_26_2);
+        String itemsAtlas = zipText(split, "assets/minecraft/atlases/items.json");
+        assertTrue(itemsAtlas.contains("\"source\": \"ui\""));
+        assertTrue(!hasEntry(split, "assets/minecraft/atlases/blocks.json"));
+
+        Path legacy = build.resolve("mc-1.14.4.zip");
+        compiler.compile(contentRoot.toPath(), legacy, allocations, JavaPackTarget.MC_1_14_4);
+        assertTrue(!hasEntry(legacy, "assets/minecraft/atlases/blocks.json"));
+        assertTrue(!hasEntry(legacy, "assets/minecraft/atlases/items.json"));
+    }
+
     private static void write(File file, String content) throws Exception {
         File parent = file.getParentFile(); if (parent != null && !parent.exists()) assertTrue(parent.mkdirs());
         Files.write(file.toPath(), content.getBytes(StandardCharsets.UTF_8));
