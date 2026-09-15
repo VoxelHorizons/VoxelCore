@@ -442,13 +442,12 @@ final class JavaPackCompilerEngine {
     private static void writeUiFont(Map<String, byte[]> entries, UiGlyphRegistry glyphs) {
         StringBuilder out = new StringBuilder("{\n  \"providers\": [\n");
         out.append("    {\"type\":\"space\",\"advances\":{");
-        int codePoint = 0xF800;
         boolean firstAdvance = true;
-        for (int distance = -1024; distance <= 1024; distance = nextSpacing(distance)) {
-            if (distance == 0) continue;
+        for (Map.Entry<Integer, Integer> advance : UiSpacingGlyphs.advances().entrySet()) {
             if (!firstAdvance) out.append(',');
             firstAdvance = false;
-            out.append('\"').append(new String(Character.toChars(codePoint++))).append("\":").append(distance);
+            out.append('\"').append(new String(Character.toChars(advance.getKey().intValue())))
+                    .append("\":").append(advance.getValue().intValue());
         }
         out.append("}}");
 
@@ -468,12 +467,6 @@ final class JavaPackCompilerEngine {
         putEntry(entries, "assets/minecraft/font/default.json", utf8(out.toString()));
     }
 
-    private static int nextSpacing(int value) {
-        if (value == -1) return 0;
-        if (value == 0) return 1;
-        if (value < 0) return value / 2;
-        return value * 2;
-    }
 
     private static int copyAuthoredAssets(List<ContentPack> packs, Map<String, byte[]> entries) {
         int count = 0;

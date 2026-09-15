@@ -15,7 +15,7 @@ The repository has completed the roadmap's foundation, content/item, minimal Jav
 - persistent ContentID storage and version-aware item creation
 - stable numeric and structured render allocations
 - deterministic Java resource-pack validation and compilation
-- compact cropped UI glyph definitions, stable private-use codepoints, generated bitmap/spacing font providers, aliases, and admin glyph lookup/copy commands
+- compact cropped UI glyph definitions, stable private-use codepoints, generated bitmap/spacing font providers, white-safe UI/offset placeholders, and admin glyph lookup/copy commands
 - exact real-server smoke coverage from Minecraft 1.12.2 through Minecraft 26.2
 - snapshot JAR publication from `main`
 
@@ -33,22 +33,33 @@ ui:
     path: ui/npc/warps_menu.png
     scale_ratio: 18
     y_position: 8
+    gui: true
 ```
 
-`path` is relative to `assets/<pack namespace>/textures/`. `scale_ratio` becomes the bitmap provider height and defaults to the PNG height. `y_position` becomes its ascent, defaults to `min(8, scale_ratio)`, may be negative, and cannot exceed `scale_ratio`. PNG dimensions and the scale ratio are limited to 256. An optional `symbol` may assign one private-use Unicode character; otherwise VoxelCore allocates a stable character and preserves the allocation in `glyph-allocations.yml`.
+`path` is relative to `assets/<pack namespace>/textures/`. `scale_ratio` becomes the bitmap provider height and defaults to the PNG height. `y_position` becomes its ascent, defaults to `min(8, scale_ratio)`, may be negative, and cannot exceed `scale_ratio`. `gui` defaults to `false`; when `true`, the placeholder automatically appends the exact negative rendered advance so following title text returns to its original horizontal position. PNG dimensions and the scale ratio are limited to 256. An optional `symbol` may assign one private-use Unicode character; otherwise VoxelCore allocates a stable character and preserves the allocation in `glyph-allocations.yml`.
 
 Menu rows are deliberately not configuration data. The same cropped overlay can cover any subset of slots in a 1–6 row inventory; its vertical placement is controlled only by `scale_ratio` and `y_position`.
 
 VoxelCore generates the final `assets/minecraft/font/default.json`, including positive/negative spacing providers and all bitmap providers, so individual packs cannot overwrite the shared font or collide silently. Missing textures, unsafe paths, invalid dimensions, duplicate explicit symbols, and incompatible targets fail validation. Minecraft 1.12.2 is rejected because it predates resource-pack bitmap fonts.
 
-Each definition has a readable alias such as `:warps_menu:` and an unambiguous full alias such as `:voxel/warps_menu:`. VoxelCore can resolve these aliases in VoxelCore-owned text, but a resource pack cannot rewrite arbitrary third-party plugin titles. For DeluxeMenus, use the literal allocated character returned by:
+Each definition has a readable alias such as `:warps_menu:` and an unambiguous full alias such as `:voxel/warps_menu:`. Runtime replacement prefixes every UI glyph with Minecraft white (`§f`, conventionally authored as `&f`) so gray inventory-title formatting does not tint the bitmap. Definitions marked `gui: true` then append their calculated negative advance; ordinary emoji, rank, and inline font images leave the cursor after the image. Initial pixel positioning uses `:offset_<pixels>:`, for example:
+
+```text
+:offset_-16::warps_menu:§rWarps
+```
+
+Offsets from -1024 through 1024 are supported. Non-power-of-two values are composed from multiple generated spacing glyphs, so `:offset_-17:` also resolves exactly.
+
+VoxelCore resolves inline definitions (`gui: false`, including the default) in player chat only for senders with `voxelcore.placeholders.chat`. Definitions marked `gui: true` and `:offset_<pixels>:` controls require the separate `voxelcore.placeholders.chat.gui` permission. The permissions are independent: premium players can receive the inline permission for emojis or ranks, while staff can receive only the GUI permission when appropriate. Both default to operators and can be granted through the server permission manager. Unauthorized placeholders remain unchanged.
+
+VoxelCore-owned UI and integrations should call `VoxelCore.getInstance().getTextPlaceholderService().resolve(text)` before sending titles or other text. A resource pack cannot mutate a title already created by an unrelated plugin; therefore DeluxeMenus cannot receive transparent `:name:` replacement from VoxelCore without a dedicated integration. Until that integration exists, use the literal allocated character returned by:
 
 ```text
 /voxelcore admin ui copy voxel:warps_menu
 /voxelcore admin ui copy :warps_menu:
 ```
 
-Both forms have tab completion. `ui list` and `ui info <content-id-or-alias>` expose the available definitions and resolved metadata. On capable clients, `ui copy` sends a clickable copy-to-clipboard component; legacy clients receive the literal character and codepoint.
+Both forms have tab completion. `ui list` and `ui info <content-id-or-alias>` expose definitions and resolved metadata. On capable clients, `ui copy` sends a clickable clipboard component; legacy clients receive the literal character and codepoint.
 
 ## Next development milestone
 
@@ -419,7 +430,7 @@ Any failure before publication leaves the existing runtime revision active.
 GitHub Actions performs:
 
 - full Maven build of all distribution jars
-- unit tests for parsing, inheritance, immutable snapshots, allocation persistence/tombstones, structured indices, modern rule generation, and reload rollback
+- unit tests for parsing, inheritance, immutable snapshots, allocation persistence/tombstones, UI/offset placeholder resolution, structured indices, modern rule generation, and reload rollback
 - real-server smoke tests for 1.12.2, 1.13.2, 1.14.4, 1.19.4, 1.20.5, 1.21.4, and 26.2
 - item create/identify verification
 - exact-target pack validate/build
