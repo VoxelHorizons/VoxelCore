@@ -18,7 +18,20 @@ The repository has completed the roadmap's foundation, content/item, and minimal
 - exact real-server smoke coverage from Minecraft 1.12.2 through Minecraft 26.2
 - snapshot JAR publication from `main`
 
-Bedrock items/mappings, action and menu sessions, richer item metadata and behavior, placed blocks, furniture, crops, skills, NPCs, vehicles, and network persistence have not been implemented yet.
+Bedrock items/mappings, item actions and menu sessions, richer item metadata and behavior, placed blocks, furniture, crops, skills, NPCs, vehicles, and network persistence have not been implemented yet.
+
+## Next development milestone
+
+The next recommended slice is **phase 3a: Java item actions and interaction dispatch**. The item pipeline can already define, render, create, identify, and reload custom items, but custom items cannot yet perform gameplay behavior. This slice should add:
+
+- typed item triggers for a deliberately small first set of interactions, beginning with right-click air/block and right-click entity
+- an immutable action definition compiled with the content snapshot
+- one central dispatcher with an explicit action context and result
+- a thin Bukkit event bridge that resolves the held item's `ContentID` before dispatch
+- execution-time permission, cooldown, cancellation, consumption, and durability checks
+- reload-safe tests and real-server smoke coverage on representative legacy and modern targets
+
+This milestone is intentionally Java-first and does not introduce inventory menus, custom UI assets, Bedrock forms, placed blocks, or addon-specific mechanics. It establishes the shared gameplay boundary those later systems can call without putting their rules into Bukkit listeners.
 
 ## Item MVP
 
