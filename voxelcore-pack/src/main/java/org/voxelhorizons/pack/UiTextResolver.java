@@ -20,8 +20,17 @@ public final class UiTextResolver {
      * Unknown or out-of-range placeholders are preserved so configuration mistakes remain visible.
      */
     public String resolve(String input) {
+        return resolve(input, true, true);
+    }
+
+    /**
+     * Resolves independently authorized inline and GUI placeholders.
+     * Pixel offsets are GUI positioning controls and therefore require GUI authorization.
+     */
+    public String resolve(String input, boolean allowInline, boolean allowGui) {
         if (input == null || input.indexOf(':') < 0) return input;
-        String resolved = glyphs.resolveAliases(input, true);
+        String resolved = glyphs.resolveAliases(input, true, allowInline, allowGui);
+        if (!allowGui) return resolved;
         Matcher matcher = OFFSET.matcher(resolved);
         StringBuffer output = new StringBuffer();
         while (matcher.find()) {
