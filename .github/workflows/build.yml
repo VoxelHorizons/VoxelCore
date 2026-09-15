@@ -40,6 +40,11 @@ jobs:
             jar=$(compgen -G "$jar_pattern" | head -n 1)
             test -n "$jar"
             unzip -p "$jar" plugin.yml | grep -Fx "api-version: '$expected'"
+            local provider
+            provider=$(unzip -p "$jar" META-INF/services/org.voxelhorizons.platform.PlatformProvider)
+            test -n "$provider"
+            local provider_class="${provider//.//}.class"
+            unzip -l "$jar" "$provider_class" | grep -F "$provider_class"
           }
           verify_api_version 'voxelcore-v1_12/target/VoxelCore-*.jar' '1.13'
           verify_api_version 'voxelcore-v1_14/target/VoxelCore-*.jar' '1.14'
