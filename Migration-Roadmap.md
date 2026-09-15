@@ -337,7 +337,7 @@ The implemented slice includes:
 - compact cropped-image metadata: `path`, optional `scale_ratio`, optional `y_position`, and optional explicit `symbol`
 - deterministic bitmap provider generation and merged `minecraft:default` output
 - validation for duplicate symbols, missing textures, unsafe paths, dimensions, properties, and incompatible targets
-- `:name:` and `:namespace/name:` alias resolution for VoxelCore-owned text
+- white-safe `:name:` and `:namespace/name:` alias resolution plus exact `:offset_<pixels>:` spacing placeholders for VoxelCore-owned text
 - admin `ui list`, `ui info`, and `ui copy` commands with ID/alias completion and clickable clipboard output where supported
 
 Example:
@@ -352,7 +352,7 @@ ui:
 
 The path is relative to the pack namespace's texture root. The scale defaults to the PNG height and the position defaults to `min(8, scale_ratio)`. Neither inventory row count nor transparent padding is required; authors can crop artwork to its visible pixels and tune its rendered size and baseline directly.
 
-Colon aliases are runtime placeholder syntax, not a resource-pack feature. VoxelCore resolves them in text it owns. Third-party menu plugins must use the literal character from `ui copy` unless a future integration explicitly resolves VoxelCore aliases.
+Colon aliases are runtime placeholder syntax, not a resource-pack feature. UI aliases are prefixed with white to prevent title tinting, and offset aliases resolve to compiler-owned spacing characters. VoxelCore resolves them in permitted player chat and exposes a reload-safe service for text it owns. Third-party menu plugins must call that service through an integration or use the literal character from `ui copy`.
 
 This phase is resource-pack content only. It does not open inventories, dispatch clicks, or introduce menu sessions. Phase 3a remains the next recommended implementation slice.
 
