@@ -33,15 +33,16 @@ ui:
     path: ui/npc/warps_menu.png
     scale_ratio: 18
     y_position: 8
+    gui: true
 ```
 
-`path` is relative to `assets/<pack namespace>/textures/`. `scale_ratio` becomes the bitmap provider height and defaults to the PNG height. `y_position` becomes its ascent, defaults to `min(8, scale_ratio)`, may be negative, and cannot exceed `scale_ratio`. PNG dimensions and the scale ratio are limited to 256. An optional `symbol` may assign one private-use Unicode character; otherwise VoxelCore allocates a stable character and preserves the allocation in `glyph-allocations.yml`.
+`path` is relative to `assets/<pack namespace>/textures/`. `scale_ratio` becomes the bitmap provider height and defaults to the PNG height. `y_position` becomes its ascent, defaults to `min(8, scale_ratio)`, may be negative, and cannot exceed `scale_ratio`. `gui` defaults to `false`; when `true`, the placeholder automatically appends the exact negative rendered advance so following title text returns to its original horizontal position. PNG dimensions and the scale ratio are limited to 256. An optional `symbol` may assign one private-use Unicode character; otherwise VoxelCore allocates a stable character and preserves the allocation in `glyph-allocations.yml`.
 
 Menu rows are deliberately not configuration data. The same cropped overlay can cover any subset of slots in a 1–6 row inventory; its vertical placement is controlled only by `scale_ratio` and `y_position`.
 
 VoxelCore generates the final `assets/minecraft/font/default.json`, including positive/negative spacing providers and all bitmap providers, so individual packs cannot overwrite the shared font or collide silently. Missing textures, unsafe paths, invalid dimensions, duplicate explicit symbols, and incompatible targets fail validation. Minecraft 1.12.2 is rejected because it predates resource-pack bitmap fonts.
 
-Each definition has a readable alias such as `:warps_menu:` and an unambiguous full alias such as `:voxel/warps_menu:`. Runtime replacement prefixes every UI glyph with Minecraft white (`§f`, conventionally authored as `&f`) so gray inventory-title formatting does not tint the bitmap. Pixel positioning uses `:offset_<pixels>:`, for example:
+Each definition has a readable alias such as `:warps_menu:` and an unambiguous full alias such as `:voxel/warps_menu:`. Runtime replacement prefixes every UI glyph with Minecraft white (`§f`, conventionally authored as `&f`) so gray inventory-title formatting does not tint the bitmap. Definitions marked `gui: true` then append their calculated negative advance; ordinary emoji, rank, and inline font images leave the cursor after the image. Initial pixel positioning uses `:offset_<pixels>:`, for example:
 
 ```text
 :offset_-16::warps_menu:§rWarps
