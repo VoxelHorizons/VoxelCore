@@ -53,6 +53,7 @@ public final class UiGlyphRegistry {
     }
 
     private static String replacement(UiGlyphDefinition glyph, boolean forceWhite) {
-        return (forceWhite ? "\u00A7f" : "") + glyph.character();
+        return (forceWhite ? "\u00A7f" : "") + glyph.character()
+                + (glyph.gui() ? UiSpacingGlyphs.charactersForOffset(-glyph.advance()) : "");
     }
 }
