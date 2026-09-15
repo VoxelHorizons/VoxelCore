@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** Parses UI glyph content and reconciles stable private-use Unicode allocations. */
+/** Parses compact UI font-image content and reconciles stable private-use Unicode allocations. */
 public final class UiGlyphLoader {
     private static final int FIRST_CODE_POINT = 0xE000;
     private static final int LAST_CODE_POINT = 0xF7FF;
@@ -45,9 +45,8 @@ public final class UiGlyphLoader {
         for (ContentID id : ids) {
             RawGlyph glyph = raw.get(id);
             Integer previous = state.active.containsKey(id) ? state.active.get(id) : state.inactive.get(id);
-            if (glyph.explicitCodePoint != null && previous != null
-                    && !glyph.explicitCodePoint.equals(previous)) {
-                throw new ContentLoadException("UI glyph " + id + " cannot change its stable character from "
+            if (glyph.explicitCodePoint != null && previous != null && !glyph.explicitCodePoint.equals(previous)) {
+                throw new ContentLoadException("UI glyph " + id + " cannot change its stable symbol from "
                         + codePoint(previous.intValue()) + " to " + codePoint(glyph.explicitCodePoint.intValue()));
             }
             Integer allocated = glyph.explicitCodePoint == null ? previous : glyph.explicitCodePoint;
@@ -83,9 +82,7 @@ public final class UiGlyphLoader {
         Map<ContentID, UiGlyphDefinition> resolved = new LinkedHashMap<ContentID, UiGlyphDefinition>();
         for (ContentID id : ids) {
             RawGlyph glyph = raw.get(id);
-            int ascent = glyph.ascent == null ? glyph.automaticAscent : glyph.ascent.intValue();
-            if (ascent > glyph.height) throw new ContentLoadException("UI glyph " + id + " ascent cannot exceed height");
-            resolved.put(id, new UiGlyphDefinition(id, glyph.texture, glyph.rows, glyph.height, ascent,
+            resolved.put(id, new UiGlyphDefinition(id, glyph.texture, glyph.scaleRatio, glyph.yPosition,
                     active.get(id).intValue()));
         }
         if (persist) writeAllocations(allocationFile, active, inactive);
@@ -120,71 +117,61 @@ public final class UiGlyphLoader {
     }
 
     private static RawGlyph parseGlyph(ContentPack pack, Path file, ContentID id, Map<?, ?> map) {
-        rejectUnknown(map, file, id.toString(), "texture", "inventory", "font");
-        String texture = requireString(map.get("texture"), "texture", id, file);
-        Resource textureResource = Resource.parse(texture, id.namespace());
-        if (!textureResource.namespace.equals(pack.manifest().namespace())
-                && !pack.manifest().dependsOn(textureResource.namespace)) {
-            throw new ContentLoadException("UI glyph " + id + " references texture " + texture
-                    + " without declaring dependency '" + textureResource.namespace + "'");
+        rejectUnknown(map, file, id.toString(), "path", "scale_ratio", "y_position", "symbol");
+        String authoredPath = requireString(map.get("path"), "path", id, file).replace('\\', '/');
+        if (authoredPath.startsWith("/") || authoredPath.contains("..")
+                || !authoredPath.toLowerCase(java.util.Locale.ROOT).endsWith(".png")
+                || !authoredPath.matches("[a-z0-9/._-]+")) {
+            throw new ContentLoadException("UI glyph " + id + " path must be a safe lowercase .png path in " + file);
         }
-        Path textureFile;
-        if (textureResource.namespace.equals(pack.manifest().namespace())) {
-            textureFile = pack.root().resolve("assets").resolve(textureResource.namespace)
-                    .resolve("textures").resolve(textureResource.path + ".png");
-        } else {
-            throw new ContentLoadException("Cross-pack UI textures are not supported yet for " + id);
-        }
+        String resourcePath = authoredPath.substring(0, authoredPath.length() - 4);
+        Path textureFile = pack.root().resolve("assets").resolve(pack.manifest().namespace())
+                .resolve("textures").resolve(authoredPath);
         if (!Files.isRegularFile(textureFile)) {
-            throw new ContentLoadException("UI glyph " + id + " references missing texture " + texture
-                    + ". Expected " + textureFile);
+            throw new ContentLoadException("UI glyph " + id + " references missing texture. Expected " + textureFile);
         }
+
         final BufferedImage image;
         try {
             image = ImageIO.read(textureFile.toFile());
-            if (image == null || image.getWidth() < 1 || image.getHeight() < 1) {
-                throw new ContentLoadException("UI glyph texture is not a readable PNG: " + textureFile);
+            if (image == null || image.getWidth() < 1 || image.getHeight() < 1
+                    || image.getWidth() > 256 || image.getHeight() > 256) {
+                throw new ContentLoadException("UI glyph texture must be a readable PNG no larger than 256x256: " + textureFile);
             }
         } catch (IOException exception) {
             throw new ContentLoadException("Unable to inspect UI glyph texture " + textureFile, exception);
         }
+        ensureVisible(image, id);
 
-        Map<?, ?> inventory = requireMap(map.get("inventory"), "inventory", id, file);
-        rejectUnknown(inventory, file, "inventory for " + id, "rows");
-        int rows = requireInteger(inventory.get("rows"), "inventory.rows", id, file);
-        if (rows < 1 || rows > 6) throw new ContentLoadException("inventory.rows must be between 1 and 6 for " + id);
-
-        Map<?, ?> font = requireMap(map.get("font"), "font", id, file);
-        rejectUnknown(font, file, "font for " + id, "height", "ascent", "character");
-        int height = requireInteger(font.get("height"), "font.height", id, file);
-        if (height < 1 || height > 1024) throw new ContentLoadException("font.height must be between 1 and 1024 for " + id);
-        Integer ascent = null;
-        if (font.containsKey("ascent")) {
-            Object value = font.get("ascent");
-            if (value instanceof String && "auto".equalsIgnoreCase(((String) value).trim())) {
-                ascent = null;
-            } else {
-                ascent = Integer.valueOf(requireInteger(value, "font.ascent", id, file));
-            }
+        int scaleRatio = map.containsKey("scale_ratio")
+                ? requireInteger(map.get("scale_ratio"), "scale_ratio", id, file)
+                : image.getHeight();
+        if (scaleRatio < 1 || scaleRatio > 256) {
+            throw new ContentLoadException("scale_ratio must be between 1 and 256 for " + id);
         }
+        int yPosition = map.containsKey("y_position")
+                ? requireInteger(map.get("y_position"), "y_position", id, file)
+                : Math.min(8, scaleRatio);
+        if (yPosition > scaleRatio) {
+            throw new ContentLoadException("y_position must be lower than or equal to scale_ratio for " + id);
+        }
+
         Integer explicit = null;
-        if (font.containsKey("character")) {
-            String character = requireString(font.get("character"), "font.character", id, file);
-            if (character.codePointCount(0, character.length()) != 1) {
-                throw new ContentLoadException("font.character must contain exactly one character for " + id);
+        if (map.containsKey("symbol")) {
+            String symbol = requireString(map.get("symbol"), "symbol", id, file);
+            if (symbol.codePointCount(0, symbol.length()) != 1) {
+                throw new ContentLoadException("symbol must contain exactly one character for " + id);
             }
-            explicit = Integer.valueOf(character.codePointAt(0));
+            explicit = Integer.valueOf(symbol.codePointAt(0));
             requirePrivateUse(explicit.intValue(), id);
         }
-        int firstVisibleRow = firstVisibleRow(image, id);
-        int automaticAscent = (int) Math.round(firstVisibleRow * ((double) height / image.getHeight())) - 5;
-        return new RawGlyph(textureResource.toString(), rows, height, ascent, automaticAscent, explicit);
+        return new RawGlyph(pack.manifest().namespace() + ":" + resourcePath, scaleRatio, yPosition, explicit);
     }
 
-    private static int firstVisibleRow(BufferedImage image, ContentID id) {
+    private static void ensureVisible(BufferedImage image, ContentID id) {
         for (int y = 0; y < image.getHeight(); y++) {
             for (int x = 0; x < image.getWidth(); x++) {
-                if (((image.getRGB(x, y) >>> 24) & 0xFF) != 0) return y;
+                if (((image.getRGB(x, y) >>> 24) & 0xFF) != 0) return;
             }
         }
         throw new ContentLoadException("UI glyph " + id + " texture is fully transparent");
@@ -278,7 +265,7 @@ public final class UiGlyphLoader {
 
     private static void requirePrivateUse(int value, ContentID id) {
         if (value < FIRST_CODE_POINT || value > LAST_CODE_POINT) {
-            throw new ContentLoadException("UI glyph " + id + " character must be in U+E000..U+F7FF");
+            throw new ContentLoadException("UI glyph " + id + " symbol must be in U+E000..U+F7FF");
         }
     }
 
@@ -297,11 +284,6 @@ public final class UiGlyphLoader {
         return ((String) value).trim();
     }
 
-    private static Map<?, ?> requireMap(Object value, String key, ContentID id, Path file) {
-        if (!(value instanceof Map)) throw new ContentLoadException(key + " must be a mapping for " + id + " in " + file);
-        return (Map<?, ?>) value;
-    }
-
     private static void rejectUnknown(Map<?, ?> map, Path file, String context, String... allowed) {
         Set<String> keys = new HashSet<String>();
         Collections.addAll(keys, allowed);
@@ -316,37 +298,17 @@ public final class UiGlyphLoader {
 
     private static final class RawGlyph {
         private final String texture;
-        private final int rows;
-        private final int height;
-        private final Integer ascent;
-        private final int automaticAscent;
+        private final int scaleRatio;
+        private final int yPosition;
         private final Integer explicitCodePoint;
-        private RawGlyph(String texture, int rows, int height, Integer ascent, int automaticAscent, Integer explicitCodePoint) {
-            this.texture = texture; this.rows = rows; this.height = height;
-            this.ascent = ascent; this.automaticAscent = automaticAscent; this.explicitCodePoint = explicitCodePoint;
+        private RawGlyph(String texture, int scaleRatio, int yPosition, Integer explicitCodePoint) {
+            this.texture = texture; this.scaleRatio = scaleRatio; this.yPosition = yPosition;
+            this.explicitCodePoint = explicitCodePoint;
         }
     }
 
     private static final class AllocationState {
         private final Map<ContentID, Integer> active = new LinkedHashMap<ContentID, Integer>();
         private final Map<ContentID, Integer> inactive = new LinkedHashMap<ContentID, Integer>();
-    }
-
-    private static final class Resource {
-        private final String namespace;
-        private final String path;
-        private Resource(String namespace, String path) { this.namespace = namespace; this.path = path; }
-        private static Resource parse(String value, String fallback) {
-            String normalized = value.trim().toLowerCase(java.util.Locale.ROOT);
-            int split = normalized.indexOf(':');
-            String namespace = split < 0 ? fallback : normalized.substring(0, split);
-            String path = split < 0 ? normalized : normalized.substring(split + 1);
-            if (!namespace.matches("[a-z0-9._-]+") || !path.matches("[a-z0-9/._-]+")
-                    || path.startsWith("/") || path.endsWith("/") || path.contains("..")) {
-                throw new ContentLoadException("Invalid UI texture resource location: " + value);
-            }
-            return new Resource(namespace, path);
-        }
-        @Override public String toString() { return namespace + ":" + path; }
     }
 }
