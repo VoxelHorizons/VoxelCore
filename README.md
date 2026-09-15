@@ -36,7 +36,7 @@ This slice should add:
 
 Unicode codepoints themselves are global within a font and are not made collision-safe by resource namespaces. VoxelCore must therefore own allocation and final font composition, while authored textures remain under their pack namespaces.
 
-Inventory height is definition data, not a fixed three-row assumption. Each UI definition must support 1–6 rows. Authors may set `ascent` when an artwork needs an intentional override; when omitted, the compiler derives it deterministically from the row count and positioning metadata. The supplied images are independent fixtures demonstrating different layouts and offsets, not canonical templates to copy.
+Inventory height is definition data, not a fixed three-row assumption. Each UI definition must support 1–6 rows. Authors may set `ascent` when an artwork needs an intentional override; when omitted, the compiler derives it deterministically from the row count and positioning metadata. The supplied images are independent fixtures demonstrating different layouts and offsets, not canonical templates to copy. Automatic ascent preserves the full canvas, finds its first visible alpha row, scales that coordinate by `font.height`, and aligns it with the vanilla first-slot offset; a fully transparent texture is rejected.
 
 The planned authoring shape is:
 
@@ -51,7 +51,7 @@ ui:
       ascent: auto
 ```
 
-`ascent: auto` may be omitted because automatic derivation is the default. A numeric `ascent` overrides it. The compiler does not infer menu rows or slot behavior from opaque pixels; a texture may cover any subset of the nine columns.
+`ascent: auto` may be omitted because automatic derivation is the default. A numeric `ascent` overrides it. The compiler does not infer menu rows or slot behavior from the image; a texture may cover any subset of the nine columns. Alpha bounds are used only for automatic vertical placement.
 
 The planned admin interface is `/voxelcore admin ui copy <content-id>`, with ContentID tab completion. On capable clients it sends a clickable copy-to-clipboard component containing exactly the allocated character; legacy clients receive a selectable character and codepoint fallback. `ui list` and `ui info <content-id>` expose discoverability and resolved metadata.
 
