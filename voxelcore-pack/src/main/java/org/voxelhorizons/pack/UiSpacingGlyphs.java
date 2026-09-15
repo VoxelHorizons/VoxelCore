@@ -34,20 +34,25 @@ public final class UiSpacingGlyphs {
      * Returns one or more generated spacing characters whose advances sum to the requested offset.
      */
     public static String charactersForOffset(int offset) {
-        if (offset < -MAX_OFFSET || offset > MAX_OFFSET) {
-            throw new IllegalArgumentException("UI offset must be between -" + MAX_OFFSET + " and " + MAX_OFFSET);
-        }
+        if (offset == Integer.MIN_VALUE) throw new IllegalArgumentException("UI offset is too small");
         if (offset == 0) return "";
         StringBuilder result = new StringBuilder();
         int remaining = Math.abs(offset);
         int sign = offset < 0 ? -1 : 1;
-        for (int distance = MAX_OFFSET; distance >= 1; distance /= 2) {
-            if ((remaining & distance) == 0) continue;
-            Integer codePoint = CODE_POINTS_BY_DISTANCE.get(Integer.valueOf(sign * distance));
-            if (codePoint == null) throw new IllegalStateException("Missing spacing allocation for " + (sign * distance));
-            result.appendCodePoint(codePoint.intValue());
+        while (remaining >= MAX_OFFSET) {
+            append(result, sign * MAX_OFFSET);
+            remaining -= MAX_OFFSET;
+        }
+        for (int distance = MAX_OFFSET / 2; distance >= 1; distance /= 2) {
+            if ((remaining & distance) != 0) append(result, sign * distance);
         }
         return result.toString();
+    }
+
+    private static void append(StringBuilder output, int distance) {
+        Integer codePoint = CODE_POINTS_BY_DISTANCE.get(Integer.valueOf(distance));
+        if (codePoint == null) throw new IllegalStateException("Missing spacing allocation for " + distance);
+        output.appendCodePoint(codePoint.intValue());
     }
 
     private static int nextDistance(int value) {
