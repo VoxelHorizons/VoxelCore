@@ -31,12 +31,29 @@ This slice should add:
 - bitmap-provider metadata for texture and height, plus a per-UI `ascent` that may be explicitly authored or derived from inventory rows and positioning metadata
 - deterministic merging into the generated font JSON so packs cannot overwrite one another
 - duplicate codepoint, missing texture, unsafe path, invalid dimension, and incompatible-target validation
-- a generated glyph manifest/report that later menu-title code can resolve without hard-coded Unicode values
+- a generated glyph manifest/report and admin lookup command so integrations can resolve or copy characters without hard-coded Unicode values
 - compiler tests covering dynamic 1–6 row inventory overlays, explicit ascent overrides, and automatically derived ascent values
 
 Unicode codepoints themselves are global within a font and are not made collision-safe by resource namespaces. VoxelCore must therefore own allocation and final font composition, while authored textures remain under their pack namespaces.
 
 Inventory height is definition data, not a fixed three-row assumption. Each UI definition must support 1–6 rows. Authors may set `ascent` when an artwork needs an intentional override; when omitted, the compiler derives it deterministically from the row count and positioning metadata. The supplied images are independent fixtures demonstrating different layouts and offsets, not canonical templates to copy.
+
+The planned authoring shape is:
+
+```yaml
+ui:
+  npc_warps:
+    texture: voxel:ui/npc/warps_menu
+    inventory:
+      rows: 1
+    font:
+      height: 256
+      ascent: auto
+```
+
+`ascent: auto` may be omitted because automatic derivation is the default. A numeric `ascent` overrides it. The compiler does not infer menu rows or slot behavior from opaque pixels; a texture may cover any subset of the nine columns.
+
+The planned admin interface is `/voxelcore admin ui copy <content-id>`, with ContentID tab completion. On capable clients it sends a clickable copy-to-clipboard component containing exactly the allocated character; legacy clients receive a selectable character and codepoint fallback. `ui list` and `ui info <content-id>` expose discoverability and resolved metadata.
 
 This milestone adds resource-pack content only. It does not yet open inventories, handle clicks, introduce runtime menu sessions, or add alternate-client UI. Java item actions move back one place and follow after the UI content contract is proven.
 
