@@ -1,3 +1,3 @@
 version: 1 # DO NOT CHANGE
 game:
-  bedrock_support: false # Disabled by Default (Enable if you use Geyser/Floodgate)
+  bedrock_support: false # Reserved for a future integration; currently has no runtime effect
