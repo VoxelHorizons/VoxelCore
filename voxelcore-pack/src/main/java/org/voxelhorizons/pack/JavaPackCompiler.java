@@ -39,6 +39,7 @@ public final class JavaPackCompiler {
     }
 
     public JavaPackBuildResult compile(Path contentRoot, Path outputZip, Path allocationManifestPath, JavaPackTarget target) {
+        prepareFreshOutput(outputZip);
         return compileWithAllAuthoredAssets(contentRoot, outputZip, allocationManifestPath, target, true);
     }
 
@@ -49,6 +50,22 @@ public final class JavaPackCompiler {
     /** Runs the complete pack validation/compiler pipeline without mutating the manifest or writing a ZIP. */
     public JavaPackBuildResult validate(Path contentRoot, Path allocationManifestPath, JavaPackTarget target) {
         return compileWithAllAuthoredAssets(contentRoot, null, allocationManifestPath, target, false);
+    }
+
+    /**
+     * Removes any previous build artifact before compilation starts. A pack build is always a complete
+     * snapshot of the currently authored resources; it must never retain files that only existed in an
+     * older build.
+     */
+    private static void prepareFreshOutput(Path outputZip) {
+        if (outputZip == null) throw new IllegalArgumentException("outputZip cannot be null when building");
+        try {
+            Path parent = outputZip.getParent();
+            if (parent != null) Files.createDirectories(parent);
+            Files.deleteIfExists(outputZip);
+        } catch (IOException exception) {
+            throw new JavaPackCompileException("Unable to clear previous resource pack " + outputZip, exception);
+        }
     }
 
     /**
