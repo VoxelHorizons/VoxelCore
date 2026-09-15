@@ -99,6 +99,32 @@ public class UiGlyphCompilerTest {
     }
 
     @Test
+    public void rejectsDuplicateExplicitCharacters() throws Exception {
+        File contentRoot = temporaryFolder.newFolder("collision-content");
+        File pack = new File(contentRoot, "voxel");
+        assertTrue(new File(pack, "content").mkdirs());
+        File first = new File(pack, "assets/voxel/textures/ui/first.png");
+        File second = new File(pack, "assets/voxel/textures/ui/second.png");
+        assertTrue(first.getParentFile().mkdirs());
+        writePng(first, 16, 16, 0);
+        writePng(second, 16, 16, 0);
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
+        write(new File(pack, "content/ui.yml"),
+                "ui:\n" +
+                "  first:\n    texture: voxel:ui/first\n    inventory: {rows: 1}\n" +
+                "    font: {height: 16, character: '\uE100'}\n" +
+                "  second:\n    texture: voxel:ui/second\n    inventory: {rows: 1}\n" +
+                "    font: {height: 16, character: '\uE100'}\n");
+        try {
+            new UiGlyphLoader().load(contentRoot.toPath(),
+                    temporaryFolder.newFolder("collision-build").toPath().resolve("glyphs.yml"), false);
+            fail("Expected duplicate character rejection");
+        } catch (RuntimeException exception) {
+            assertTrue(exception.getMessage().contains("Duplicate UI glyph codepoint"));
+        }
+    }
+
+    @Test
     public void rejectsUiContentForPreFontTarget() throws Exception {
         File contentRoot = temporaryFolder.newFolder("legacy-content");
         File pack = new File(contentRoot, "voxel");
