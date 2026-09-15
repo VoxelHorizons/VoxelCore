@@ -44,11 +44,21 @@ public final class UiGlyphLoader {
 
         for (ContentID id : ids) {
             RawGlyph glyph = raw.get(id);
-            Integer allocated = glyph.explicitCodePoint;
-            if (allocated == null) allocated = state.active.get(id);
-            if (allocated == null) allocated = state.inactive.get(id);
+            Integer previous = state.active.containsKey(id) ? state.active.get(id) : state.inactive.get(id);
+            if (glyph.explicitCodePoint != null && previous != null
+                    && !glyph.explicitCodePoint.equals(previous)) {
+                throw new ContentLoadException("UI glyph " + id + " cannot change its stable character from "
+                        + codePoint(previous.intValue()) + " to " + codePoint(glyph.explicitCodePoint.intValue()));
+            }
+            Integer allocated = glyph.explicitCodePoint == null ? previous : glyph.explicitCodePoint;
             if (allocated != null) {
                 requirePrivateUse(allocated.intValue(), id);
+                for (Map.Entry<ContentID, Integer> reserved : state.inactive.entrySet()) {
+                    if (!reserved.getKey().equals(id) && reserved.getValue().equals(allocated)) {
+                        throw new ContentLoadException("UI glyph codepoint " + codePoint(allocated.intValue())
+                                + " is reserved by inactive glyph " + reserved.getKey());
+                    }
+                }
                 if (!used.add(allocated)) throw new ContentLoadException("Duplicate UI glyph codepoint "
                         + codePoint(allocated.intValue()) + " for " + id);
                 active.put(id, allocated);
