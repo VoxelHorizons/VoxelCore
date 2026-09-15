@@ -1,6 +1,6 @@
 # VoxelCore migration and optimization roadmap
 
-> **Implementation status (September 2026):** The foundation, item/content pipeline, and minimal Java resource-pack compiler (phases 0, 1, and 2a) are implemented on `main`, with exact real-server validation from Minecraft 1.12.2 through 26.2. Legacy HavenCore aliases from the original phase-1 acceptance criteria remain deferred migration work. The next recommended implementation slice is phase 3a: Java item actions and interaction dispatch. The README remains the canonical feature and compatibility reference.
+> **Implementation status (September 2026):** The foundation, item/content pipeline, and minimal Java resource-pack compiler (phases 0, 1, and 2a) are implemented on `main`, with exact real-server validation from Minecraft 1.12.2 through 26.2. Legacy HavenCore aliases from the original phase-1 acceptance criteria remain deferred migration work. The next recommended implementation slice is phase 2c: Java UI font-content compilation. Runtime item actions remain the following milestone. The README remains the canonical feature and compatibility reference.
 
 Prepared for Voxel Horizons · 12 September 2026 · Living implementation plan
 
@@ -182,6 +182,7 @@ Implemented Java MVP layout:
 - `plugins/VoxelCore/content/<pack>/pack.yml`: schema, namespace and dependencies.
 - `content/**/*.yml`: recursively discovered item definitions; paths are organizational and IDs come from item keys.
 - `assets/<namespace>/models` and `assets/<namespace>/textures`: authored Java item assets copied into target packs.
+- UI font definitions are not implemented yet; phase 2c will add authored namespaced glyph metadata while keeping final font composition compiler-owned.
 - `build/resource-packs/<target>.zip`: deterministic generated output, separate from authored assets.
 
 Pack priorities, blocks, furniture, crops, vehicles, menus, Java fonts/sounds, and Bedrock-specific asset trees remain planned extensions rather than accepted input in the current compiler.
@@ -279,7 +280,8 @@ Each row is a separately reviewable feature slice. Dependencies should be satisf
 | 1 | Content IDs, inheritance, registry and item factory — HavenCore | Implemented core; legacy aliases deferred | Keep deterministic inheritance, immutable registries, isolated stacks, and failed-reload rollback; add legacy aliases only with the migration slice |
 | 2a | Minimal Java pack compiler — new | Implemented | Maintain stable allocations and exact validated legacy/modern pack profiles |
 | 2b | Bedrock items, pack and mappings — new/integrations | Planned | Same item behaves correctly in hand, inventory, drop and equip contexts; pack/reconnect lifecycle documented |
-| 3a | Java item actions and interaction dispatch — HavenCore | **Next** | Typed triggers, immutable compiled actions, central context/result dispatch, execution-time validation, reload safety, and legacy/modern smoke coverage |
+| 2c | Java UI font content and stable glyph allocation — new/HavenCore assets | **Next** | Shared spacing resources, namespaced bitmap definitions, collision-free stable codepoints, deterministic merged font output, target capability checks, and a three-row overlay fixture |
+| 3a | Java item actions and interaction dispatch — HavenCore | Planned after 2c | Typed triggers, immutable compiled actions, central context/result dispatch, execution-time validation, reload safety, and legacy/modern smoke coverage |
 | 3b | Menus and session lifecycle — HavenCore | Planned after 3a | Presentation-independent actions, deterministic close/disconnect cleanup, and duplicate/stale action rejection before adding alternate frontends |
 | 4a | Basic items, books, heads, prefixes and bound rules — HavenCore | Planned | Correct cloning and metadata; optional permission integration; bound semantics cover all intended transfer paths |
 | 4b | Tool actions and upgrades — HavenCore | Planned | Water/moisture tools and implemented upgrades first; consumption/durability correct; partial enum effects specified separately |
@@ -326,11 +328,25 @@ Each feature's test fixture should cover every frontend and runtime combination 
 
 ## 13. Next implementation unit
 
-Implement **phase 3a: Java item actions and interaction dispatch**. The existing MVP proves authored item definition through runtime identity and generated Java packs; the next useful vertical slice is making those items perform controlled gameplay behavior.
+Implement **phase 2c: Java UI font-content compilation** before runtime menu functionality. VoxelCore should first establish how authored UI textures, spacing glyphs, Unicode allocation, and target-specific font output become deterministic pack content.
 
-Keep the first PR narrow: add typed right-click-air/block and right-click-entity triggers; compile action definitions into the immutable content snapshot; resolve the held item's `ContentID` in a thin Bukkit listener; dispatch through a central action context/result API; and validate cancellation, permissions, cooldowns, consumption, and durability at execution time. Failed action compilation must preserve the active content revision just like other reload failures.
+The compiler—not individual packs—must own the final font composition. Resource namespaces make texture paths unambiguous, but Unicode codepoints remain global within a font. Letting each pack ship an independent replacement `minecraft:default` file would create last-writer-wins behavior and silent glyph collisions.
 
-Start with test/debug actions that prove dispatch and state handling rather than migrating addon-specific mechanics. Add unit tests for parsing, inheritance, validation, and dispatch, plus representative legacy and modern real-server smoke assertions. Inventory menus and other presentation systems belong in phase 3b after the action boundary is stable.
+The first reviewable slice should include:
+
+- built-in positive and negative spacing resources injected into every compatible generated Java pack
+- an authored `ui`/glyph definition keyed by stable namespaced `ContentID`
+- stable codepoint allocation with persisted tombstones, separate from item render allocation
+- bitmap provider compilation with explicit texture, height, and ascent
+- preservation of transparent positioning canvas for overlay textures
+- deterministic merging and ordering of generated font providers
+- validation for duplicate explicit characters, missing textures, invalid paths/dimensions, unsupported provider properties, and incompatible target profiles
+- a generated manifest that maps UI IDs to characters for later menu-title rendering
+- a three-row inventory overlay fixture based on the supplied network-exchange artwork
+
+The supplied historical `default.json` is migration evidence, not a file to copy wholesale: it combines hundreds of unrelated providers and contains duplicate character assignments. The supplied spacing TTF should likewise be treated as an input to validate per target; if a target cannot safely load it, pack compilation must omit or reject that capability explicitly rather than producing a nominally successful but broken pack.
+
+This phase is resource-pack content only. It does not open inventories, dispatch clicks, or create menu sessions. Phase 3a item actions follows once this content contract is stable, and phase 3b then consumes both the action API and generated glyph manifest for runtime menus.
 
 Legacy HavenCore ID/material aliases remain a separate migration concern and should be implemented only alongside representative old content and an explicit compatibility report.
 
