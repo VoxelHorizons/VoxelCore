@@ -74,7 +74,7 @@ public class UiGlyphCompilerTest {
         assertTrue(new File(pack, "content").mkdirs());
         File texture = new File(pack, "assets/voxel/textures/ui/overlay.png");
         assertTrue(texture.getParentFile().mkdirs());
-        writePng(texture, 256, 256);
+        writePng(texture, 256, 256, 0);
         write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
         File definition = new File(pack, "content/ui.yml");
         write(definition,
