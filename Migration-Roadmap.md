@@ -1,6 +1,6 @@
 # VoxelCore migration and optimization roadmap
 
-> **Implementation status (September 2026):** The foundation, item/content pipeline, and minimal Java resource-pack compiler (phases 0, 1, and 2a) are implemented on `main`, with exact real-server validation from Minecraft 1.12.2 through 26.2. Legacy HavenCore aliases from the original phase-1 acceptance criteria remain deferred migration work. The next recommended implementation slice is phase 2c: Java UI font-content compilation. Runtime item actions remain the following milestone. The README remains the canonical feature and compatibility reference.
+> **Implementation status (September 2026):** The foundation, item/content pipeline, and minimal Java resource-pack compiler (phases 0, 1, and 2a) are implemented on `main`, with exact real-server validation from Minecraft 1.12.2 through 26.2. Legacy HavenCore aliases from the original phase-1 acceptance criteria remain deferred migration work. Java UI font-content compilation (phase 2c) is implemented by this change. The next recommended implementation slice is phase 3a: Java item actions and interaction dispatch. The README remains the canonical feature and compatibility reference.
 
 Prepared for Voxel Horizons · 12 September 2026 · Living implementation plan
 
@@ -280,8 +280,8 @@ Each row is a separately reviewable feature slice. Dependencies should be satisf
 | 1 | Content IDs, inheritance, registry and item factory — HavenCore | Implemented core; legacy aliases deferred | Keep deterministic inheritance, immutable registries, isolated stacks, and failed-reload rollback; add legacy aliases only with the migration slice |
 | 2a | Minimal Java pack compiler — new | Implemented | Maintain stable allocations and exact validated legacy/modern pack profiles |
 | 2b | Bedrock items, pack and mappings — new/integrations | Planned | Same item behaves correctly in hand, inventory, drop and equip contexts; pack/reconnect lifecycle documented |
-| 2c | Java UI font content and stable glyph allocation — new/HavenCore assets | **Next** | Shared spacing resources, namespaced bitmap definitions, collision-free stable codepoints, deterministic merged font output, target capability checks, and dynamic 1–6 row overlay fixtures with explicit/derived ascent |
-| 3a | Java item actions and interaction dispatch — HavenCore | Planned after 2c | Typed triggers, immutable compiled actions, central context/result dispatch, execution-time validation, reload safety, and legacy/modern smoke coverage |
+| 2c | Java UI font content and stable glyph allocation — new/HavenCore assets | Implemented | Shared spacing resources, namespaced bitmap definitions, collision-free stable codepoints, deterministic merged font output, target capability checks, and dynamic 1–6 row overlay fixtures with explicit/derived ascent |
+| 3a | Java item actions and interaction dispatch — HavenCore | **Next** | Typed triggers, immutable compiled actions, central context/result dispatch, execution-time validation, reload safety, and legacy/modern smoke coverage |
 | 3b | Menus and session lifecycle — HavenCore | Planned after 3a | Presentation-independent actions, deterministic close/disconnect cleanup, and duplicate/stale action rejection before adding alternate frontends |
 | 4a | Basic items, books, heads, prefixes and bound rules — HavenCore | Planned | Correct cloning and metadata; optional permission integration; bound semantics cover all intended transfer paths |
 | 4b | Tool actions and upgrades — HavenCore | Planned | Water/moisture tools and implemented upgrades first; consumption/durability correct; partial enum effects specified separately |
@@ -328,11 +328,11 @@ Each feature's test fixture should cover every frontend and runtime combination 
 
 ## 13. Next implementation unit
 
-Implement **phase 2c: Java UI font-content compilation** before runtime menu functionality. VoxelCore should first establish how authored UI textures, spacing glyphs, Unicode allocation, and target-specific font output become deterministic pack content.
+Phase 2c implements **Java UI font-content compilation** before runtime menu functionality. VoxelCore should first establish how authored UI textures, spacing glyphs, Unicode allocation, and target-specific font output become deterministic pack content.
 
 The compiler—not individual packs—must own the final font composition. Resource namespaces make texture paths unambiguous, but Unicode codepoints remain global within a font. Letting each pack ship an independent replacement `minecraft:default` file would create last-writer-wins behavior and silent glyph collisions.
 
-The first reviewable slice should include:
+The implemented slice includes:
 
 - built-in positive and negative spacing resources injected into every compatible generated Java pack
 - an authored `ui`/glyph definition keyed by stable namespaced `ContentID`
