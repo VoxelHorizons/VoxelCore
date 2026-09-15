@@ -1,8 +1,8 @@
 # VoxelCore migration and optimization roadmap
 
-> **Implementation status (September 2026):** Roadmap phases 0, 1, and 2a are implemented on `main`, including the hardened item/content pipeline, exact Java resource-pack profiles, and real-server validation through Minecraft 26.2. This document preserves the original architecture audit and source evidence; use the README for the canonical current feature and compatibility summary.
+> **Implementation status (September 2026):** The foundation, item/content pipeline, and minimal Java resource-pack compiler (phases 0, 1, and 2a) are implemented on `main`, with exact real-server validation from Minecraft 1.12.2 through 26.2. Legacy HavenCore aliases from the original phase-1 acceptance criteria remain deferred migration work. The next recommended implementation slice is phase 3a: Java item actions and interaction dispatch. The README remains the canonical feature and compatibility reference.
 
-Prepared for Voxel Horizons · 12 September 2026 · Planning only
+Prepared for Voxel Horizons · 12 September 2026 · Living implementation plan
 
 ## 1. Recommendation and scope
 
@@ -177,14 +177,14 @@ For mixed Java clients on a modern backend, compute a per-session capability pro
 
 Treat this as a deterministic compiler from shared authoring data to several outputs, not a ZIP utility and not a universal Java-to-Bedrock converter.
 
-Proposed authored layout:
+Implemented Java MVP layout:
 
-- plugins/VoxelCore/content/<pack>/pack.yml: namespace, dependencies and override priority.
-- definitions/: items, blocks, furniture, crops, vehicles and menus.
-- assets/shared/: common textures and authoring models where practical.
-- assets/java/: Java-specific models, fonts, item definitions and overrides.
-- assets/bedrock/: geometry, attachables, client entities, animation controllers and overrides.
-- build/: generated outputs, separate from authored assets.
+- `plugins/VoxelCore/content/<pack>/pack.yml`: schema, namespace and dependencies.
+- `content/**/*.yml`: recursively discovered item definitions; paths are organizational and IDs come from item keys.
+- `assets/<namespace>/models` and `assets/<namespace>/textures`: authored Java item assets copied into target packs.
+- `build/resource-packs/<target>.zip`: deterministic generated output, separate from authored assets.
+
+Pack priorities, blocks, furniture, crops, vehicles, menus, Java fonts/sounds, and Bedrock-specific asset trees remain planned extensions rather than accepted input in the current compiler.
 
 Compile configuration inheritance and resource-pack model inheritance as separate graphs. They are related but have different merge semantics. Resolve textures, model parents, animation frames, sounds, fonts, particle references and target-specific references transitively.
 
@@ -273,32 +273,33 @@ Redis Pub/Sub is at-most-once delivery. Use it for advisory invalidations, not t
 
 Each row is a separately reviewable feature slice. Dependencies should be satisfied first; multiple rows in a phase do not imply one large merge.
 
-| Phase | Slice and source | Dependencies | Required outcome before proceeding |
+| Phase | Slice and source | Status | Required outcome before proceeding |
 | --- | --- | --- | --- |
-| 0 | VoxelCore build, lifecycle, config and CI baseline | None | Pin server/JDK targets; successful-init marker; commands tested after registration; config preserved across upgrade; clean shutdown |
-| 1 | Content IDs, inheritance, registry and item factory — HavenCore | 0 | Parent order irrelevant; cycles/missing refs reported; clones isolated; legacy ID aliases; failed reload retains old registry |
-| 2a | Minimal Java pack compiler — new | 1 | One 2D item and inherited variants work with stable allocations in legacy and modern profiles |
-| 2b | Bedrock items, pack and mappings — new/integrations | 2a | Same item behaves correctly in hand, inventory, drop and equip contexts; pack/reconnect lifecycle documented |
-| 3 | Actions, menus and session lifecycle — HavenCore | 1–2 | Java inventory and Bedrock form perform the same action; close/disconnect cleanup; duplicate/stale action rejection |
-| 4a | Basic items, books, heads, prefixes and bound rules — HavenCore | 1,3 | Correct cloning and metadata; optional permission integration; bound semantics cover all intended transfer paths |
-| 4b | Tool actions and upgrades — HavenCore | 4a | Water/moisture tools and implemented upgrades first; consumption/durability correct; partial enum effects specified separately |
-| 5a | Placement/storage/index services; custom blocks — HavenCore | 1–2 | Note-block state allocation, drops, protection, physics/explosions/pistons and restart identity covered |
-| 5b | Furniture placement/rotation/variants — HavenFurniture | 5a | Preflight rollback; owner enforcement; chunk reload without duplicates; modern/legacy/Bedrock visuals demonstrated |
-| 5c | Furniture seats, storage, light and animations | 5b,3 | Multiple viewers share authoritative storage; cleanup; actual lighting separated from brightness; animation state persists |
-| 5d | Gate prototype, then drawbridge feasibility — new | 5c | Obstruction/collision behavior proved before broader moving-platform support |
-| 6a | Crops/seeds/stages/harvest — HavenFarms | 5a,4b | Loaded-chunk growth scheduler; deterministic neighbor tests; drops/seed consumption once; restart policy |
-| 6b | Plot selection/schematics/XP/spawn control — HavenFarms | 6a,3 | Optional PlotSquared/WorldEdit integration; bounded edits; database-disabled operation; plot permissions |
-| 7a | Levels, skill points, drops, XP and tool gates — HavenSkills | 4b,6a | Correct level thresholds and multi-level awards; buffered persistence; Java/Bedrock UI |
-| 7b | Region access/discovery and HUD — HavenSkills | 7a | Indexed region checks, block-boundary movement filtering, cached HUD and client-safe text |
-| 7c | Shared regeneration engine — HavenSkills/RegenMines | 5a | Sparse changed-block records, deadline queue, bounded restoration, chunk unload and restart recovery |
-| 8a | NPC dialogue/relationships/actions — HavenNPCs | 3,4a | Citizens adapter; stable NPC identity; timed conversation cleanup; persisted standing; Java/Bedrock equivalence |
-| 8b | Furniture showroom/templates — HavenFurnitureShop | 5c,3 | Configurable world/regions; relative template positions; bounded capture/reset; implement missing spawn behavior |
-| 9a | Vehicle input and land simulation — HavenVehicles | 5c,2b | Replace ItemsAdder dependency through item service; fixed-tick motion; safe packet boundary; driving/riding parity |
-| 9b | Vehicle variants/storage/trailers/flight | 9a | Cycle-free trailer chains; persistence; packet/entity budgets; collision and passenger edge cases |
-| 10 | Games, lobbies, Tag, bomb rules — HavenGames | 3,7b | UUID→session index; empty-lobby handling; explicit game state transitions; independent inventory group |
-| 11a | Proxy commands and pack distribution — HavenNetwork/new | 2b | Correct deployment location, revision coordination, validated messages |
-| 11b | Escrow exchange — requested behavior not found in main | 1,10, persistence | Durable transfer record; duplicate retries safe; capacity and unavailable-content policy |
-| 11c | Shared inventory groups — new | 11b | Fenced ownership, crash/timeout/duplicate tests, cross-version serialization policy |
+| 0 | VoxelCore build, lifecycle, config and CI baseline | Implemented | Keep pinned targets, successful-init checks, preserved config migration, and clean shutdown covered by CI |
+| 1 | Content IDs, inheritance, registry and item factory — HavenCore | Implemented core; legacy aliases deferred | Keep deterministic inheritance, immutable registries, isolated stacks, and failed-reload rollback; add legacy aliases only with the migration slice |
+| 2a | Minimal Java pack compiler — new | Implemented | Maintain stable allocations and exact validated legacy/modern pack profiles |
+| 2b | Bedrock items, pack and mappings — new/integrations | Planned | Same item behaves correctly in hand, inventory, drop and equip contexts; pack/reconnect lifecycle documented |
+| 3a | Java item actions and interaction dispatch — HavenCore | **Next** | Typed triggers, immutable compiled actions, central context/result dispatch, execution-time validation, reload safety, and legacy/modern smoke coverage |
+| 3b | Menus and session lifecycle — HavenCore | Planned after 3a | Presentation-independent actions, deterministic close/disconnect cleanup, and duplicate/stale action rejection before adding alternate frontends |
+| 4a | Basic items, books, heads, prefixes and bound rules — HavenCore | Planned | Correct cloning and metadata; optional permission integration; bound semantics cover all intended transfer paths |
+| 4b | Tool actions and upgrades — HavenCore | Planned | Water/moisture tools and implemented upgrades first; consumption/durability correct; partial enum effects specified separately |
+| 5a | Placement/storage/index services; custom blocks — HavenCore | Planned | State allocation, drops, protection, physics/explosions/pistons and restart identity covered |
+| 5b | Furniture placement/rotation/variants — HavenFurniture | Planned | Preflight rollback; owner enforcement; chunk reload without duplicates; version-appropriate visuals demonstrated |
+| 5c | Furniture seats, storage, light and animations | Planned after 5b and 3b | Multiple viewers share authoritative storage; cleanup; actual lighting separated from brightness; animation state persists |
+| 5d | Gate prototype, then drawbridge feasibility — new | Planned | Obstruction/collision behavior proved before broader moving-platform support |
+| 6a | Crops/seeds/stages/harvest — HavenFarms | Planned | Loaded-chunk growth scheduler; deterministic neighbor tests; drops/seed consumption once; restart policy |
+| 6b | Plot selection/schematics/XP/spawn control — HavenFarms | Planned | Optional PlotSquared/WorldEdit integration; bounded edits; database-disabled operation; plot permissions |
+| 7a | Levels, skill points, drops, XP and tool gates — HavenSkills | Planned | Correct level thresholds and multi-level awards; buffered persistence; frontend-neutral services |
+| 7b | Region access/discovery and HUD — HavenSkills | Planned | Indexed region checks, block-boundary movement filtering, cached HUD and client-safe text |
+| 7c | Shared regeneration engine — HavenSkills/RegenMines | Planned | Sparse changed-block records, deadline queue, bounded restoration, chunk unload and restart recovery |
+| 8a | NPC dialogue/relationships/actions — HavenNPCs | Planned | Citizens adapter; stable NPC identity; timed conversation cleanup; persisted standing |
+| 8b | Furniture showroom/templates — HavenFurnitureShop | Planned | Configurable world/regions; relative template positions; bounded capture/reset; implement missing spawn behavior |
+| 9a | Vehicle input and land simulation — HavenVehicles | Planned | Replace ItemsAdder through item services; fixed-tick motion; safe input boundary; driving/riding validation |
+| 9b | Vehicle variants/storage/trailers/flight | Planned | Cycle-free trailer chains; persistence; packet/entity budgets; collision and passenger edge cases |
+| 10 | Games, lobbies, Tag, bomb rules — HavenGames | Planned | UUID-to-session index; empty-lobby handling; explicit game state transitions; independent inventory group |
+| 11a | Proxy commands and pack distribution — HavenNetwork/new | Planned | Correct deployment location, revision coordination, validated messages |
+| 11b | Escrow exchange — requested behavior not found in main | Planned | Durable transfer record; duplicate retries safe; capacity and unavailable-content policy |
+| 11c | Shared inventory groups — new | Planned | Fenced ownership, crash/timeout/duplicate tests, cross-version serialization policy |
 
 Recipes, general custom-mob AI, a complete economy, arbitrary combat/food behavior and a generic animation editor are not established implementations in the inspected core. Add them deliberately if wanted; an ItemType enum entry alone is not a mechanic to port.
 
@@ -321,17 +322,17 @@ The counts are proposed stress-test fixtures, not supported-capacity promises. U
 
 Test exact pinned combinations at feature boundaries: one legacy numeric-CMD backend/client; 1.19.4 display boundary; 1.20.4/1.20.5 item-storage boundary; 1.21.3/1.21.4 pack boundary; selected current Paper/JDK; selected Geyser/Floodgate/Bedrock builds. Add translated clients only where support is claimed. Do not multiply every historical version into a full Cartesian matrix. Keep an optional latest canary separate from release gates.
 
-Each feature's test fixture should include Java and Bedrock behavior, restart, chunk unload/load, invalid config, reload failure and optional dependency absence. For high-value state also include duplicate actions, crashes and recovery. Treat packet-thread access as an explicit verification item. If Folia support is desired later, its regional ownership model requires a separate scheduling design and test gate; do not advertise it just because background work is asynchronous.
+Each feature's test fixture should cover every frontend and runtime combination that the feature actually claims to support, plus restart, chunk unload/load, invalid config, reload failure, and optional dependency absence where relevant. For high-value state also include duplicate actions, crashes, and recovery. Treat asynchronous callbacks and server-thread ownership as explicit verification items.
 
-## 13. First migration unit
+## 13. Next implementation unit
 
-Begin with the **content definition compiler and item factory**, after the small build/CI baseline adjustment. This is the foundation every addon depends on and it addresses the most concrete core defects.
+Implement **phase 3a: Java item actions and interaction dispatch**. The existing MVP proves authored item definition through runtime identity and generated Java packs; the next useful vertical slice is making those items perform controlled gameplay behavior.
 
-The first reviewable deliverable should contain: schema v1; canonical IDs; legacy material-parent import; cycle/missing-reference errors; defined merge rules; immutable registry; isolated ItemStack creation; legacy ID recognition; safe reload; and tests using a base item plus several inherited variants. Then extend that same fixture into the minimal Java/Bedrock pack proof.
+Keep the first PR narrow: add typed right-click-air/block and right-click-entity triggers; compile action definitions into the immutable content snapshot; resolve the held item's `ContentID` in a thin Bukkit listener; dispatch through a central action context/result API; and validate cancellation, permissions, cooldowns, consumption, and durability at execution time. Failed action compilation must preserve the active content revision just like other reload failures.
 
-Before coding the renderer, record the chosen oldest backend and oldest Java client separately, whether Geyser runs on proxy/backend/standalone, and whether the first release must include older backend support or only older clients. The roadmap above remains useful without those answers; they determine which adapters we implement first.
+Start with test/debug actions that prove dispatch and state handling rather than migrating addon-specific mechanics. Add unit tests for parsing, inheritance, validation, and dispatch, plus representative legacy and modern real-server smoke assertions. Inventory menus and other presentation systems belong in phase 3b after the action boundary is stable.
 
-This was the original recommended first migration unit. It is now implemented on `main`; the remaining rows in the mechanics migration backlog describe future slices.
+Legacy HavenCore ID/material aliases remain a separate migration concern and should be implemented only alongside representative old content and an explicit compatibility report.
 
 ## Appendix A. Reviewed snapshots
 
