@@ -82,7 +82,7 @@ public class UiGlyphCompilerTest {
                 "    font:\n      height: 40\n      ascent: 31\n");
 
         UiGlyphDefinition glyph = new UiGlyphLoader().load(contentRoot.toPath(),
-                temporaryFolder.newFile("glyphs.yml").toPath(), false)
+                temporaryFolder.newFolder("explicit-build").toPath().resolve("glyphs.yml"), false)
                 .get(org.voxelhorizons.content.ContentID.of("voxel", "overlay")).get();
         assertEquals(6, glyph.rows());
         assertEquals(31, glyph.ascent());
@@ -91,7 +91,7 @@ public class UiGlyphCompilerTest {
                 "ui:\n  overlay:\n    texture: voxel:ui/overlay\n    inventory:\n      rows: 7\n" +
                 "    font:\n      height: 40\n");
         try {
-            new UiGlyphLoader().load(contentRoot.toPath(), temporaryFolder.newFile("bad-glyphs.yml").toPath(), false);
+            new UiGlyphLoader().load(contentRoot.toPath(), temporaryFolder.newFolder("invalid-build").toPath().resolve("bad-glyphs.yml"), false);
             fail("Expected invalid row count to fail");
         } catch (RuntimeException exception) {
             assertTrue(exception.getMessage().contains("between 1 and 6"));
@@ -112,7 +112,7 @@ public class UiGlyphCompilerTest {
                 "    font:\n      height: 16\n");
         try {
             new JavaPackCompiler().compile(contentRoot.toPath(), temporaryFolder.newFile("legacy.zip").toPath(),
-                    temporaryFolder.newFile("render.yml").toPath(), JavaPackTarget.MC_1_12_2);
+                    temporaryFolder.newFolder("legacy-build").toPath().resolve("render.yml"), JavaPackTarget.MC_1_12_2);
             fail("Expected pre-font target rejection");
         } catch (JavaPackCompileException exception) {
             assertTrue(exception.getMessage().contains("does not support custom UI fonts"));
