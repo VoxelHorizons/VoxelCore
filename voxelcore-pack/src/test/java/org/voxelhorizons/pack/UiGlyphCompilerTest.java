@@ -51,6 +51,13 @@ public class UiGlyphCompilerTest {
         assertEquals(glyph.character(), registry.resolveAliases(":warps_menu:"));
         assertEquals(glyph.character(), registry.resolveAliases(":voxel/warps_menu:"));
 
+        UiTextResolver resolver = new UiTextResolver(registry);
+        String rendered = resolver.resolve(":offset_-16::warps_menu:\u00A7rWarps");
+        assertEquals(UiSpacingGlyphs.charactersForOffset(-16) + "\u00A7f" + glyph.character() + "\u00A7rWarps", rendered);
+        assertEquals(UiSpacingGlyphs.charactersForOffset(-17), resolver.resolve(":offset_-17:"));
+        assertEquals("", resolver.resolve(":offset_0:"));
+        assertEquals(":offset_-2048:", resolver.resolve(":offset_-2048:"));
+
         String font = zipText(output, "assets/minecraft/font/default.json");
         assertTrue(font.contains("\"type\":\"space\""));
         assertTrue(font.contains("\"type\":\"bitmap\""));
