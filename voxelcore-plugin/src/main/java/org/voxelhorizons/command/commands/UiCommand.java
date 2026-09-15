@@ -64,8 +64,23 @@ public final class UiCommand implements SubCommand {
             sender.sendMessage("A UI ContentID is required.");
             return null;
         }
+        String requested = args[0];
+        if (requested.startsWith(":") && requested.endsWith(":") && requested.length() > 2) {
+            requested = requested.substring(1, requested.length() - 1);
+            UiGlyphDefinition alias = null;
+            for (UiGlyphDefinition candidate : registry(persist).entries().values()) {
+                if (candidate.id().value().equals(requested)) {
+                    if (alias != null) {
+                        sender.sendMessage("Ambiguous UI alias ':" + requested + ":'. Use a full ContentID.");
+                        return null;
+                    }
+                    alias = candidate;
+                }
+            }
+            if (alias != null) return alias;
+        }
         final ContentID id;
-        try { id = parse(args[0]); }
+        try { id = parse(requested); }
         catch (IllegalArgumentException exception) {
             sender.sendMessage("Invalid UI ContentID '" + args[0] + "'.");
             return null;
@@ -103,7 +118,8 @@ public final class UiCommand implements SubCommand {
             UiGlyphDefinition glyph = find(sender, args, false);
             if (glyph == null) return;
             sender.sendMessage("VoxelCore UI " + glyph.id() + ": texture=" + glyph.texture()
-                    + ", rows=" + glyph.rows() + ", height=" + glyph.height() + ", ascent=" + glyph.ascent()
+                    + ", alias=:" + glyph.id().value() + ":, scale_ratio=" + glyph.scaleRatio()
+                    + ", y_position=" + glyph.yPosition()
                     + ", character=" + glyph.character() + " (" + glyph.escapedCodePoint() + ")");
         }
     }
