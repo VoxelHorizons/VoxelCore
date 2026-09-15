@@ -28,6 +28,9 @@ public final class UiTextResolver {
             String replacement = matcher.group(0);
             try {
                 int offset = Integer.parseInt(matcher.group(1));
+                if (offset < -UiSpacingGlyphs.maxOffset() || offset > UiSpacingGlyphs.maxOffset()) {
+                    throw new IllegalArgumentException("Offset is outside the public placeholder range");
+                }
                 replacement = UiSpacingGlyphs.charactersForOffset(offset);
             } catch (IllegalArgumentException ignored) {
                 // Preserve malformed and out-of-range placeholders for diagnosis.
