@@ -6,30 +6,29 @@ import org.voxelhorizons.content.ContentID;
 public final class UiGlyphDefinition {
     private final ContentID id;
     private final String texture;
-    private final int rows;
-    private final int height;
-    private final int ascent;
+    private final int scaleRatio;
+    private final int yPosition;
     private final int codePoint;
 
-    UiGlyphDefinition(ContentID id, String texture, int rows, int height, int ascent, int codePoint) {
+    UiGlyphDefinition(ContentID id, String texture, int scaleRatio, int yPosition, int codePoint) {
         this.id = id;
         this.texture = texture;
-        this.rows = rows;
-        this.height = height;
-        this.ascent = ascent;
+        this.scaleRatio = scaleRatio;
+        this.yPosition = yPosition;
         this.codePoint = codePoint;
     }
 
     public ContentID id() { return id; }
     public String texture() { return texture; }
-    public int rows() { return rows; }
-    public int height() { return height; }
-    public int ascent() { return ascent; }
+    public int scaleRatio() { return scaleRatio; }
+    public int yPosition() { return yPosition; }
+    public int height() { return scaleRatio; }
+    public int ascent() { return yPosition; }
     public int codePoint() { return codePoint; }
     public String character() { return new String(Character.toChars(codePoint)); }
     public String escapedCodePoint() { return String.format("U+%04X", codePoint); }
 
     @Override public String toString() {
-        return id + " (" + escapedCodePoint() + ", rows=" + rows + ", height=" + height + ", ascent=" + ascent + ")";
+        return id + " (" + escapedCodePoint() + ", scale_ratio=" + scaleRatio + ", y_position=" + yPosition + ")";
     }
 }
