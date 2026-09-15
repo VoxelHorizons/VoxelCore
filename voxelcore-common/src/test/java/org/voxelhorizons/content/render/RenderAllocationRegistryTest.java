@@ -90,8 +90,34 @@ public class RenderAllocationRegistryTest {
         assertEquals("test:item/red_item", registry.get(ContentID.of("test", "child_item")).get().model());
     }
 
+    @Test
+    public void allowsSameExplicitAllocationForDifferentMaterials() throws Exception {
+        File root = temporaryFolder.newFolder("material-scope-content");
+        File pack = new File(root, "pack");
+        File content = new File(pack, "content");
+        assertTrue(content.mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: test\n");
+        write(new File(content, "items.yml"),
+                "items:\n" +
+                "  glass_ui:\n" +
+                "    material: minecraft:glass_pane\n" +
+                "    render:\n" +
+                "      model: test:ui/blank\n" +
+                "      custom_model_data: 1\n" +
+                "  branding:\n" +
+                "    material: minecraft:light_blue_stained_glass\n" +
+                "    render:\n" +
+                "      model: test:brand/logo\n" +
+                "      custom_model_data: 1\n");
+
+        RenderAllocationRegistry registry = RenderAllocationRegistry.reconcile(
+                new ContentLoader().load(root.toPath()), RenderAllocationRegistry.empty());
+        assertEquals(1, registry.get(ContentID.of("test", "glass_ui")).get().customModelData());
+        assertEquals(1, registry.get(ContentID.of("test", "branding")).get().customModelData());
+    }
+
     @Test(expected = IllegalArgumentException.class)
-    public void rejectsSameExplicitAllocationForDifferentModels() throws Exception {
+    public void rejectsSameExplicitAllocationForDifferentModelsOnSameMaterial() throws Exception {
         File root = temporaryFolder.newFolder("collision-content");
         File pack = new File(root, "pack");
         File content = new File(pack, "content");
