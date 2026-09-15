@@ -15,6 +15,10 @@ public final class TextPlaceholderService {
         return resolver.resolve(input);
     }
 
+    public String resolve(String input, boolean allowInline, boolean allowGui) {
+        return resolver.resolve(input, allowInline, allowGui);
+    }
+
     public void update(UiGlyphRegistry glyphs) {
         resolver = new UiTextResolver(glyphs);
     }
