@@ -59,10 +59,46 @@ public class JavaPackAuthoredAssetsTest {
         assertEquals(1, result.copiedAssets());
     }
 
+    @Test
+    public void rebuildRemovesAssetsThatNoLongerExist() throws Exception {
+        File contentRoot = temporaryFolder.newFolder("rebuild-content");
+        File pack = new File(contentRoot, "voxel");
+        assertTrue(new File(pack, "content").mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
+
+        File obsolete = new File(pack, "assets/voxel/textures/item/obsolete.png");
+        write(obsolete, "old-texture");
+
+        Path build = temporaryFolder.newFolder("rebuild-build").toPath();
+        Path output = build.resolve("pack.zip");
+        Path allocations = build.resolve("render-allocations.yml");
+        JavaPackCompiler compiler = new JavaPackCompiler();
+        JavaPackTarget target = JavaPackTarget.numericCmd("fresh-rebuild-test", 22);
+
+        compiler.compile(contentRoot.toPath(), output, allocations, target);
+        assertTrue(hasEntry(output, "assets/voxel/textures/item/obsolete.png"));
+
+        assertTrue(obsolete.delete());
+        write(new File(pack, "assets/voxel/textures/item/current.png"), "new-texture");
+
+        compiler.compile(contentRoot.toPath(), output, allocations, target);
+        assertTrue(!hasEntry(output, "assets/voxel/textures/item/obsolete.png"));
+        assertEquals("new-texture", zipText(output, "assets/voxel/textures/item/current.png"));
+    }
+
     private static void write(File file, String content) throws Exception {
         File parent = file.getParentFile();
         if (parent != null && !parent.exists()) assertTrue(parent.mkdirs());
         Files.write(file.toPath(), content.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static boolean hasEntry(Path zip, String name) throws Exception {
+        ZipFile file = new ZipFile(zip.toFile());
+        try {
+            return file.getEntry(name) != null;
+        } finally {
+            file.close();
+        }
     }
 
     private static String zipText(Path zip, String name) throws Exception {
