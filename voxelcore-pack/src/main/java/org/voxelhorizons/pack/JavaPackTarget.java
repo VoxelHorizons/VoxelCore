@@ -46,6 +46,7 @@ public final class JavaPackTarget {
     public int packFormatMinor() { return packFormatMinor; }
     public boolean usesRangeMetadata() { return rangeMetadata; }
     public JavaPackMode mode() { return mode; }
+    public boolean supportsUiFonts() { return packFormat >= 4; }
 
     public static JavaPackTarget legacyDamage(String id, int packFormat) { return new JavaPackTarget(id, packFormat, JavaPackMode.LEGACY_DAMAGE_UNBREAKABLE); }
     public static JavaPackTarget numericCmd(String id, int packFormat) { return new JavaPackTarget(id, packFormat, JavaPackMode.NUMERIC_CUSTOM_MODEL_DATA); }
