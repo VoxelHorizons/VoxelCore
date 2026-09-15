@@ -122,6 +122,7 @@ public final class UiCommand implements SubCommand {
             sender.sendMessage("VoxelCore UI " + glyph.id() + ": texture=" + glyph.texture()
                     + ", alias=:" + glyph.id().value() + ":, scale_ratio=" + glyph.scaleRatio()
                     + ", y_position=" + glyph.yPosition()
+                    + ", advance=" + glyph.advance() + ", gui=" + glyph.gui()
                     + ", character=" + glyph.character() + " (" + glyph.escapedCodePoint() + ")");
         }
     }
