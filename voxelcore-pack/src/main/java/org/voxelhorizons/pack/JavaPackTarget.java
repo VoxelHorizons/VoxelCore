@@ -47,6 +47,17 @@ public final class JavaPackTarget {
     public boolean usesRangeMetadata() { return rangeMetadata; }
     public JavaPackMode mode() { return mode; }
 
+    /**
+     * Returns the atlas definition used by item models for this target, or {@code null}
+     * when the target predates configurable texture atlases.
+     */
+    public String itemModelAtlasPath() {
+        if (packFormat < 13) return null;
+        return packFormat >= 88
+                ? "assets/minecraft/atlases/items.json"
+                : "assets/minecraft/atlases/blocks.json";
+    }
+
     public static JavaPackTarget legacyDamage(String id, int packFormat) { return new JavaPackTarget(id, packFormat, JavaPackMode.LEGACY_DAMAGE_UNBREAKABLE); }
     public static JavaPackTarget numericCmd(String id, int packFormat) { return new JavaPackTarget(id, packFormat, JavaPackMode.NUMERIC_CUSTOM_MODEL_DATA); }
     public static JavaPackTarget modern(String id, int packFormat) { return new JavaPackTarget(id, packFormat, JavaPackMode.ITEM_MODEL_1_21_4_PLUS); }
