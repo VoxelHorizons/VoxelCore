@@ -17,6 +17,21 @@ cleanup() {
 }
 trap cleanup EXIT
 
+rcon() {
+  local command="$1"
+  local output
+  for _ in $(seq 1 30); do
+    if output="$(docker exec "$NAME" rcon-cli --password voxelcore-smoke "$command" 2>&1)"; then
+      printf '%s\n' "$output"
+      return 0
+    fi
+    sleep 2
+  done
+  echo "RCON command did not succeed within 60 seconds: $command" >&2
+  echo "$output" >&2
+  return 1
+}
+
 rm -rf "$DATA_DIR"
 mkdir -p "$DATA_DIR/plugins/VoxelCore/content"
 
@@ -61,19 +76,19 @@ if [[ "$READY" != 1 ]]; then
   exit 1
 fi
 
-CONTENT_INFO="$(docker exec "$NAME" rcon-cli --password voxelcore-smoke 'voxelcore admin content info')"
+CONTENT_INFO="$(rcon 'voxelcore admin content info')"
 echo "$CONTENT_INFO"
 grep -q 'content revision 1: 3 items' <<<"$CONTENT_INFO"
 
-VERIFY="$(docker exec "$NAME" rcon-cli --password voxelcore-smoke 'voxelcore admin item verify voxeltest:red_item')"
+VERIFY="$(rcon 'voxelcore admin item verify voxeltest:red_item')"
 echo "$VERIFY"
 grep -q 'VOXELCORE_ITEM_VERIFY_OK id=voxeltest:red_item' <<<"$VERIFY"
 
-PACK_VALIDATE="$(docker exec "$NAME" rcon-cli --password voxelcore-smoke "voxelcore admin pack validate $PACK_TARGET")"
+PACK_VALIDATE="$(rcon "voxelcore admin pack validate $PACK_TARGET")"
 echo "$PACK_VALIDATE"
 grep -q "pack valid for $PACK_TARGET" <<<"$PACK_VALIDATE"
 
-PACK_BUILD="$(docker exec "$NAME" rcon-cli --password voxelcore-smoke "voxelcore admin pack build $PACK_TARGET")"
+PACK_BUILD="$(rcon "voxelcore admin pack build $PACK_TARGET")"
 echo "$PACK_BUILD"
 grep -q "pack built for $PACK_TARGET" <<<"$PACK_BUILD"
 test -f "$DATA_DIR/plugins/VoxelCore/build/resource-packs/$PACK_TARGET.zip"
@@ -85,20 +100,20 @@ items:
     material: minecraft:paper
 BROKEN
 
-FAILED_RELOAD="$(docker exec "$NAME" rcon-cli --password voxelcore-smoke 'voxelcore admin content reload')"
+FAILED_RELOAD="$(rcon 'voxelcore admin content reload')"
 echo "$FAILED_RELOAD"
 grep -q 'reload failed; revision 1 remains active' <<<"$FAILED_RELOAD"
 
-VERIFY_AFTER_FAILURE="$(docker exec "$NAME" rcon-cli --password voxelcore-smoke 'voxelcore admin item verify voxeltest:red_item')"
+VERIFY_AFTER_FAILURE="$(rcon 'voxelcore admin item verify voxeltest:red_item')"
 echo "$VERIFY_AFTER_FAILURE"
 grep -q 'VOXELCORE_ITEM_VERIFY_OK id=voxeltest:red_item' <<<"$VERIFY_AFTER_FAILURE"
 
 docker exec -i "$NAME" sh -c "cat > '$CONTAINER_ITEMS'" < "$FIXTURE_ITEMS"
-SUCCESS_RELOAD="$(docker exec "$NAME" rcon-cli --password voxelcore-smoke 'voxelcore admin content reload')"
+SUCCESS_RELOAD="$(rcon 'voxelcore admin content reload')"
 echo "$SUCCESS_RELOAD"
 grep -q 'content reloaded: revision 2, 3 items' <<<"$SUCCESS_RELOAD"
 
-FINAL_VERIFY="$(docker exec "$NAME" rcon-cli --password voxelcore-smoke 'voxelcore admin item verify voxeltest:child_item')"
+FINAL_VERIFY="$(rcon 'voxelcore admin item verify voxeltest:child_item')"
 echo "$FINAL_VERIFY"
 grep -q 'VOXELCORE_ITEM_VERIFY_OK id=voxeltest:child_item' <<<"$FINAL_VERIFY"
 
