@@ -352,7 +352,7 @@ ui:
 
 The path is relative to the pack namespace's texture root. The scale defaults to the PNG height and the position defaults to `min(8, scale_ratio)`. `gui: true` appends an automatically calculated negative bitmap advance during placeholder resolution, while inline images keep normal text flow. Neither inventory row count nor transparent padding is required.
 
-Colon aliases are runtime placeholder syntax, not a resource-pack feature. UI aliases are prefixed with white to prevent title tinting, and offset aliases resolve to compiler-owned spacing characters. VoxelCore resolves them in permitted player chat and exposes a reload-safe service for text it owns. Third-party menu plugins must call that service through an integration or use the literal character from `ui copy`.
+Colon aliases are runtime placeholder syntax, not a resource-pack feature. UI aliases are prefixed with white to prevent title tinting, and offset aliases resolve to compiler-owned spacing characters. VoxelCore resolves them in player chat with independent inline and GUI permissions and exposes a reload-safe service for text it owns. Third-party menu plugins must call that service through an integration or use the literal character from `ui copy`.
 
 This phase is resource-pack content only. It does not open inventories, dispatch clicks, or introduce menu sessions. Phase 3a remains the next recommended implementation slice.
 
