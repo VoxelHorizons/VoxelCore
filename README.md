@@ -50,7 +50,7 @@ Each definition has a readable alias such as `:warps_menu:` and an unambiguous f
 
 Offsets from -1024 through 1024 are supported. Non-power-of-two values are composed from multiple generated spacing glyphs, so `:offset_-17:` also resolves exactly.
 
-VoxelCore automatically resolves these placeholders in player chat for senders with `voxelcore.placeholders.chat`. The permission defaults to operators and can be granted through the server permission manager. The listener uses the legacy Bukkit chat event so the same implementation remains compatible across VoxelCore's supported server families.
+VoxelCore resolves inline definitions (`gui: false`, including the default) in player chat only for senders with `voxelcore.placeholders.chat`. Definitions marked `gui: true` and `:offset_<pixels>:` controls require the separate `voxelcore.placeholders.chat.gui` permission. The permissions are independent: premium players can receive the inline permission for emojis or ranks, while staff can receive only the GUI permission when appropriate. Both default to operators and can be granted through the server permission manager. Unauthorized placeholders remain unchanged.
 
 VoxelCore-owned UI and integrations should call `VoxelCore.getInstance().getTextPlaceholderService().resolve(text)` before sending titles or other text. A resource pack cannot mutate a title already created by an unrelated plugin; therefore DeluxeMenus cannot receive transparent `:name:` replacement from VoxelCore without a dedicated integration. Until that integration exists, use the literal allocated character returned by:
 
