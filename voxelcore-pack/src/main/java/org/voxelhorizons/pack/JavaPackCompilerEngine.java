@@ -76,6 +76,7 @@ final class JavaPackCompilerEngine {
         TreeMap<String, byte[]> entries = new TreeMap<String, byte[]>();
         putEntry(entries, "pack.mcmeta", utf8(packMeta(target)));
         int copiedAssets = copyAuthoredAssets(packs, entries);
+        writeCustomTextureAtlas(packs, target, entries);
         if (target.supportsUiFonts()) writeUiFont(entries, glyphs);
 
         List<ItemDefinition> items = new ArrayList<ItemDefinition>(registry.entries().values());
@@ -390,6 +391,52 @@ final class JavaPackCompilerEngine {
             if (previous != null) throw new JavaPackCompileException("Duplicate content pack namespace '" + pack.manifest().namespace() + "'");
         }
         return indexed;
+    }
+
+    private static void writeCustomTextureAtlas(List<ContentPack> packs,
+                                                JavaPackTarget target,
+                                                Map<String, byte[]> entries) {
+        String atlasPath = target.itemModelAtlasPath();
+        if (atlasPath == null) return;
+
+        java.util.SortedSet<String> directories = new java.util.TreeSet<String>();
+        for (ContentPack pack : packs) {
+            Path textures = pack.root().resolve("assets").resolve(pack.manifest().namespace()).resolve("textures");
+            if (!Files.isDirectory(textures)) continue;
+            try {
+                java.nio.file.DirectoryStream<Path> stream = Files.newDirectoryStream(textures);
+                try {
+                    for (Path child : stream) {
+                        if (!Files.isDirectory(child) || Files.isSymbolicLink(child)) continue;
+                        String directory = child.getFileName().toString();
+                        if ("block".equals(directory) || "item".equals(directory)) continue;
+                        List<Path> files = new ArrayList<Path>();
+                        collectFiles(child, files);
+                        for (Path file : files) {
+                            if (file.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".png")) {
+                                directories.add(directory);
+                                break;
+                            }
+                        }
+                    }
+                } finally { stream.close(); }
+            } catch (IOException exception) {
+                throw new JavaPackCompileException("Unable to discover custom texture directories for pack "
+                        + pack.manifest().namespace(), exception);
+            }
+        }
+        if (directories.isEmpty()) return;
+
+        StringBuilder atlas = new StringBuilder("{\n  \"sources\": [\n");
+        int index = 0;
+        for (String directory : directories) {
+            if (index++ > 0) atlas.append(",\n");
+            atlas.append("    {\"type\": \"directory\", \"source\": \"")
+                    .append(json(directory)).append("\", \"prefix\": \"")
+                    .append(json(directory)).append("/\"}");
+        }
+        atlas.append("\n  ]\n}\n");
+        putEntry(entries, atlasPath, utf8(atlas.toString()));
     }
 
     private static void writeUiFont(Map<String, byte[]> entries, UiGlyphRegistry glyphs) {
