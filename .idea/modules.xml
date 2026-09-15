@@ -3,6 +3,15 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/VoxelCore.iml" filepath="$PROJECT_DIR$/VoxelCore.iml" />
+      <module fileurl="file://$PROJECT_DIR$/voxelcore-common/voxelcore-common.iml" filepath="$PROJECT_DIR$/voxelcore-common/voxelcore-common.iml" />
+      <module fileurl="file://$PROJECT_DIR$/voxelcore-pack/voxelcore-pack.iml" filepath="$PROJECT_DIR$/voxelcore-pack/voxelcore-pack.iml" />
+      <module fileurl="file://$PROJECT_DIR$/voxelcore-plugin/voxelcore-plugin.iml" filepath="$PROJECT_DIR$/voxelcore-plugin/voxelcore-plugin.iml" />
+      <module fileurl="file://$PROJECT_DIR$/voxelcore-v1_12/voxelcore-v1_12.iml" filepath="$PROJECT_DIR$/voxelcore-v1_12/voxelcore-v1_12.iml" />
+      <module fileurl="file://$PROJECT_DIR$/voxelcore-v1_14/voxelcore-v1_14.iml" filepath="$PROJECT_DIR$/voxelcore-v1_14/voxelcore-v1_14.iml" />
+      <module fileurl="file://$PROJECT_DIR$/voxelcore-v1_19_4/voxelcore-v1_19_4.iml" filepath="$PROJECT_DIR$/voxelcore-v1_19_4/voxelcore-v1_19_4.iml" />
+      <module fileurl="file://$PROJECT_DIR$/voxelcore-v1_20_5/voxelcore-v1_20_5.iml" filepath="$PROJECT_DIR$/voxelcore-v1_20_5/voxelcore-v1_20_5.iml" />
+      <module fileurl="file://$PROJECT_DIR$/voxelcore-v1_21_4/voxelcore-v1_21_4.iml" filepath="$PROJECT_DIR$/voxelcore-v1_21_4/voxelcore-v1_21_4.iml" />
+      <module fileurl="file://$PROJECT_DIR$/voxelcore-v26_2/voxelcore-v26_2.iml" filepath="$PROJECT_DIR$/voxelcore-v26_2/voxelcore-v26_2.iml" />
     </modules>
   </component>
 </project>

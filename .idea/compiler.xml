@@ -7,7 +7,15 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="ItemCore" />
-        <module name="VoxelCore" />
+        <module name="voxelcore-v1_20_5" />
+        <module name="voxelcore-v1_21_4" />
+        <module name="voxelcore-v1_12" />
+        <module name="voxelcore-v1_14" />
+        <module name="voxelcore-common" />
+        <module name="voxelcore-plugin" />
+        <module name="voxelcore-v1_19_4" />
+        <module name="voxelcore-v26_2" />
+        <module name="voxelcore-pack" />
       </profile>
     </annotationProcessing>
   </component>
