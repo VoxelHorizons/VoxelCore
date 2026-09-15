@@ -21,6 +21,10 @@ public final class JavaPackCompiler {
         return engine.compile(contentRoot, outputZip, allocationManifestPath, target, true);
     }
 
+    public UiGlyphRegistry loadUiGlyphs(Path contentRoot, Path allocationManifestPath, boolean persist) {
+        return new UiGlyphLoader().load(contentRoot, allocationManifestPath, persist);
+    }
+
     /** Runs the complete pack validation/compiler pipeline without mutating the manifest or writing a ZIP. */
     public JavaPackBuildResult validate(Path contentRoot, Path allocationManifestPath, JavaPackTarget target) {
         return engine.compile(contentRoot, null, allocationManifestPath, target, false);
