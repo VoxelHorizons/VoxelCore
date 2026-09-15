@@ -104,7 +104,11 @@ public class CommandFactory implements CommandExecutor, TabCompleter {
             return Collections.emptyList();
         }
 
-        return tabCompleteSub(sender, Arrays.copyOfRange(args, 1, args.length), current.getChildren());
+        String[] remaining = Arrays.copyOfRange(args, 1, args.length);
+        if (current.getChildren().isEmpty()) {
+            return current.onTabComplete(sender, remaining);
+        }
+        return tabCompleteSub(sender, remaining, current.getChildren());
     }
 
     public Set<String> getAllCommandPaths() {
