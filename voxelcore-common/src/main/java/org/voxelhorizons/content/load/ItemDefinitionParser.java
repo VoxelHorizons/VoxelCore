@@ -41,7 +41,7 @@ public final class ItemDefinitionParser {
         if (!(loaded instanceof Map)) throw new ContentLoadException("Definition file must be a mapping: " + file);
         Map<?, ?> root = (Map<?, ?>) loaded;
         for (Object key : root.keySet()) {
-            if (!"items".equals(key)) throw new ContentLoadException("Unsupported top-level key '" + key + "' in " + file);
+            if (!"items".equals(key) && !"ui".equals(key)) throw new ContentLoadException("Unsupported top-level key '" + key + "' in " + file);
         }
         Object itemsValue = root.get("items");
         if (itemsValue == null) return Collections.emptyList();
