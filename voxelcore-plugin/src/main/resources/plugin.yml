@@ -42,3 +42,10 @@ permissions:
     default: op
   voxelcore.admin.pack.build:
     default: op
+
+  voxelcore.placeholders:
+    default: op
+  voxelcore.placeholders.chat:
+    default: op
+  voxelcore.placeholders.chat.gui:
+    default: op

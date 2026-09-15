@@ -31,10 +31,13 @@ public class UiGlyphCompilerTest {
         File texture = new File(pack, "assets/voxel/textures/ui/npc/warps_menu.png");
         assertTrue(texture.getParentFile().mkdirs());
         writePng(texture, 176, 18);
+        File inlineTexture = new File(pack, "assets/voxel/textures/ui/smile.png");
+        writePng(inlineTexture, 18, 18);
         write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
         write(new File(pack, "content/ui.yml"),
                 "ui:\n  warps_menu:\n    path: ui/npc/warps_menu.png\n" +
-                "    scale_ratio: 18\n    y_position: 8\n");
+                "    scale_ratio: 18\n    y_position: 8\n    gui: true\n" +
+                "  z_smile:\n    path: ui/smile.png\n    scale_ratio: 18\n");
 
         Path build = temporaryFolder.newFolder("build").toPath();
         Path renderAllocations = build.resolve("render-allocations.yml");
@@ -47,9 +50,29 @@ public class UiGlyphCompilerTest {
         UiGlyphDefinition glyph = registry.get(ContentID.of("voxel", "warps_menu")).get();
         assertEquals(18, glyph.scaleRatio());
         assertEquals(8, glyph.yPosition());
+        assertEquals(177, glyph.advance());
+        assertTrue(glyph.gui());
         assertEquals(0xE000, glyph.codePoint());
         assertEquals(glyph.character(), registry.resolveAliases(":warps_menu:"));
         assertEquals(glyph.character(), registry.resolveAliases(":voxel/warps_menu:"));
+
+        UiTextResolver resolver = new UiTextResolver(registry);
+        String rendered = resolver.resolve(":offset_-16::warps_menu:\u00A7rWarps");
+        assertEquals(UiSpacingGlyphs.charactersForOffset(-16) + "\u00A7f" + glyph.character()
+                + UiSpacingGlyphs.charactersForOffset(-177) + "\u00A7rWarps", rendered);
+        assertEquals(UiSpacingGlyphs.charactersForOffset(-17), resolver.resolve(":offset_-17:"));
+        assertEquals("", resolver.resolve(":offset_0:"));
+        assertEquals(":offset_-2048:", resolver.resolve(":offset_-2048:"));
+
+        UiGlyphDefinition inline = registry.get(ContentID.of("voxel", "z_smile")).get();
+        assertTrue(!inline.gui());
+        String permissionSample = ":z_smile::warps_menu::offset_-16:";
+        assertEquals("\u00A7f" + inline.character() + ":warps_menu::offset_-16:",
+                resolver.resolve(permissionSample, true, false));
+        assertEquals(":z_smile:\u00A7f" + glyph.character()
+                        + UiSpacingGlyphs.charactersForOffset(-177) + UiSpacingGlyphs.charactersForOffset(-16),
+                resolver.resolve(permissionSample, false, true));
+        assertEquals(permissionSample, resolver.resolve(permissionSample, false, false));
 
         String font = zipText(output, "assets/minecraft/font/default.json");
         assertTrue(font.contains("\"type\":\"space\""));
@@ -81,6 +104,8 @@ public class UiGlyphCompilerTest {
                 .get(ContentID.of("voxel", "overlay")).get();
         assertEquals(18, glyph.scaleRatio());
         assertEquals(8, glyph.yPosition());
+        assertEquals(41, glyph.advance());
+        assertTrue(!glyph.gui());
 
         write(definition, "ui:\n  overlay:\n    path: ui/overlay.png\n    scale_ratio: 18\n    y_position: 19\n");
         try {

@@ -27,6 +27,8 @@ import org.voxelhorizons.platform.VersionAdapter;
 import org.voxelhorizons.platform.VersionAdapterFactory;
 import org.voxelhorizons.platform.server.ServerPlatformCapabilities;
 import org.voxelhorizons.platform.server.ServerPlatformCapabilitiesFactory;
+import org.voxelhorizons.text.ChatPlaceholderListener;
+import org.voxelhorizons.text.TextPlaceholderService;
 
 import java.io.File;
 import java.io.IOException;
@@ -53,6 +55,7 @@ public final class VoxelCore extends JavaPlugin {
     private ContentRuntimeReloader contentReloader;
     private ItemManager itemManager;
     private PackManager packManager;
+    private TextPlaceholderService textPlaceholderService;
     private Path contentRoot;
 
     public static VoxelCore getInstance() { return instance; }
@@ -108,7 +111,7 @@ public final class VoxelCore extends JavaPlugin {
                         }
                     });
             packManager = new PackManager(getDataFolder().toPath(), contentRoot, versionAdapter.version());
-            packManager.uiGlyphs(true);
+            textPlaceholderService = new TextPlaceholderService(packManager.uiGlyphs(true));
         } catch (IOException exception) {
             logger.log(Level.SEVERE, "Unable to create VoxelCore content directory " + contentRoot, exception);
             getServer().getPluginManager().disablePlugin(this);
@@ -124,6 +127,9 @@ public final class VoxelCore extends JavaPlugin {
         }
 
         itemManager = new ItemManager(contentRuntime, versionAdapter);
+        if (packManager.currentTarget().supportsUiFonts()) {
+            getServer().getPluginManager().registerEvents(new ChatPlaceholderListener(textPlaceholderService), this);
+        }
 
         logger.info("VoxelCore platform ready on " + serverPlatformCapabilities.platformName()
                 + " for Minecraft " + versionAdapter.version()
@@ -173,7 +179,7 @@ public final class VoxelCore extends JavaPlugin {
         }
         ContentReloadResult result = contentReloader.reload();
         if (result.success()) {
-            packManager.uiGlyphs(true);
+            textPlaceholderService.update(packManager.uiGlyphs(true));
             logger.info("Published content revision " + result.activeRevision() + " (" + result.itemCount() + " items)");
         } else {
             logger.warning("Content reload failed; revision " + result.activeRevision() + " remains active. " + result.message());
@@ -187,6 +193,7 @@ public final class VoxelCore extends JavaPlugin {
     public ItemDefinitionRegistry getItemRegistry() { return contentRuntime.current().items(); }
     public ItemManager getItemManager() { return itemManager; }
     public PackManager getPackManager() { return packManager; }
+    public TextPlaceholderService getTextPlaceholderService() { return textPlaceholderService; }
 
     private void validateForPlatform(ItemDefinitionRegistry items, RenderAllocationRegistry allocations) {
         for (ItemDefinition definition : items.entries().values()) {
