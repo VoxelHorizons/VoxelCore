@@ -15,7 +15,7 @@ The repository has completed the roadmap's foundation, content/item, minimal Jav
 - persistent ContentID storage and version-aware item creation
 - stable numeric and structured render allocations
 - deterministic Java resource-pack validation and compilation
-- validated 1–6 row UI glyph definitions, stable private-use codepoints, generated bitmap/spacing font providers, and admin glyph lookup/copy commands
+- compact cropped UI glyph definitions, stable private-use codepoints, generated bitmap/spacing font providers, aliases, and admin glyph lookup/copy commands
 - exact real-server smoke coverage from Minecraft 1.12.2 through Minecraft 26.2
 - snapshot JAR publication from `main`
 
@@ -23,38 +23,32 @@ Bedrock items/mappings, item actions and menu sessions, richer item metadata and
 
 ## Java UI font content
 
-Phase 2c compiles shared spacing glyphs and namespaced bitmap UI definitions into every compatible generated Java pack.
+Phase 2c compiles shared spacing glyphs and namespaced bitmap UI definitions into every compatible generated Java pack. Textures can be tightly cropped: transparent padding is neither required nor used for positioning.
 
-The implementation includes:
-
-- compiler-owned positive and negative spacing glyph resources
-- namespaced UI glyph definitions keyed by stable `ContentID`, with centrally allocated Unicode codepoints
-- bitmap-provider metadata for texture and height, plus a per-UI `ascent` that may be explicitly authored or derived from inventory rows and positioning metadata
-- deterministic merging into the generated font JSON so packs cannot overwrite one another
-- duplicate codepoint, missing texture, unsafe path, invalid dimension, and incompatible-target validation
-- a generated glyph manifest/report and admin lookup command so integrations can resolve or copy characters without hard-coded Unicode values
-- compiler tests covering dynamic 1–6 row inventory overlays, explicit ascent overrides, and automatically derived ascent values
-
-Unicode codepoints themselves are global within a font and are not made collision-safe by resource namespaces. VoxelCore must therefore own allocation and final font composition, while authored textures remain under their pack namespaces.
-
-Inventory height is definition data, not a fixed three-row assumption. Each UI definition must support 1–6 rows. Authors may set `ascent` when an artwork needs an intentional override; when omitted, the compiler derives it deterministically from the row count and positioning metadata. The supplied images are independent fixtures demonstrating different layouts and offsets, not canonical templates to copy. Automatic ascent preserves the full canvas, finds its first visible alpha row, scales that coordinate by `font.height`, and aligns it with the vanilla first-slot offset; a fully transparent texture is rejected.
-
-The planned authoring shape is:
+Use the compact ItemsAdder-style authoring shape:
 
 ```yaml
 ui:
-  npc_warps:
-    texture: voxel:ui/npc/warps_menu
-    inventory:
-      rows: 1
-    font:
-      height: 256
-      ascent: auto
+  warps_menu:
+    path: ui/npc/warps_menu.png
+    scale_ratio: 18
+    y_position: 8
 ```
 
-`ascent: auto` may be omitted because automatic derivation is the default. A numeric `ascent` overrides it. The compiler does not infer menu rows or slot behavior from the image; a texture may cover any subset of the nine columns. Alpha bounds are used only for automatic vertical placement.
+`path` is relative to `assets/<pack namespace>/textures/`. `scale_ratio` becomes the bitmap provider height and defaults to the PNG height. `y_position` becomes its ascent, defaults to `min(8, scale_ratio)`, may be negative, and cannot exceed `scale_ratio`. PNG dimensions and the scale ratio are limited to 256. An optional `symbol` may assign one private-use Unicode character; otherwise VoxelCore allocates a stable character and preserves the allocation in `glyph-allocations.yml`.
 
-The planned admin interface is `/voxelcore admin ui copy <content-id>`, with ContentID tab completion. On capable clients it sends a clickable copy-to-clipboard component containing exactly the allocated character; legacy clients receive a selectable character and codepoint fallback. `ui list` and `ui info <content-id>` expose discoverability and resolved metadata.
+Menu rows are deliberately not configuration data. The same cropped overlay can cover any subset of slots in a 1–6 row inventory; its vertical placement is controlled only by `scale_ratio` and `y_position`.
+
+VoxelCore generates the final `assets/minecraft/font/default.json`, including positive/negative spacing providers and all bitmap providers, so individual packs cannot overwrite the shared font or collide silently. Missing textures, unsafe paths, invalid dimensions, duplicate explicit symbols, and incompatible targets fail validation. Minecraft 1.12.2 is rejected because it predates resource-pack bitmap fonts.
+
+Each definition has a readable alias such as `:warps_menu:` and an unambiguous full alias such as `:voxel/warps_menu:`. VoxelCore can resolve these aliases in VoxelCore-owned text, but a resource pack cannot rewrite arbitrary third-party plugin titles. For DeluxeMenus, use the literal allocated character returned by:
+
+```text
+/voxelcore admin ui copy voxel:warps_menu
+/voxelcore admin ui copy :warps_menu:
+```
+
+Both forms have tab completion. `ui list` and `ui info <content-id-or-alias>` expose the available definitions and resolved metadata. On capable clients, `ui copy` sends a clickable copy-to-clipboard component; legacy clients receive the literal character and codepoint.
 
 ## Next development milestone
 
