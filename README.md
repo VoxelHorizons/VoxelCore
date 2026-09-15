@@ -1,12 +1,12 @@
 # VoxelCore
 
-VoxelCore is the version-aware content foundation for Voxel Horizons. The current MVP covers the complete custom-item pipeline: deterministic YAML pack discovery, inheritance compilation, immutable runtime snapshots, stable content identity, version-specific `ItemStack` creation, stable render allocations, deterministic Java resource-pack compilation, and safe atomic reloads.
+VoxelCore is the version-aware content foundation for Voxel Horizons. The current MVP covers the complete custom-item pipeline: deterministic YAML pack discovery, inheritance compilation, immutable runtime snapshots, stable content identity, version-specific `ItemStack` creation, stable render allocations, deterministic Java resource-pack compilation, stable UI glyph/font compilation, and safe atomic reloads.
 
 Higher-level gameplay systems such as placed blocks, furniture, vehicles, crops, GUIs, Bedrock/Geyser presentation, and legacy HavenCore migration are deliberately outside this MVP.
 
 ## Current implementation status
 
-The repository has completed the roadmap's foundation, content/item, and minimal Java pack milestones (phases 0, 1, and 2a):
+The repository has completed the roadmap's foundation, content/item, minimal Java pack, and Java UI font-content milestones (phases 0, 1, 2a, and 2c):
 
 - multi-module Maven build with per-version shaded distributions
 - automatic Paper capability detection with a Bukkit-compatible fallback
@@ -15,16 +15,17 @@ The repository has completed the roadmap's foundation, content/item, and minimal
 - persistent ContentID storage and version-aware item creation
 - stable numeric and structured render allocations
 - deterministic Java resource-pack validation and compilation
+- validated 1–6 row UI glyph definitions, stable private-use codepoints, generated bitmap/spacing font providers, and admin glyph lookup/copy commands
 - exact real-server smoke coverage from Minecraft 1.12.2 through Minecraft 26.2
 - snapshot JAR publication from `main`
 
 Bedrock items/mappings, item actions and menu sessions, richer item metadata and behavior, placed blocks, furniture, crops, skills, NPCs, vehicles, and network persistence have not been implemented yet.
 
-## Next development milestone
+## Java UI font content
 
-The next recommended slice is **phase 2c: Java UI font-content foundation**. Before runtime menu behavior is added, VoxelCore should be able to compile shared spacing glyphs and namespaced bitmap UI definitions into every compatible generated Java pack.
+Phase 2c compiles shared spacing glyphs and namespaced bitmap UI definitions into every compatible generated Java pack.
 
-This slice should add:
+The implementation includes:
 
 - compiler-owned positive and negative spacing glyph resources
 - namespaced UI glyph definitions keyed by stable `ContentID`, with centrally allocated Unicode codepoints
@@ -54,6 +55,10 @@ ui:
 `ascent: auto` may be omitted because automatic derivation is the default. A numeric `ascent` overrides it. The compiler does not infer menu rows or slot behavior from the image; a texture may cover any subset of the nine columns. Alpha bounds are used only for automatic vertical placement.
 
 The planned admin interface is `/voxelcore admin ui copy <content-id>`, with ContentID tab completion. On capable clients it sends a clickable copy-to-clipboard component containing exactly the allocated character; legacy clients receive a selectable character and codepoint fallback. `ui list` and `ui info <content-id>` expose discoverability and resolved metadata.
+
+## Next development milestone
+
+The next recommended slice is **phase 3a: Java item actions and interaction dispatch**. It should add typed triggers and immutable compiled actions behind a central dispatcher while keeping menu session lifecycle in phase 3b.
 
 This milestone adds resource-pack content only. It does not yet open inventories, handle clicks, introduce runtime menu sessions, or add alternate-client UI. Java item actions move back one place and follow after the UI content contract is proven.
 
