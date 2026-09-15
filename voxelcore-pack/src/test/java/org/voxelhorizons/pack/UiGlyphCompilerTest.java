@@ -88,7 +88,7 @@ public class UiGlyphCompilerTest {
                     temporaryFolder.newFolder("invalid-build").toPath().resolve("bad-glyphs.yml"), false);
             fail("Expected invalid y_position to fail");
         } catch (RuntimeException exception) {
-            assertTrue(exception.getMessage().contains("must not exceed scale_ratio"));
+            assertTrue(exception.getMessage().contains("lower than or equal to scale_ratio"));
         }
     }
 
