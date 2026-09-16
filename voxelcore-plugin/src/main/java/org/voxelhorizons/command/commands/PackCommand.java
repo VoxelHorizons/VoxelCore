@@ -105,11 +105,13 @@ public final class PackCommand implements SubCommand {
                 VoxelCore plugin = VoxelCore.getInstance();
                 JavaPackBuildResult result = plugin.getPackManager().build(target);
                 sender.sendMessage("VoxelCore pack built for " + target.id() + ": " + result.output()
-                        + " (" + result.renderedItems() + " rendered items, " + result.copiedAssets() + " authored assets)");
+                        + " (" + result.renderedItems() + " rendered items, " + result.renderedBlocks()
+                        + " rendered blocks, " + result.copiedAssets() + " authored assets)");
                 ContentReloadResult reload = plugin.onReload();
                 if (reload.success()) {
                     sender.sendMessage("Published content revision " + reload.activeRevision() + " with "
-                            + reload.itemCount() + " items; UI placeholders are now active.");
+                            + reload.itemCount() + " items and " + reload.blockCount()
+                            + " blocks; UI placeholders are now active.");
                 } else {
                     sender.sendMessage("Pack built, but live content reload failed; revision "
                             + reload.activeRevision() + " remains active: " + reload.message());

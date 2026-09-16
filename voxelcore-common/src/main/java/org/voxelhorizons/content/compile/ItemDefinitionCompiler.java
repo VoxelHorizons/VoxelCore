@@ -60,7 +60,7 @@ public final class ItemDefinitionCompiler {
         return new ItemDefinition(raw.id(), type, raw.material(), raw.displayName(),
                 raw.lore() == null ? Collections.<String>emptyList() : raw.lore(), bound, abstractDefinition,
                 Optional.ofNullable(raw.parent()), render,
-                raw.properties() == null ? Collections.<String, Object>emptyMap() : raw.properties());
+                raw.properties() == null ? Collections.<String, Object>emptyMap() : raw.properties(), raw.events());
     }
 
     private ItemRenderDefinition compileRender(RawItemRenderDefinition raw) {

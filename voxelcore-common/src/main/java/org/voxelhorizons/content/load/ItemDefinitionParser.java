@@ -1,6 +1,7 @@
 package org.voxelhorizons.content.load;
 
 import org.voxelhorizons.content.ContentID;
+import org.voxelhorizons.content.action.EventActions;
 import org.voxelhorizons.content.item.CustomModelDataDefinition;
 import org.voxelhorizons.content.item.ItemType;
 import org.voxelhorizons.content.item.RawItemDefinition;
@@ -23,11 +24,12 @@ import java.util.Set;
 
 public final class ItemDefinitionParser {
     private static final Set<String> ITEM_KEYS = new HashSet<String>(Arrays.asList(
-            "extends", "type", "material", "display_name", "lore", "bound", "abstract", "render", "properties"
+            "extends", "type", "material", "display_name", "lore", "bound", "abstract", "render", "properties", "events"
     ));
     private static final Set<String> RENDER_KEYS = new HashSet<String>(Arrays.asList(
             "model", "unbreakable", "durability", "attributes", "custom_model_data", "rule"
     ));
+    private final ActionDefinitionParser actions = new ActionDefinitionParser();
 
     public List<RawItemDefinition> parse(ContentPack pack, Path file) {
         Object loaded;
@@ -41,7 +43,7 @@ public final class ItemDefinitionParser {
         if (!(loaded instanceof Map)) throw new ContentLoadException("Definition file must be a mapping: " + file);
         Map<?, ?> root = (Map<?, ?>) loaded;
         for (Object key : root.keySet()) {
-            if (!"items".equals(key) && !"ui".equals(key)) throw new ContentLoadException("Unsupported top-level key '" + key + "' in " + file);
+            if (!"items".equals(key) && !"ui".equals(key) && !"blocks".equals(key)) throw new ContentLoadException("Unsupported top-level key '" + key + "' in " + file);
         }
         Object itemsValue = root.get("items");
         if (itemsValue == null) return Collections.emptyList();
@@ -122,8 +124,9 @@ public final class ItemDefinitionParser {
             properties = normalizeMap((Map<?, ?>) value, file);
         }
 
+        EventActions events = map.containsKey("events") ? actions.parse(map.get("events"), id, file) : null;
         return new RawItemDefinition(id, parent, type, string(map, "material", file, false),
-                string(map, "display_name", file, false), lore, bound, abstractDefinition, render, properties);
+                string(map, "display_name", file, false), lore, bound, abstractDefinition, render, properties, events);
     }
 
     private static Boolean booleanValue(Map<?, ?> map, String key, ContentID id, Path file) {

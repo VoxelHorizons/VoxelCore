@@ -37,12 +37,13 @@ public class ReloadCommand implements SubCommand {
         ContentReloadResult result = VoxelCore.getInstance().onReload();
         if (result.success()) {
             sender.sendMessage("Reloaded " + name + " successfully. Content revision "
-                    + result.activeRevision() + " is active with " + result.itemCount() + " items.");
+                    + result.activeRevision() + " is active with " + result.itemCount() + " items and "
+                    + result.blockCount() + " blocks.");
             return;
         }
 
         sender.sendMessage("Reload failed: " + result.message());
         sender.sendMessage("Content revision " + result.activeRevision()
-                + " remains active with " + result.itemCount() + " items.");
+                + " remains active with " + result.itemCount() + " items and " + result.blockCount() + " blocks.");
     }
 }

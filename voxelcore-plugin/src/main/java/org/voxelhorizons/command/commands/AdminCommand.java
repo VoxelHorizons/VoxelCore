@@ -17,6 +17,7 @@ public class AdminCommand implements SubCommand {
         register(new ReloadCommand());
         register(new ContentCommand());
         register(new ItemCommand());
+        register(new BlockCommand());
         register(new PackCommand());
         register(new UiCommand());
     }
@@ -45,6 +46,6 @@ public class AdminCommand implements SubCommand {
 
     @Override
     public void execute(CommandSender sender, String[] args) {
-        sender.sendMessage("Usage: /voxelcore admin <reload|content|item|pack|ui>");
+        sender.sendMessage("Usage: /voxelcore admin <reload|content|item|block|pack|ui>");
     }
 }

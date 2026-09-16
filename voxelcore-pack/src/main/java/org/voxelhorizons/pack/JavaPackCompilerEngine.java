@@ -13,6 +13,10 @@ import org.voxelhorizons.content.render.RenderAllocation;
 import org.voxelhorizons.content.render.RenderAllocationRegistry;
 import org.voxelhorizons.content.render.RenderAllocationStore;
 import org.voxelhorizons.content.render.StructuredModelDataAllocation;
+import org.voxelhorizons.content.block.BlockAllocationRegistry;
+import org.voxelhorizons.content.block.BlockAllocationStore;
+import org.voxelhorizons.content.block.BlockDefinitionRegistry;
+import org.voxelhorizons.content.block.BlockDefinition;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -57,6 +61,7 @@ final class JavaPackCompilerEngine {
         List<ContentPack> packs = packDiscovery.discover(contentRoot);
         Map<String, ContentPack> packsByNamespace = indexPacks(packs);
         ItemDefinitionRegistry registry = contentLoader.load(contentRoot);
+        BlockDefinitionRegistry blocks = contentLoader.loadBlocks(contentRoot);
         Path glyphAllocationPath = allocationManifestPath.resolveSibling("glyph-allocations.yml");
         UiGlyphLoader glyphLoader = new UiGlyphLoader();
         UiGlyphRegistry glyphs = glyphLoader.load(contentRoot, glyphAllocationPath, false);
@@ -145,6 +150,14 @@ final class JavaPackCompilerEngine {
             writeLegacyDamageOverrides(entries, overrides);
         }
 
+        boolean modernBlockStates = target.supportsFlattenedBlockStates();
+        BlockAllocationStore blockAllocationStore = new BlockAllocationStore(
+                allocationManifestPath.resolveSibling("block-allocations.yml"));
+        BlockAllocationRegistry blockAllocations = BlockAllocationRegistry.reconcile(
+                blocks, blockAllocationStore.load(), modernBlockStates);
+        validateBlockTextures(blocks, packsByNamespace);
+        int renderedBlocks = BlockPackCompiler.write(entries, blocks, blockAllocations, modernBlockStates);
+
         if (writeOutput) {
             try {
                 allocationStore.save(allocations);
@@ -152,9 +165,28 @@ final class JavaPackCompilerEngine {
                 throw new JavaPackCompileException("Unable to persist render allocations: " + exception.getMessage(), exception);
             }
             glyphLoader.load(contentRoot, glyphAllocationPath, true);
+            blockAllocationStore.save(blockAllocations);
             writeDeterministicZip(outputZip, entries);
         }
-        return new JavaPackBuildResult(outputZip, allocationManifestPath, renderedItems, copiedAssets);
+        return new JavaPackBuildResult(outputZip, allocationManifestPath, renderedItems, copiedAssets, renderedBlocks);
+    }
+
+    private static void validateBlockTextures(BlockDefinitionRegistry blocks, Map<String, ContentPack> packs) {
+        for (BlockDefinition definition : blocks.entries().values()) {
+            if (definition.abstractDefinition()) continue;
+            for (String texture : definition.textures().values()) {
+                int separator = texture.indexOf(':');
+                String namespace = texture.substring(0, separator);
+                String path = texture.substring(separator + 1);
+                if ("minecraft".equals(namespace)) continue;
+                ContentPack owner = packs.get(namespace);
+                if (owner == null) throw new JavaPackCompileException("Block " + definition.id()
+                        + " references texture in missing namespace " + namespace);
+                Path file = owner.root().resolve("assets").resolve(namespace).resolve("textures").resolve(path + ".png");
+                if (!Files.isRegularFile(file)) throw new JavaPackCompileException("Block " + definition.id()
+                        + " references missing texture. Expected " + file);
+            }
+        }
     }
 
     private static String compileModernNode(Object raw,

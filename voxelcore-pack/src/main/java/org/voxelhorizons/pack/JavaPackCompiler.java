@@ -47,7 +47,7 @@ public final class JavaPackCompiler {
                     contentRoot, stagedOutput, allocationManifestPath, target, true);
             publishOutput(stagedOutput, outputZip);
             return new JavaPackBuildResult(outputZip, result.allocationManifest(), result.renderedItems(),
-                    result.copiedAssets());
+                    result.copiedAssets(), result.renderedBlocks());
         } finally {
             try {
                 Files.deleteIfExists(stagedOutput);
@@ -120,7 +120,7 @@ public final class JavaPackCompiler {
             JavaPackBuildResult result = engine.compile(stagedRoot, outputZip, allocationManifestPath, target, writeOutput);
             if (writeOutput) mergeAdditionalAssets(outputZip, additionalAssets);
             return new JavaPackBuildResult(result.output(), result.allocationManifest(), result.renderedItems(),
-                    result.copiedAssets() + additionalAssets.size());
+                    result.copiedAssets() + additionalAssets.size(), result.renderedBlocks());
         } catch (IOException exception) {
             throw new JavaPackCompileException("Unable to stage authored resource-pack assets: " + exception.getMessage(), exception);
         } finally {

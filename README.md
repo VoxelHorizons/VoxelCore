@@ -211,6 +211,7 @@ Supported item fields:
 - `abstract`
 - `render`
 - `properties`
+- `events`
 
 Unknown keys and malformed values are rejected rather than ignored.
 
@@ -247,6 +248,90 @@ Merge behavior:
 - structured `custom_model_data` → semantic-key merge when both sides are structured
 
 Compiled definitions and nested property/render-rule structures are immutable.
+
+## Custom blocks
+
+VoxelCore supports real, full-cube custom blocks intended for ores, building blocks, logs, and similar content. It does not use display entities or furniture-style placement; furniture belongs in an addon such as VoxelFurniture.
+
+The smallest definition needs one texture:
+
+```yaml
+blocks:
+  ruby_ore:
+    texture: mypack:block/ruby_ore
+    drop: ruby_ore
+```
+
+`model: cube_column` supports a log-style side/top/bottom layout, while `model: cube` supports six independent faces:
+
+```yaml
+blocks:
+  ruby_log:
+    model: cube_column
+    textures:
+      side: mypack:block/ruby_log
+      top: mypack:block/ruby_log_top
+      bottom: mypack:block/ruby_log_bottom
+
+  directional_ore:
+    model: cube
+    textures:
+      north: mypack:block/ore_north
+      south: mypack:block/ore_south
+      east: mypack:block/ore_east
+      west: mypack:block/ore_west
+      up: mypack:block/ore_top
+      down: mypack:block/ore_bottom
+```
+
+Supported block fields are `extends`, `abstract`, `method`, `model`, `texture`, `textures`, `hardness`, `blast_resistance`, `explosion_immune`, `drop_when_mined`, `drop`, `silk_touch`, and `events`. Block definitions support the same bounded, cycle-aware inheritance rules as items.
+
+Carrier methods in this first implementation:
+
+| Method | Modern servers | 1.12 legacy servers | Status |
+|---|---|---|---|
+| `auto` | selects `solid` | selects `mushroom` | supported |
+| `solid` | unused note-block states | legacy mushroom states | supported |
+| `mushroom` | unused mushroom face states | legacy mushroom states | supported |
+| `transparent`, `wire`, `fire` | — | — | recognized but rejected until a safe runtime implementation is available |
+
+Allocations are persisted in `plugins/VoxelCore/block-allocations.yml`. Removed IDs become tombstones instead of silently reusing a state, so existing worlds remain stable. Do not delete this file on a live server. Interaction, physics, and note playback are suppressed for allocated carrier states, and `explosion_immune: true` removes the block from explosion damage lists. `hardness` and `blast_resistance` are compiled metadata in this initial version; custom mining-speed and non-immune blast-strength simulation are reserved for the next runtime layer.
+
+The resource-pack compiler generates the block model and complete carrier blockstate tables. Authors only supply the referenced texture PNGs. A placeable inventory item remains an ordinary VoxelCore item and can use `set_block`, which keeps the block system independent from future furniture addons.
+
+## Actions
+
+Items and blocks can declare reusable event actions. For example, a 2D ore item can place its corresponding block:
+
+```yaml
+items:
+  ruby_ore:
+    material: minecraft:paper
+    render:
+      model: mypack:item/ruby_ore
+    events:
+      interact:
+        right:
+          actions:
+            - type: set_block
+              block: ruby_ore
+              target: relative
+              replace: air_only
+              consume: 1
+```
+
+Item triggers are `interact.right`, `interact.right_shift`, `interact.left`, and `interact.left_shift`. Block triggers are `placed_block.interact` and `placed_block.break`.
+
+Available actions are:
+
+- `set_block`: `block`, optional `target` (`relative`, `clicked`, or `target`), `replace`, and `consume`
+- `remove_block`: optional `target`
+- `command`: `command` and optional `executor` (`player` or `console`)
+- `give_item` / `drop_item`: `item` and optional `amount`
+- `message`: `text`
+- `cancel`
+
+Command and message strings support `{player}`, `{player_uuid}`, `{world}`, `{x}`, `{y}`, `{z}`, `{item_id}`, and `{block_id}` placeholders. Unknown action keys and missing content references fail validation rather than being ignored.
 
 ## Rendering
 
@@ -396,6 +481,11 @@ plugins/VoxelCore/build/resource-packs/<target>.zip
 /voxelcore admin item verify <content-id>
 /voxelcore admin item test <content-id>
 
+/voxelcore admin block list
+/voxelcore admin block info <content-id>
+/voxelcore admin block give <content-id> [amount] [player]
+/voxelcore admin block identify
+
 /voxelcore admin pack info
 /voxelcore admin pack validate [target]
 /voxelcore admin pack build [target]
@@ -414,7 +504,7 @@ Reload builds the candidate revision in isolation:
 1. discover and parse packs
 2. resolve inheritance
 3. compile immutable definitions
-4. reconcile stable render allocations
+4. reconcile stable item and block allocations
 5. preflight every definition through the active platform adapter
 6. persist the validated allocation state
 7. atomically publish the new snapshot

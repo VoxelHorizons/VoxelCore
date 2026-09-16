@@ -12,7 +12,15 @@ import org.voxelhorizons.command.commands.BaseCommand;
 import org.voxelhorizons.config.ConfigMigrationSupport;
 import org.voxelhorizons.content.item.ItemDefinition;
 import org.voxelhorizons.content.item.ItemDefinitionRegistry;
+import org.voxelhorizons.content.action.ActionDefinition;
+import org.voxelhorizons.content.action.ActionType;
+import org.voxelhorizons.content.action.EventActions;
+import org.voxelhorizons.content.block.BlockAllocationRegistry;
+import org.voxelhorizons.content.block.BlockAllocationStore;
+import org.voxelhorizons.content.block.BlockDefinition;
+import org.voxelhorizons.content.block.BlockDefinitionRegistry;
 import org.voxelhorizons.content.load.ContentLoadException;
+import org.voxelhorizons.content.load.ContentDefinitions;
 import org.voxelhorizons.content.load.ContentLoader;
 import org.voxelhorizons.content.render.RenderAllocationRegistry;
 import org.voxelhorizons.content.render.RenderAllocationStore;
@@ -22,6 +30,10 @@ import org.voxelhorizons.content.runtime.ContentRuntimeReloader;
 import org.voxelhorizons.content.runtime.ContentSnapshot;
 import org.voxelhorizons.content.runtime.ContentSnapshotValidator;
 import org.voxelhorizons.item.ItemManager;
+import org.voxelhorizons.block.BlockManager;
+import org.voxelhorizons.block.BlockListener;
+import org.voxelhorizons.action.ActionExecutor;
+import org.voxelhorizons.action.ItemActionListener;
 import org.voxelhorizons.pack.PackManager;
 import org.voxelhorizons.platform.VersionAdapter;
 import org.voxelhorizons.platform.VersionAdapterFactory;
@@ -56,6 +68,8 @@ public final class VoxelCore extends JavaPlugin {
     private ContentRuntime contentRuntime;
     private ContentRuntimeReloader contentReloader;
     private ItemManager itemManager;
+    private BlockManager blockManager;
+    private ActionExecutor actionExecutor;
     private PackManager packManager;
     private TextPlaceholderService textPlaceholderService;
     private Path contentRoot;
@@ -100,18 +114,31 @@ public final class VoxelCore extends JavaPlugin {
 
         try {
             Files.createDirectories(contentRoot);
-            ItemDefinitionRegistry initialRegistry = contentLoader.load(contentRoot);
+            ContentDefinitions initialDefinitions = contentLoader.loadDefinitions(contentRoot);
+            ItemDefinitionRegistry initialRegistry = initialDefinitions.items();
             RenderAllocationStore allocationStore = new RenderAllocationStore(getDataFolder().toPath().resolve("render-allocations.yml"));
             RenderAllocationRegistry initialAllocations = RenderAllocationRegistry.reconcile(initialRegistry, allocationStore.load());
+            boolean modernBlockStates = versionAdapter.version().atLeast(1, 13, 0);
+            BlockAllocationStore blockAllocationStore = new BlockAllocationStore(
+                    getDataFolder().toPath().resolve("block-allocations.yml"));
+            BlockAllocationRegistry initialBlockAllocations = BlockAllocationRegistry.reconcile(
+                    initialDefinitions.blocks(), blockAllocationStore.load(), modernBlockStates);
             validateForPlatform(initialRegistry, initialAllocations);
+            validateBlocks(initialDefinitions.blocks(), initialBlockAllocations, initialRegistry);
             allocationStore.save(initialAllocations);
-            contentRuntime = new ContentRuntime(new ContentSnapshot(1L, initialRegistry, initialAllocations));
+            blockAllocationStore.save(initialBlockAllocations);
+            contentRuntime = new ContentRuntime(new ContentSnapshot(1L, initialRegistry, initialAllocations,
+                    initialDefinitions.blocks(), initialBlockAllocations));
             contentReloader = new ContentRuntimeReloader(contentLoader, contentRoot, contentRuntime, allocationStore,
                     new ContentSnapshotValidator() {
                         @Override public void validate(ItemDefinitionRegistry items, RenderAllocationRegistry allocations) {
                             validateForPlatform(items, allocations);
                         }
-                    });
+                        @Override public void validateBlocks(BlockDefinitionRegistry blocks,
+                                                             BlockAllocationRegistry allocations) {
+                            VoxelCore.this.validateBlocks(blocks, allocations, contentLoader.load(contentRoot));
+                        }
+                    }, blockAllocationStore, modernBlockStates);
             packManager = new PackManager(getDataFolder().toPath(), contentRoot, versionAdapter.version());
             textPlaceholderService = new TextPlaceholderService(packManager.uiGlyphs(true));
         } catch (IOException exception) {
@@ -129,6 +156,10 @@ public final class VoxelCore extends JavaPlugin {
         }
 
         itemManager = new ItemManager(contentRuntime, versionAdapter);
+        blockManager = new BlockManager(contentRuntime, versionAdapter.version().atLeast(1, 13, 0));
+        actionExecutor = new ActionExecutor(blockManager, itemManager);
+        getServer().getPluginManager().registerEvents(new ItemActionListener(itemManager, actionExecutor), this);
+        getServer().getPluginManager().registerEvents(new BlockListener(blockManager, itemManager, actionExecutor), this);
         if (packManager.currentTarget().supportsUiFonts()) {
             getServer().getPluginManager().registerEvents(new ChatPlaceholderListener(textPlaceholderService), this);
             PaperChatPlaceholderBridge.registerIfAvailable(this, textPlaceholderService);
@@ -139,7 +170,8 @@ public final class VoxelCore extends JavaPlugin {
         logger.info("VoxelCore platform ready on " + serverPlatformCapabilities.platformName()
                 + " for Minecraft " + versionAdapter.version()
                 + " with content revision " + contentRuntime.current().revision()
-                + " (" + contentRuntime.current().items().size() + " items)");
+                + " (" + contentRuntime.current().items().size() + " items, "
+                + contentRuntime.current().blocks().size() + " blocks)");
 
         RootCommand baseCommand = new BaseCommand();
         CommandFactory commandFactory = new CommandFactory(baseCommand);
@@ -185,7 +217,8 @@ public final class VoxelCore extends JavaPlugin {
         ContentReloadResult result = contentReloader.reload();
         if (result.success()) {
             textPlaceholderService.update(packManager.uiGlyphs(true));
-            logger.info("Published content revision " + result.activeRevision() + " (" + result.itemCount() + " items)");
+            logger.info("Published content revision " + result.activeRevision() + " (" + result.itemCount()
+                    + " items, " + result.blockCount() + " blocks)");
         } else {
             logger.warning("Content reload failed; revision " + result.activeRevision() + " remains active. " + result.message());
         }
@@ -197,6 +230,8 @@ public final class VoxelCore extends JavaPlugin {
     public ContentRuntime getContentRuntime() { return contentRuntime; }
     public ItemDefinitionRegistry getItemRegistry() { return contentRuntime.current().items(); }
     public ItemManager getItemManager() { return itemManager; }
+    public BlockManager getBlockManager() { return blockManager; }
+    public BlockDefinitionRegistry getBlockRegistry() { return contentRuntime.current().blocks(); }
     public PackManager getPackManager() { return packManager; }
     public TextPlaceholderService getTextPlaceholderService() { return textPlaceholderService; }
 
@@ -204,6 +239,44 @@ public final class VoxelCore extends JavaPlugin {
         for (ItemDefinition definition : items.entries().values()) {
             if (definition.abstractDefinition()) continue;
             versionAdapter.items().validateDefinition(definition, allocations.get(definition.id()).orElse(null));
+        }
+    }
+
+    private void validateBlocks(BlockDefinitionRegistry blocks, BlockAllocationRegistry allocations,
+                                ItemDefinitionRegistry items) {
+        for (BlockDefinition definition : blocks.entries().values()) {
+            if (definition.abstractDefinition()) continue;
+            if (!allocations.get(definition.id()).isPresent()) {
+                throw new IllegalArgumentException("Missing block allocation for " + definition.id());
+            }
+            if (definition.dropWhenMined() && definition.dropItem() != null
+                    && !items.contains(definition.dropItem())) {
+                throw new IllegalArgumentException("Block " + definition.id() + " drops unknown item "
+                        + definition.dropItem());
+            }
+            validateActions(definition.id(), definition.events(), blocks, items);
+        }
+        for (ItemDefinition definition : items.entries().values()) {
+            validateActions(definition.id(), definition.events(), blocks, items);
+        }
+    }
+
+    private static void validateActions(org.voxelhorizons.content.ContentID owner, EventActions events,
+                                        BlockDefinitionRegistry blocks, ItemDefinitionRegistry items) {
+        for (java.util.List<ActionDefinition> actions : events.entries().values()) {
+            for (ActionDefinition action : actions) {
+                if (action.type() == ActionType.SET_BLOCK) {
+                    org.voxelhorizons.content.ContentID target = org.voxelhorizons.content.ContentID.parse(
+                            action.string("block"), owner.namespace());
+                    if (!blocks.contains(target)) throw new IllegalArgumentException(owner
+                            + " set_block references unknown block " + target);
+                } else if (action.type() == ActionType.GIVE_ITEM || action.type() == ActionType.DROP_ITEM) {
+                    org.voxelhorizons.content.ContentID target = org.voxelhorizons.content.ContentID.parse(
+                            action.string("item"), owner.namespace());
+                    if (!items.contains(target)) throw new IllegalArgumentException(owner
+                            + " action references unknown item " + target);
+                }
+            }
         }
     }
 
