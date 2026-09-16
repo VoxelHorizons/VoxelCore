@@ -63,7 +63,8 @@ public final class ItemInheritanceResolver {
                 child.bound() != null ? child.bound() : parent.bound(),
                 child.abstractDefinition() != null ? child.abstractDefinition() : parent.abstractDefinition(),
                 mergeRender(parent.render(), child.render()),
-                mergeMaps(parent.properties(), child.properties())
+                mergeMaps(parent.properties(), child.properties()),
+                child.events() != null ? child.events() : parent.events()
         );
     }
 

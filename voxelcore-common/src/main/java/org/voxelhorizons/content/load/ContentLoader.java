@@ -2,6 +2,9 @@ package org.voxelhorizons.content.load;
 
 import org.voxelhorizons.content.ContentID;
 import org.voxelhorizons.content.compile.ContentCompileException;
+import org.voxelhorizons.content.compile.BlockDefinitionCompiler;
+import org.voxelhorizons.content.block.BlockDefinitionRegistry;
+import org.voxelhorizons.content.block.RawBlockDefinition;
 import org.voxelhorizons.content.compile.ItemDefinitionCompiler;
 import org.voxelhorizons.content.item.ItemDefinitionRegistry;
 import org.voxelhorizons.content.item.RawItemDefinition;
@@ -23,15 +26,25 @@ public final class ContentLoader {
     private final ContentPackDiscovery packDiscovery;
     private final ItemDefinitionParser itemParser;
     private final ItemDefinitionCompiler compiler;
+    private final BlockDefinitionParser blockParser;
+    private final BlockDefinitionCompiler blockCompiler;
 
     public ContentLoader() {
-        this(new ContentPackDiscovery(), new ItemDefinitionParser(), new ItemDefinitionCompiler());
+        this(new ContentPackDiscovery(), new ItemDefinitionParser(), new ItemDefinitionCompiler(),
+                new BlockDefinitionParser(), new BlockDefinitionCompiler());
     }
 
     ContentLoader(ContentPackDiscovery packDiscovery, ItemDefinitionParser itemParser, ItemDefinitionCompiler compiler) {
+        this(packDiscovery, itemParser, compiler, new BlockDefinitionParser(), new BlockDefinitionCompiler());
+    }
+
+    ContentLoader(ContentPackDiscovery packDiscovery, ItemDefinitionParser itemParser, ItemDefinitionCompiler compiler,
+                  BlockDefinitionParser blockParser, BlockDefinitionCompiler blockCompiler) {
         this.packDiscovery = packDiscovery;
         this.itemParser = itemParser;
         this.compiler = compiler;
+        this.blockParser = blockParser;
+        this.blockCompiler = blockCompiler;
     }
 
     public List<RawItemDefinition> loadRaw(Path contentRoot) {
@@ -70,6 +83,39 @@ public final class ContentLoader {
         }
     }
 
+    public List<RawBlockDefinition> loadRawBlocks(Path contentRoot) {
+        List<ContentPack> packs = packDiscovery.discover(contentRoot);
+        indexAndValidatePacks(packs);
+        Map<ContentID, RawBlockDefinition> definitions = new LinkedHashMap<ContentID, RawBlockDefinition>();
+        Map<ContentID, Path> sources = new LinkedHashMap<ContentID, Path>();
+        for (ContentPack pack : packs) {
+            Path authoredRoot = pack.root().resolve("content");
+            if (!Files.exists(authoredRoot)) continue;
+            if (!Files.isDirectory(authoredRoot)) throw new ContentLoadException("Content path is not a directory: " + authoredRoot);
+            for (Path file : contentFiles(authoredRoot)) {
+                for (RawBlockDefinition definition : blockParser.parse(pack, file)) {
+                    validateBlockParentDependency(pack, definition);
+                    Path previous = sources.put(definition.id(), file);
+                    if (previous != null) throw new ContentLoadException("Duplicate block id " + definition.id()
+                            + " in " + previous + " and " + file);
+                    definitions.put(definition.id(), definition);
+                }
+            }
+        }
+        return Collections.unmodifiableList(new ArrayList<RawBlockDefinition>(definitions.values()));
+    }
+
+    public BlockDefinitionRegistry loadBlocks(Path contentRoot) {
+        try { return blockCompiler.compile(loadRawBlocks(contentRoot)); }
+        catch (ContentCompileException exception) {
+            throw new ContentLoadException("Block compilation failed: " + exception.getMessage(), exception);
+        }
+    }
+
+    public ContentDefinitions loadDefinitions(Path contentRoot) {
+        return new ContentDefinitions(load(contentRoot), loadBlocks(contentRoot));
+    }
+
     private static Map<String, ContentPack> indexAndValidatePacks(List<ContentPack> packs) {
         Map<String, ContentPack> indexed = new LinkedHashMap<String, ContentPack>();
         for (ContentPack pack : packs) {
@@ -96,6 +142,16 @@ public final class ContentLoader {
         if (parent == null || parent.namespace().equals(pack.manifest().namespace())) return;
         if (!pack.manifest().dependsOn(parent.namespace())) {
             throw new ContentLoadException("Item " + definition.id() + " extends " + parent
+                    + " but pack '" + pack.manifest().namespace() + "' does not declare dependency '"
+                    + parent.namespace() + "'");
+        }
+    }
+
+    private static void validateBlockParentDependency(ContentPack pack, RawBlockDefinition definition) {
+        ContentID parent = definition.parent();
+        if (parent == null || parent.namespace().equals(pack.manifest().namespace())) return;
+        if (!pack.manifest().dependsOn(parent.namespace())) {
+            throw new ContentLoadException("Block " + definition.id() + " extends " + parent
                     + " but pack '" + pack.manifest().namespace() + "' does not declare dependency '"
                     + parent.namespace() + "'");
         }

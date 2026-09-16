@@ -1,6 +1,7 @@
 package org.voxelhorizons.content.item;
 
 import org.voxelhorizons.content.ContentID;
+import org.voxelhorizons.content.action.EventActions;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,6 +24,7 @@ public final class RawItemDefinition {
     private final Boolean abstractDefinition;
     private final RawItemRenderDefinition render;
     private final Map<String, Object> properties;
+    private final EventActions events;
 
     public RawItemDefinition(ContentID id,
                              ContentID parent,
@@ -46,6 +48,20 @@ public final class RawItemDefinition {
                              Boolean abstractDefinition,
                              RawItemRenderDefinition render,
                              Map<String, Object> properties) {
+        this(id, parent, type, material, displayName, lore, bound, abstractDefinition, render, properties, null);
+    }
+
+    public RawItemDefinition(ContentID id,
+                             ContentID parent,
+                             ItemType type,
+                             String material,
+                             String displayName,
+                             List<String> lore,
+                             Boolean bound,
+                             Boolean abstractDefinition,
+                             RawItemRenderDefinition render,
+                             Map<String, Object> properties,
+                             EventActions events) {
         this.id = id;
         this.parent = parent;
         this.type = type;
@@ -56,6 +72,7 @@ public final class RawItemDefinition {
         this.abstractDefinition = abstractDefinition;
         this.render = render;
         this.properties = properties == null ? null : Collections.unmodifiableMap(new HashMap<String, Object>(properties));
+        this.events = events;
     }
 
     public ContentID id() { return id; }
@@ -68,4 +85,5 @@ public final class RawItemDefinition {
     public Boolean abstractDefinition() { return abstractDefinition; }
     public RawItemRenderDefinition render() { return render; }
     public Map<String, Object> properties() { return properties; }
+    public EventActions events() { return events; }
 }

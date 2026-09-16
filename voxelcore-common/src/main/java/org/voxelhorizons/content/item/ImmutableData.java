@@ -7,10 +7,10 @@ import java.util.List;
 import java.util.Map;
 
 /** Deep immutable copies for YAML-shaped compiled content data. */
-final class ImmutableData {
+public final class ImmutableData {
     private ImmutableData() {}
 
-    static Map<String, Object> map(Map<String, Object> source) {
+    public static Map<String, Object> map(Map<String, Object> source) {
         if (source == null || source.isEmpty()) return Collections.emptyMap();
         Map<String, Object> copy = new LinkedHashMap<String, Object>();
         for (Map.Entry<String, Object> entry : source.entrySet()) {
