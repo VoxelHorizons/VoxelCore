@@ -52,7 +52,8 @@ public final class ContentCommand implements SubCommand {
         @Override public void execute(CommandSender sender, String[] args) {
             ContentReloadResult result = VoxelCore.getInstance().onReload();
             if (result.success()) {
-                sender.sendMessage("VoxelCore content reloaded: revision " + result.activeRevision() + ", " + result.itemCount() + " items");
+                sender.sendMessage("VoxelCore content reloaded: revision " + result.activeRevision() + ", "
+                        + result.itemCount() + " items, " + result.blockCount() + " blocks");
             } else {
                 sender.sendMessage("VoxelCore content reload failed; revision " + result.activeRevision() + " remains active: " + result.message());
             }

@@ -1,6 +1,7 @@
 package org.voxelhorizons.content.item;
 
 import org.voxelhorizons.content.ContentID;
+import org.voxelhorizons.content.action.EventActions;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -19,6 +20,7 @@ public final class ItemDefinition {
     private final Optional<ContentID> parent;
     private final ItemRenderDefinition render;
     private final Map<String, Object> properties;
+    private final EventActions events;
 
     public ItemDefinition(ContentID id,
                           ItemType type,
@@ -29,7 +31,32 @@ public final class ItemDefinition {
                           Optional<ContentID> parent,
                           ItemRenderDefinition render,
                           Map<String, Object> properties) {
-        this(id, type, material, displayName, lore, bound, false, parent, render, properties);
+        this(id, type, material, displayName, lore, bound, false, parent, render, properties,
+                EventActions.empty());
+    }
+
+    public ItemDefinition(ContentID id,
+                          ItemType type,
+                          String material,
+                          String displayName,
+                          List<String> lore,
+                          boolean bound,
+                          boolean abstractDefinition,
+                          Optional<ContentID> parent,
+                          ItemRenderDefinition render,
+                          Map<String, Object> properties,
+                          EventActions events) {
+        this.id = id;
+        this.type = type;
+        this.material = material;
+        this.displayName = displayName;
+        this.lore = Collections.unmodifiableList(new ArrayList<String>(lore == null ? Collections.<String>emptyList() : lore));
+        this.bound = bound;
+        this.abstractDefinition = abstractDefinition;
+        this.parent = parent == null ? Optional.<ContentID>empty() : parent;
+        this.render = render;
+        this.properties = ImmutableData.map(properties);
+        this.events = events == null ? EventActions.empty() : events;
     }
 
     public ItemDefinition(ContentID id,
@@ -42,16 +69,8 @@ public final class ItemDefinition {
                           Optional<ContentID> parent,
                           ItemRenderDefinition render,
                           Map<String, Object> properties) {
-        this.id = id;
-        this.type = type;
-        this.material = material;
-        this.displayName = displayName;
-        this.lore = Collections.unmodifiableList(new ArrayList<String>(lore == null ? Collections.<String>emptyList() : lore));
-        this.bound = bound;
-        this.abstractDefinition = abstractDefinition;
-        this.parent = parent == null ? Optional.<ContentID>empty() : parent;
-        this.render = render;
-        this.properties = ImmutableData.map(properties);
+        this(id, type, material, displayName, lore, bound, abstractDefinition, parent, render, properties,
+                EventActions.empty());
     }
 
     public ContentID id() { return id; }
@@ -64,4 +83,5 @@ public final class ItemDefinition {
     public Optional<ContentID> parent() { return parent; }
     public ItemRenderDefinition render() { return render; }
     public Map<String, Object> properties() { return properties; }
+    public EventActions events() { return events; }
 }
