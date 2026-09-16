@@ -14,7 +14,9 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class JavaPackAuthoredAssetsTest {
     @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
@@ -84,6 +86,35 @@ public class JavaPackAuthoredAssetsTest {
         compiler.compile(contentRoot.toPath(), output, allocations, target);
         assertTrue(!hasEntry(output, "assets/voxel/textures/item/obsolete.png"));
         assertEquals("new-texture", zipText(output, "assets/voxel/textures/item/current.png"));
+    }
+
+    @Test
+    public void failedRebuildPreservesLastPublishedPack() throws Exception {
+        File contentRoot = temporaryFolder.newFolder("failed-rebuild-content");
+        File pack = new File(contentRoot, "voxel");
+        assertTrue(new File(pack, "content").mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
+        write(new File(pack, "assets/voxel/textures/item/current.png"), "published-texture");
+
+        Path build = temporaryFolder.newFolder("failed-rebuild-build").toPath();
+        Path output = build.resolve("pack.zip");
+        Path allocations = build.resolve("render-allocations.yml");
+        JavaPackCompiler compiler = new JavaPackCompiler();
+        JavaPackTarget target = JavaPackTarget.numericCmd("atomic-publish-test", 22);
+
+        compiler.compile(contentRoot.toPath(), output, allocations, target);
+        byte[] published = Files.readAllBytes(output);
+
+        write(new File(pack, "content/broken.yml"), "items:\n  broken: [not-a-definition]\n");
+        try {
+            compiler.compile(contentRoot.toPath(), output, allocations, target);
+            fail("Expected invalid content to fail the rebuild");
+        } catch (RuntimeException expected) {
+            // The failed candidate must not replace the previously published resource pack.
+        }
+
+        assertArrayEquals(published, Files.readAllBytes(output));
+        assertEquals("published-texture", zipText(output, "assets/voxel/textures/item/current.png"));
     }
 
     private static void write(File file, String content) throws Exception {
