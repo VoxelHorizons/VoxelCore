@@ -1,12 +1,18 @@
 package org.voxelhorizons.content.load;
 
 import org.voxelhorizons.content.ContentID;
+import org.voxelhorizons.content.action.ActionDefinition;
+import org.voxelhorizons.content.action.ActionType;
+import org.voxelhorizons.content.action.EventActions;
+import org.voxelhorizons.content.block.BlockDefinition;
 import org.voxelhorizons.content.compile.ContentCompileException;
 import org.voxelhorizons.content.compile.BlockDefinitionCompiler;
 import org.voxelhorizons.content.block.BlockDefinitionRegistry;
 import org.voxelhorizons.content.block.RawBlockDefinition;
 import org.voxelhorizons.content.compile.ItemDefinitionCompiler;
 import org.voxelhorizons.content.item.ItemDefinitionRegistry;
+import org.voxelhorizons.content.item.ItemType;
+import org.voxelhorizons.content.item.RawItemRenderDefinition;
 import org.voxelhorizons.content.item.RawItemDefinition;
 import org.voxelhorizons.content.pack.ContentPack;
 import org.voxelhorizons.content.pack.ContentPackDiscovery;
@@ -76,8 +82,17 @@ public final class ContentLoader {
     }
 
     public ItemDefinitionRegistry load(Path contentRoot) {
+        BlockDefinitionRegistry blocks = loadBlocks(contentRoot);
         try {
-            return compiler.compile(loadRaw(contentRoot));
+            List<RawItemDefinition> items = new ArrayList<RawItemDefinition>(loadRaw(contentRoot));
+            Map<ContentID, RawItemDefinition> byId = new LinkedHashMap<ContentID, RawItemDefinition>();
+            for (RawItemDefinition item : items) byId.put(item.id(), item);
+            for (BlockDefinition block : blocks.entries().values()) {
+                if (!block.abstractDefinition() && !byId.containsKey(block.id())) {
+                    items.add(implicitBlockItem(block));
+                }
+            }
+            return compiler.compile(items);
         } catch (ContentCompileException exception) {
             throw new ContentLoadException("Content compilation failed: " + exception.getMessage(), exception);
         }
@@ -114,6 +129,25 @@ public final class ContentLoader {
 
     public ContentDefinitions loadDefinitions(Path contentRoot) {
         return new ContentDefinitions(load(contentRoot), loadBlocks(contentRoot));
+    }
+
+    private static RawItemDefinition implicitBlockItem(BlockDefinition block) {
+        Map<String, Object> parameters = new LinkedHashMap<String, Object>();
+        parameters.put("block", block.id().toString());
+        parameters.put("target", "relative");
+        parameters.put("replace", "air_only");
+        parameters.put("consume", Integer.valueOf(1));
+
+        Map<String, List<ActionDefinition>> eventMap = new LinkedHashMap<String, List<ActionDefinition>>();
+        eventMap.put("interact.right", Collections.singletonList(
+                new ActionDefinition(ActionType.SET_BLOCK, parameters)));
+
+        String model = block.id().namespace() + ":block/" + block.id().value();
+        return new RawItemDefinition(block.id(), null, ItemType.ITEM, "minecraft:diamond_hoe",
+                block.displayName(), Collections.<String>emptyList(), Boolean.FALSE, Boolean.FALSE,
+                new RawItemRenderDefinition(model, Boolean.TRUE, null, null, null),
+                Collections.<String, Object>emptyMap(),
+                new EventActions(eventMap));
     }
 
     private static Map<String, ContentPack> indexAndValidatePacks(List<ContentPack> packs) {

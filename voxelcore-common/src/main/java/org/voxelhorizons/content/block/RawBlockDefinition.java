@@ -14,6 +14,7 @@ public final class RawBlockDefinition {
     private final Boolean abstractDefinition;
     private final BlockMethod method;
     private final BlockModelPreset model;
+    private final String displayName;
     private final String texture;
     private final Map<String, String> textures;
     private final Double hardness;
@@ -29,11 +30,21 @@ public final class RawBlockDefinition {
                               Map<String, String> textures, Double hardness, Double blastResistance,
                               Boolean explosionImmune, Boolean dropWhenMined, ContentID dropItem,
                               ContentID silkTouchItem, EventActions events) {
+        this(id, parent, abstractDefinition, method, model, null, texture, textures, hardness,
+                blastResistance, explosionImmune, dropWhenMined, dropItem, silkTouchItem, events);
+    }
+
+    public RawBlockDefinition(ContentID id, ContentID parent, Boolean abstractDefinition,
+                              BlockMethod method, BlockModelPreset model, String displayName, String texture,
+                              Map<String, String> textures, Double hardness, Double blastResistance,
+                              Boolean explosionImmune, Boolean dropWhenMined, ContentID dropItem,
+                              ContentID silkTouchItem, EventActions events) {
         this.id = id;
         this.parent = parent;
         this.abstractDefinition = abstractDefinition;
         this.method = method;
         this.model = model;
+        this.displayName = displayName;
         this.texture = texture;
         this.textures = textures == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, String>(textures));
         this.hardness = hardness;
@@ -50,6 +61,7 @@ public final class RawBlockDefinition {
     public Boolean abstractDefinition() { return abstractDefinition; }
     public BlockMethod method() { return method; }
     public BlockModelPreset model() { return model; }
+    public String displayName() { return displayName; }
     public String texture() { return texture; }
     public Map<String, String> textures() { return textures; }
     public Double hardness() { return hardness; }
