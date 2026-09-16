@@ -44,8 +44,8 @@ final class BlockPackCompiler {
             if (definition.abstractDefinition()) continue;
             BlockAllocation allocation = allocations.get(definition.id()).orElseThrow(
                     () -> new JavaPackCompileException("Missing block allocation for " + definition.id()));
-            String model = definition.id().namespace() + ":block/" + definition.id().path();
-            put(entries, "assets/" + definition.id().namespace() + "/models/block/" + definition.id().path() + ".json",
+            String model = definition.id().namespace() + ":block/" + definition.id().value();
+            put(entries, "assets/" + definition.id().namespace() + "/models/block/" + definition.id().value() + ".json",
                     modelJson(definition));
             String state = BlockCarrierStates.state(allocation, modern);
             String carrier = modern ? BlockCarrierStates.blockName(state) : legacyCarrier(state);
