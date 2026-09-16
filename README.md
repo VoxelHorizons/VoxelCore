@@ -403,6 +403,8 @@ plugins/VoxelCore/build/resource-packs/<target>.zip
 
 When `[target]` is omitted, VoxelCore uses the current server version only when an exact validated pack profile exists. Otherwise specify a target explicitly.
 
+`pack build` publishes the completed ZIP atomically, preserving the previous successful artifact when compilation fails. After a successful build it also performs the safe content reload below, so new items and `:name:` UI placeholders become active without a second command. If live reload validation fails, the built ZIP is retained while the previous runtime revision stays active and the command reports both outcomes.
+
 `item list` reports only concrete definitions. Abstract definitions can still be inspected directly with `item info` and used as inheritance parents; `bound` does not affect list visibility.
 
 ## Safe reloads
