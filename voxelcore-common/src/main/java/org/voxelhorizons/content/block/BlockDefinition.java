@@ -5,6 +5,7 @@ import org.voxelhorizons.content.action.EventActions;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -19,6 +20,8 @@ public final class BlockDefinition {
     private final Map<String, String> textures;
     private final double hardness;
     private final double blastResistance;
+    private final List<String> breakTools;
+    private final String minimumToolTier;
     private final boolean explosionImmune;
     private final boolean dropWhenMined;
     private final ContentID dropItem;
@@ -31,13 +34,23 @@ public final class BlockDefinition {
                            boolean dropWhenMined, ContentID dropItem, ContentID silkTouchItem,
                            EventActions events) {
         this(id, parent, abstractDefinition, method, model, textures, null, hardness, blastResistance,
-                explosionImmune, dropWhenMined, dropItem, silkTouchItem, events);
+                Collections.<String>emptyList(), null, explosionImmune, dropWhenMined, dropItem, silkTouchItem, events);
     }
 
     public BlockDefinition(ContentID id, Optional<ContentID> parent, boolean abstractDefinition,
                            BlockMethod method, BlockModelPreset model, Map<String, String> textures,
                            String displayName,
                            double hardness, double blastResistance, boolean explosionImmune,
+                           boolean dropWhenMined, ContentID dropItem, ContentID silkTouchItem,
+                           EventActions events) {
+        this(id, parent, abstractDefinition, method, model, textures, displayName, hardness, blastResistance,
+                Collections.<String>emptyList(), null, explosionImmune, dropWhenMined, dropItem, silkTouchItem, events);
+    }
+
+    public BlockDefinition(ContentID id, Optional<ContentID> parent, boolean abstractDefinition,
+                           BlockMethod method, BlockModelPreset model, Map<String, String> textures,
+                           String displayName, double hardness, double blastResistance,
+                           List<String> breakTools, String minimumToolTier, boolean explosionImmune,
                            boolean dropWhenMined, ContentID dropItem, ContentID silkTouchItem,
                            EventActions events) {
         this.id = id;
@@ -49,6 +62,8 @@ public final class BlockDefinition {
         this.textures = Collections.unmodifiableMap(new LinkedHashMap<String, String>(textures));
         this.hardness = hardness;
         this.blastResistance = blastResistance;
+        this.breakTools = Collections.unmodifiableList(new java.util.ArrayList<String>(breakTools));
+        this.minimumToolTier = minimumToolTier;
         this.explosionImmune = explosionImmune;
         this.dropWhenMined = dropWhenMined;
         this.dropItem = dropItem;
@@ -65,6 +80,8 @@ public final class BlockDefinition {
     public Map<String, String> textures() { return textures; }
     public double hardness() { return hardness; }
     public double blastResistance() { return blastResistance; }
+    public List<String> breakTools() { return breakTools; }
+    public String minimumToolTier() { return minimumToolTier; }
     public boolean explosionImmune() { return explosionImmune; }
     public boolean dropWhenMined() { return dropWhenMined; }
     public ContentID dropItem() { return dropItem; }
