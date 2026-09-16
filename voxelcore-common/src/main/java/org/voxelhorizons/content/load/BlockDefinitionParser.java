@@ -24,7 +24,8 @@ import java.util.Set;
 public final class BlockDefinitionParser {
     private static final Set<String> KEYS = new HashSet<String>(Arrays.asList(
             "extends", "abstract", "method", "model", "display_name", "texture", "textures", "hardness",
-            "blast_resistance", "explosion_immune", "drop_when_mined", "drop", "silk_touch", "events"
+            "blast_resistance", "break_tools", "minimum_tool_tier", "explosion_immune",
+            "drop_when_mined", "drop", "silk_touch", "events"
     ));
     private final ActionDefinitionParser actions = new ActionDefinitionParser();
 
@@ -95,13 +96,19 @@ public final class BlockDefinitionParser {
 
         Double hardness = number(map, "hardness", file, id, 0.0D);
         Double resistance = number(map, "blast_resistance", file, id, 0.0D);
+        List<String> breakTools = stringList(map, "break_tools", file, id);
+        String minimumToolTier = map.containsKey("minimum_tool_tier")
+                ? string(map, "minimum_tool_tier", file, id).toUpperCase(java.util.Locale.ROOT) : null;
+        if (minimumToolTier != null && !Arrays.asList("WOOD", "GOLD", "STONE", "IRON", "DIAMOND", "NETHERITE").contains(minimumToolTier)) {
+            throw new ContentLoadException("minimum_tool_tier must be WOOD, GOLD, STONE, IRON, DIAMOND, or NETHERITE for " + id + " in " + file);
+        }
         Boolean explosionImmune = bool(map, "explosion_immune", file, id);
         Boolean dropWhenMined = bool(map, "drop_when_mined", file, id);
         ContentID drop = contentId(map, "drop", pack, file, id);
         ContentID silk = contentId(map, "silk_touch", pack, file, id);
         EventActions events = map.containsKey("events") ? actions.parse(map.get("events"), id, file) : null;
         return new RawBlockDefinition(id, parent, abstractDefinition, method, model, displayName, texture, textures,
-                hardness, resistance, explosionImmune, dropWhenMined, drop, silk, events);
+                hardness, resistance, breakTools, minimumToolTier, explosionImmune, dropWhenMined, drop, silk, events);
     }
 
     private static void rejectUnknown(Map<?, ?> map, Path file, ContentID id) {
@@ -141,6 +148,22 @@ public final class BlockDefinitionParser {
         Object value = map.get(key);
         if (!(value instanceof Boolean)) throw new ContentLoadException(key + " must be boolean for " + id + " in " + file);
         return (Boolean) value;
+    }
+
+    private static List<String> stringList(Map<?, ?> map, String key, Path file, ContentID id) {
+        if (!map.containsKey(key)) return null;
+        Object value = map.get(key);
+        if (!(value instanceof List) || ((List<?>) value).isEmpty()) {
+            throw new ContentLoadException(key + " must be a non-empty list for " + id + " in " + file);
+        }
+        List<String> values = new ArrayList<String>();
+        for (Object entry : (List<?>) value) {
+            if (!(entry instanceof String) || ((String) entry).trim().isEmpty()) {
+                throw new ContentLoadException(key + " entries must be non-empty strings for " + id + " in " + file);
+            }
+            values.add(((String) entry).trim().toUpperCase(java.util.Locale.ROOT));
+        }
+        return values;
     }
 
     private static Double number(Map<?, ?> map, String key, Path file, ContentID id, double minimum) {
