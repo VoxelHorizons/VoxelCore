@@ -22,6 +22,33 @@ public class ContentLoaderTest {
     public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
     @Test
+    public void createsPlaceableInventoryItemForBlockOnlyDefinition() throws Exception {
+        File root = temporaryFolder.newFolder("implicit-block-item");
+        File pack = new File(root, "voxelpack");
+        File content = new File(pack, "content/blocks");
+        assertTrue(content.mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
+        write(new File(content, "ores.yml"),
+                "blocks:\n" +
+                "  ruby_ore:\n" +
+                "    display_name: '&cRuby Ore'\n" +
+                "    texture: voxel:block/ore/ruby_ore\n" +
+                "    hardness: 3.0\n" +
+                "    blast_resistance: 3.0\n" +
+                "    drop: voxel:ruby_ore\n" +
+                "    silk_touch: voxel:ruby_ore\n");
+
+        ContentDefinitions definitions = new ContentLoader().loadDefinitions(root.toPath());
+        ItemDefinition item = definitions.items().get(ContentID.of("voxel", "ruby_ore")).get();
+        assertEquals("&cRuby Ore", item.displayName());
+        assertEquals("voxel:block/ruby_ore", item.render().model());
+        assertEquals("voxel:ruby_ore",
+                item.events().forEvent("interact.right").get(0).string("block"));
+        assertEquals(ContentID.of("voxel", "ruby_ore"),
+                definitions.blocks().get(ContentID.of("voxel", "ruby_ore")).get().dropItem());
+    }
+
+    @Test
     public void loadsYamlAndCompilesInheritance() throws Exception {
         File root = temporaryFolder.newFolder("content");
         File pack = new File(root, "voxel_horizons");

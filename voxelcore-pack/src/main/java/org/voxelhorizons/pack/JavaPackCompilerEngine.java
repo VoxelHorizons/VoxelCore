@@ -109,7 +109,9 @@ final class JavaPackCompilerEngine {
             if (itemPack == null) throw new JavaPackCompileException("No content pack owns item namespace " + item.id().namespace());
             ResourceLocation model = ResourceLocation.parse(render.model(), item.id().namespace());
             validateModelReference(itemPack, packsByNamespace, model, item.id());
-            validateModelAsset(packsByNamespace, model, item.id());
+            if (!isGeneratedBlockModel(model, item.id(), blocks)) {
+                validateModelAsset(packsByNamespace, model, item.id());
+            }
 
             CustomModelDataDefinition authored = render.customModelData();
             if (target.mode() == JavaPackMode.NUMERIC_CUSTOM_MODEL_DATA && authored != null && authored.isStructured()) {
@@ -131,7 +133,8 @@ final class JavaPackCompilerEngine {
                 putEntry(entries, itemInfoPath, utf8("{\n  \"model\": " + node + "\n}\n"));
             } else {
                 Integer predicateValue = target.mode() == JavaPackMode.LEGACY_DAMAGE_UNBREAKABLE
-                        ? render.durability() : Integer.valueOf(allocation.customModelData());
+                        ? legacyPredicateValue(item, render, model, blocks, allocation)
+                        : Integer.valueOf(allocation.customModelData());
                 if (predicateValue != null) {
                     ResourceLocation material = ResourceLocation.parse(item.material(), "minecraft");
                     List<ModelOverride> materialOverrides = overrides.get(material);
@@ -559,6 +562,21 @@ final class JavaPackCompilerEngine {
         ContentPack owner = packs.get(model.namespace);
         Path expected = owner.root().resolve("assets").resolve(model.namespace).resolve("models").resolve(model.path + ".json");
         if (!Files.isRegularFile(expected)) throw new JavaPackCompileException("Item " + itemId + " references missing model " + model + ". Expected " + expected);
+    }
+
+    private static boolean isGeneratedBlockModel(ResourceLocation model, ContentID itemId,
+                                                   BlockDefinitionRegistry blocks) {
+        return model.namespace.equals(itemId.namespace())
+                && model.path.equals("block/" + itemId.value())
+                && blocks.contains(itemId);
+    }
+
+    private static Integer legacyPredicateValue(ItemDefinition item, ItemRenderDefinition render,
+                                                ResourceLocation model, BlockDefinitionRegistry blocks,
+                                                RenderAllocation allocation) {
+        if (render.durability() != null) return render.durability();
+        return isGeneratedBlockModel(model, item.id(), blocks)
+                ? Integer.valueOf(allocation.customModelData()) : null;
     }
 
     private static String packMeta(JavaPackTarget target) {
