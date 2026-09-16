@@ -64,7 +64,7 @@ blocks:
   red_ore:
     method: auto
     model: cube_all
-    texture: voxeltest:item/red_item
+    texture: minecraft:block/redstone_ore
     drop: red_item
     silk_touch: red_item
     hardness: 3.0
