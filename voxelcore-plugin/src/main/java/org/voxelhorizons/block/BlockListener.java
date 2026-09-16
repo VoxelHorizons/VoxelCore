@@ -1,6 +1,7 @@
 package org.voxelhorizons.block;
 
 import org.bukkit.Material;
+import org.bukkit.GameMode;
 import org.bukkit.block.Block;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.event.EventHandler;
@@ -10,6 +11,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.block.BlockPhysicsEvent;
 import org.bukkit.event.block.NotePlayEvent;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
@@ -41,9 +43,15 @@ public final class BlockListener implements Listener {
         if (!id.isPresent()) return;
         BlockDefinition definition = blocks.getDefinition(id.get()).orElse(null);
         if (definition == null) return;
-        suppressVanillaDrops(event);
         ItemStack held = event.getPlayer().getInventory().getItemInMainHand();
-        if (definition.dropWhenMined()) {
+        ContentID heldId = items.identify(held).orElse(null);
+        if (!BlockToolMatcher.canBreak(definition, held == null ? null : held.getType().name(), heldId,
+                event.getPlayer().getGameMode() == GameMode.CREATIVE)) {
+            event.setCancelled(true);
+            return;
+        }
+        suppressVanillaDrops(event);
+        if (definition.dropWhenMined() && event.getPlayer().getGameMode() != GameMode.CREATIVE) {
             ContentID drop = held != null && held.containsEnchantment(Enchantment.SILK_TOUCH)
                     ? definition.silkTouchItem() : definition.dropItem();
             if (drop != null && items.hasItem(drop)) {
@@ -68,7 +76,7 @@ public final class BlockListener implements Listener {
                 new ActionContext(event.getPlayer(), held, items.identify(held).orElse(null), clicked,
                         id.get(), event.getBlockFace(), event));
         // Prevent note-block tuning and other vanilla carrier interactions from changing the allocated state.
-        event.setCancelled(true);
+        if (event.getAction() == Action.RIGHT_CLICK_BLOCK) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

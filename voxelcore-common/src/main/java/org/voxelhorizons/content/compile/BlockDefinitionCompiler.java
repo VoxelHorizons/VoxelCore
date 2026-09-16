@@ -69,6 +69,7 @@ public final class BlockDefinitionCompiler {
                 choose(child.displayName(), parent.displayName()),
                 child.texture() != null ? child.texture() : parent.texture(), textures,
                 choose(child.hardness(), parent.hardness()), choose(child.blastResistance(), parent.blastResistance()),
+                choose(child.breakTools(), parent.breakTools()), choose(child.minimumToolTier(), parent.minimumToolTier()),
                 choose(child.explosionImmune(), parent.explosionImmune()),
                 choose(child.dropWhenMined(), parent.dropWhenMined()),
                 child.dropItem() != null ? child.dropItem() : parent.dropItem(),
@@ -89,8 +90,10 @@ public final class BlockDefinitionCompiler {
         ContentID dropItem = raw.dropItem() == null && drop ? raw.id() : raw.dropItem();
         ContentID silk = raw.silkTouchItem() == null ? dropItem : raw.silkTouchItem();
         return new BlockDefinition(raw.id(), Optional.ofNullable(raw.parent()), abstractDefinition, method, model,
-                textures, raw.displayName(), hardness, resistance, Boolean.TRUE.equals(raw.explosionImmune()), drop,
-                dropItem, silk, raw.events() == null ? EventActions.empty() : raw.events());
+                textures, raw.displayName(), hardness, resistance,
+                raw.breakTools() == null ? Collections.<String>emptyList() : raw.breakTools(),
+                raw.minimumToolTier(), Boolean.TRUE.equals(raw.explosionImmune()), drop, dropItem, silk,
+                raw.events() == null ? EventActions.empty() : raw.events());
     }
 
     private static Map<String, String> normalizedTextures(RawBlockDefinition raw, BlockModelPreset model,
