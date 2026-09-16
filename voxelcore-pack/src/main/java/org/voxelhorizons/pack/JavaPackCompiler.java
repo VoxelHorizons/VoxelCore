@@ -11,6 +11,8 @@ import java.io.OutputStream;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,8 +41,20 @@ public final class JavaPackCompiler {
     }
 
     public JavaPackBuildResult compile(Path contentRoot, Path outputZip, Path allocationManifestPath, JavaPackTarget target) {
-        prepareFreshOutput(outputZip);
-        return compileWithAllAuthoredAssets(contentRoot, outputZip, allocationManifestPath, target, true);
+        Path stagedOutput = prepareStagedOutput(outputZip);
+        try {
+            JavaPackBuildResult result = compileWithAllAuthoredAssets(
+                    contentRoot, stagedOutput, allocationManifestPath, target, true);
+            publishOutput(stagedOutput, outputZip);
+            return new JavaPackBuildResult(outputZip, result.allocationManifest(), result.renderedItems(),
+                    result.copiedAssets());
+        } finally {
+            try {
+                Files.deleteIfExists(stagedOutput);
+            } catch (IOException ignored) {
+                // A successfully published file has already moved. A failed build reports its real cause.
+            }
+        }
     }
 
     public UiGlyphRegistry loadUiGlyphs(Path contentRoot, Path allocationManifestPath, boolean persist) {
@@ -53,18 +67,31 @@ public final class JavaPackCompiler {
     }
 
     /**
-     * Removes any previous build artifact before compilation starts. A pack build is always a complete
-     * snapshot of the currently authored resources; it must never retain files that only existed in an
-     * older build.
+     * Builds into a fresh sibling file so stale ZIP entries cannot survive a rebuild and a failed build
+     * cannot destroy the last successfully published resource pack.
      */
-    private static void prepareFreshOutput(Path outputZip) {
+    private static Path prepareStagedOutput(Path outputZip) {
         if (outputZip == null) throw new IllegalArgumentException("outputZip cannot be null when building");
         try {
             Path parent = outputZip.getParent();
             if (parent != null) Files.createDirectories(parent);
-            Files.deleteIfExists(outputZip);
+            Path stagingDirectory = parent == null ? outputZip.toAbsolutePath().getParent() : parent;
+            return Files.createTempFile(stagingDirectory, outputZip.getFileName().toString() + ".", ".tmp");
         } catch (IOException exception) {
-            throw new JavaPackCompileException("Unable to clear previous resource pack " + outputZip, exception);
+            throw new JavaPackCompileException("Unable to stage resource pack " + outputZip, exception);
+        }
+    }
+
+    private static void publishOutput(Path stagedOutput, Path outputZip) {
+        try {
+            try {
+                Files.move(stagedOutput, outputZip, StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException ignored) {
+                Files.move(stagedOutput, outputZip, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException exception) {
+            throw new JavaPackCompileException("Unable to publish resource pack " + outputZip, exception);
         }
     }
 

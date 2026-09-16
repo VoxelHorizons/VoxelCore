@@ -91,6 +91,7 @@ grep -q "pack valid for $PACK_TARGET" <<<"$PACK_VALIDATE"
 PACK_BUILD="$(rcon "voxelcore admin pack build $PACK_TARGET")"
 echo "$PACK_BUILD"
 grep -q "pack built for $PACK_TARGET" <<<"$PACK_BUILD"
+grep -q 'Published content revision 2 with 3 items' <<<"$PACK_BUILD"
 test -f "$DATA_DIR/plugins/VoxelCore/build/resource-packs/$PACK_TARGET.zip"
 
 docker exec -i "$NAME" sh -c "cat > '$CONTAINER_ITEMS'" <<'BROKEN'
@@ -102,7 +103,7 @@ BROKEN
 
 FAILED_RELOAD="$(rcon 'voxelcore admin content reload')"
 echo "$FAILED_RELOAD"
-grep -q 'reload failed; revision 1 remains active' <<<"$FAILED_RELOAD"
+grep -q 'reload failed; revision 2 remains active' <<<"$FAILED_RELOAD"
 
 VERIFY_AFTER_FAILURE="$(rcon 'voxelcore admin item verify voxeltest:red_item')"
 echo "$VERIFY_AFTER_FAILURE"
@@ -111,7 +112,7 @@ grep -q 'VOXELCORE_ITEM_VERIFY_OK id=voxeltest:red_item' <<<"$VERIFY_AFTER_FAILU
 docker exec -i "$NAME" sh -c "cat > '$CONTAINER_ITEMS'" < "$FIXTURE_ITEMS"
 SUCCESS_RELOAD="$(rcon 'voxelcore admin content reload')"
 echo "$SUCCESS_RELOAD"
-grep -q 'content reloaded: revision 2, 3 items' <<<"$SUCCESS_RELOAD"
+grep -q 'content reloaded: revision 3, 3 items' <<<"$SUCCESS_RELOAD"
 
 FINAL_VERIFY="$(rcon 'voxelcore admin item verify voxeltest:child_item')"
 echo "$FINAL_VERIFY"
