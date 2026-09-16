@@ -5,6 +5,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.voxelhorizons.content.ContentID;
 import org.voxelhorizons.content.item.ItemDefinition;
+import org.voxelhorizons.content.render.RenderAllocation;
 import org.voxelhorizons.platform.item.ItemMetadataSupport;
 import org.voxelhorizons.platform.item.ItemPlatformAdapter;
 
@@ -15,6 +16,11 @@ public final class v1_12_ItemAdapter implements ItemPlatformAdapter {
 
     @Override
     public ItemStack createItem(ItemDefinition definition, int quantity) {
+        return createItem(definition, quantity, null);
+    }
+
+    @Override
+    public ItemStack createItem(ItemDefinition definition, int quantity, RenderAllocation allocation) {
         String materialName = definition.material().replace("minecraft:", "").toUpperCase(Locale.ROOT);
         Material material = Material.matchMaterial(materialName);
         if (material == null) throw new IllegalArgumentException("Unknown Minecraft material: " + definition.material());
@@ -30,6 +36,9 @@ public final class v1_12_ItemAdapter implements ItemPlatformAdapter {
             if (definition.render() != null && definition.render().durability() != null) {
                 durability = definition.render().durability();
                 validateDurability(material, durability.intValue(), definition);
+            } else if (isGeneratedBlockItem(definition) && allocation != null) {
+                durability = Integer.valueOf(allocation.customModelData());
+                validateDurability(material, durability.intValue(), definition);
             }
             // custom_model_data intentionally has no runtime representation before 1.14.
             stack.setItemMeta(meta);
@@ -38,6 +47,12 @@ public final class v1_12_ItemAdapter implements ItemPlatformAdapter {
         // Legacy Bukkit stores damage/durability directly on ItemStack.
         if (durability != null) stack.setDurability(durability.shortValue());
         return setContentId(stack, definition.id());
+    }
+
+    private static boolean isGeneratedBlockItem(ItemDefinition definition) {
+        if (definition.render() == null || definition.render().model() == null) return false;
+        return definition.render().model().equals(
+                definition.id().namespace() + ":block/" + definition.id().value());
     }
 
     private static void validateDurability(Material material, int durability, ItemDefinition definition) {
