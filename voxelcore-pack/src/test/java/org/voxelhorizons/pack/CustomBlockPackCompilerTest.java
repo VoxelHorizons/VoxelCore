@@ -27,7 +27,9 @@ public class CustomBlockPackCompilerTest {
         JavaPackBuildResult result = new JavaPackCompiler().compile(root.toPath(), zip,
                 build.resolve("render-allocations.yml"), JavaPackTarget.MC_1_21_4);
         assertEquals(1, result.renderedBlocks());
+        assertEquals(1, result.renderedItems());
         assertTrue(zipText(zip, "assets/test/models/block/ruby_ore.json").contains("test:block/ruby_ore"));
+        assertTrue(zipText(zip, "assets/test/items/block/ruby_ore.json").contains("test:block/ruby_ore"));
         assertTrue(zipText(zip, "assets/minecraft/blockstates/note_block.json").contains("test:block/ruby_ore"));
         assertTrue(Files.readAllBytes(build.resolve("block-allocations.yml")).length > 0);
     }
@@ -41,6 +43,8 @@ public class CustomBlockPackCompilerTest {
                 JavaPackTarget.MC_1_12_2);
         assertTrue(zipText(zip, "assets/minecraft/blockstates/brown_mushroom_block.json")
                 .contains("test:block/ruby_ore"));
+        assertTrue(zipText(zip, "assets/minecraft/models/item/diamond_hoe.json")
+                .contains("test:block/ruby_ore"));
     }
 
     private File content(String name) throws Exception {
@@ -50,8 +54,9 @@ public class CustomBlockPackCompilerTest {
         assertTrue(new File(pack, "assets/test/textures/block").mkdirs());
         write(new File(pack, "pack.yml"), "schema: 1\nnamespace: test\n");
         write(new File(pack, "content/blocks.yml"),
-                "items:\n  ruby_ore:\n    material: minecraft:paper\n" +
-                "blocks:\n  ruby_ore:\n    method: auto\n    model: cube_all\n    texture: test:block/ruby_ore\n");
+                "blocks:\n  ruby_ore:\n    display_name: '&cRuby Ore'\n    method: auto\n" +
+                "    model: cube_all\n    texture: test:block/ruby_ore\n" +
+                "    drop: test:ruby_ore\n    silk_touch: test:ruby_ore\n");
         write(new File(pack, "assets/test/textures/block/ruby_ore.png"), "texture-bytes");
         return root;
     }

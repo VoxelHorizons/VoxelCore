@@ -258,6 +258,7 @@ The smallest definition needs one texture:
 ```yaml
 blocks:
   ruby_ore:
+    display_name: "&cRuby Ore"
     texture: mypack:block/ruby_ore
     drop: ruby_ore
 ```
@@ -284,7 +285,7 @@ blocks:
       down: mypack:block/ore_bottom
 ```
 
-Supported block fields are `extends`, `abstract`, `method`, `model`, `texture`, `textures`, `hardness`, `blast_resistance`, `explosion_immune`, `drop_when_mined`, `drop`, `silk_touch`, and `events`. Block definitions support the same bounded, cycle-aware inheritance rules as items.
+Supported block fields are `extends`, `abstract`, `display_name`, `method`, `model`, `texture`, `textures`, `hardness`, `blast_resistance`, `explosion_immune`, `drop_when_mined`, `drop`, `silk_touch`, and `events`. Block definitions support the same bounded, cycle-aware inheritance rules as items.
 
 Carrier methods in this first implementation:
 
@@ -297,7 +298,7 @@ Carrier methods in this first implementation:
 
 Allocations are persisted in `plugins/VoxelCore/block-allocations.yml`. Removed IDs become tombstones instead of silently reusing a state, so existing worlds remain stable. Do not delete this file on a live server. Interaction, physics, and note playback are suppressed for allocated carrier states, and `explosion_immune: true` removes the block from explosion damage lists. `hardness` and `blast_resistance` are compiled metadata in this initial version; custom mining-speed and non-immune blast-strength simulation are reserved for the next runtime layer.
 
-The resource-pack compiler generates the block model and complete carrier blockstate tables. Authors only supply the referenced texture PNGs. A placeable inventory item remains an ordinary VoxelCore item and can use `set_block`, which keeps the block system independent from future furniture addons.
+The resource-pack compiler generates the block model, inventory model, and complete carrier blockstate tables. Authors only supply the referenced texture PNGs. Every concrete block automatically receives a matching placeable inventory item, and its default drop is that item. An explicit `items:` definition with the same content ID overrides the generated item when a special 2D icon or custom item behavior is required.
 
 ## Actions
 

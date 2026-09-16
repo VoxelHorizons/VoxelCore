@@ -66,6 +66,7 @@ public final class BlockDefinitionCompiler {
         }
         return new RawBlockDefinition(child.id(), child.parent(), choose(child.abstractDefinition(), parent.abstractDefinition()),
                 choose(child.method(), parent.method()), choose(child.model(), parent.model()),
+                choose(child.displayName(), parent.displayName()),
                 child.texture() != null ? child.texture() : parent.texture(), textures,
                 choose(child.hardness(), parent.hardness()), choose(child.blastResistance(), parent.blastResistance()),
                 choose(child.explosionImmune(), parent.explosionImmune()),
@@ -88,7 +89,7 @@ public final class BlockDefinitionCompiler {
         ContentID dropItem = raw.dropItem() == null && drop ? raw.id() : raw.dropItem();
         ContentID silk = raw.silkTouchItem() == null ? dropItem : raw.silkTouchItem();
         return new BlockDefinition(raw.id(), Optional.ofNullable(raw.parent()), abstractDefinition, method, model,
-                textures, hardness, resistance, Boolean.TRUE.equals(raw.explosionImmune()), drop,
+                textures, raw.displayName(), hardness, resistance, Boolean.TRUE.equals(raw.explosionImmune()), drop,
                 dropItem, silk, raw.events() == null ? EventActions.empty() : raw.events());
     }
 

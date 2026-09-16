@@ -23,7 +23,7 @@ import java.util.Set;
 
 public final class BlockDefinitionParser {
     private static final Set<String> KEYS = new HashSet<String>(Arrays.asList(
-            "extends", "abstract", "method", "model", "texture", "textures", "hardness",
+            "extends", "abstract", "method", "model", "display_name", "texture", "textures", "hardness",
             "blast_resistance", "explosion_immune", "drop_when_mined", "drop", "silk_touch", "events"
     ));
     private final ActionDefinitionParser actions = new ActionDefinitionParser();
@@ -71,6 +71,7 @@ public final class BlockDefinitionParser {
             try { model = BlockModelPreset.parse(string(map, "model", file, id)); }
             catch (IllegalArgumentException exception) { throw new ContentLoadException(exception.getMessage() + " for " + id + " in " + file); }
         }
+        String displayName = map.containsKey("display_name") ? string(map, "display_name", file, id) : null;
         String texture = map.containsKey("texture") ? texture(string(map, "texture", file, id), file, id) : null;
         Map<String, String> textures = null;
         if (map.containsKey("textures")) {
@@ -99,7 +100,7 @@ public final class BlockDefinitionParser {
         ContentID drop = contentId(map, "drop", pack, file, id);
         ContentID silk = contentId(map, "silk_touch", pack, file, id);
         EventActions events = map.containsKey("events") ? actions.parse(map.get("events"), id, file) : null;
-        return new RawBlockDefinition(id, parent, abstractDefinition, method, model, texture, textures,
+        return new RawBlockDefinition(id, parent, abstractDefinition, method, model, displayName, texture, textures,
                 hardness, resistance, explosionImmune, dropWhenMined, drop, silk, events);
     }
 
