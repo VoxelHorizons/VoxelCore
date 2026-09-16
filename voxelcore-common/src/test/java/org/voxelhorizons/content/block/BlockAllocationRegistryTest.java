@@ -41,6 +41,6 @@ public class BlockAllocationRegistryTest {
 
     private static RawBlockDefinition block(ContentID id) {
         return new RawBlockDefinition(id, null, null, BlockMethod.AUTO, BlockModelPreset.CUBE_ALL,
-                id.namespace() + ":block/" + id.path(), null, null, null, null, null, id, id, null);
+                id.namespace() + ":block/" + id.value(), null, null, null, null, null, id, id, null);
     }
 }
