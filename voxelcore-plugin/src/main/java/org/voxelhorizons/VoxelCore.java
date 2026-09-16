@@ -136,7 +136,7 @@ public final class VoxelCore extends JavaPlugin {
                         }
                         @Override public void validateBlocks(BlockDefinitionRegistry blocks,
                                                              BlockAllocationRegistry allocations) {
-                            validateBlocks(blocks, allocations, contentLoader.load(contentRoot));
+                            VoxelCore.this.validateBlocks(blocks, allocations, contentLoader.load(contentRoot));
                         }
                     }, blockAllocationStore, modernBlockStates);
             packManager = new PackManager(getDataFolder().toPath(), contentRoot, versionAdapter.version());
