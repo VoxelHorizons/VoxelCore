@@ -10,6 +10,7 @@ import org.voxelhorizons.content.item.ItemDefinitionRegistry;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -35,6 +36,9 @@ public class ContentLoaderTest {
                 "    texture: voxel:block/ore/ruby_ore\n" +
                 "    hardness: 3.0\n" +
                 "    blast_resistance: 3.0\n" +
+                "    break_tools:\n" +
+                "      - PICKAXE\n" +
+                "    minimum_tool_tier: IRON\n" +
                 "    drop: voxel:ruby_ore\n" +
                 "    silk_touch: voxel:ruby_ore\n");
 
@@ -46,6 +50,10 @@ public class ContentLoaderTest {
                 item.events().forEvent("interact.right").get(0).string("block"));
         assertEquals(ContentID.of("voxel", "ruby_ore"),
                 definitions.blocks().get(ContentID.of("voxel", "ruby_ore")).get().dropItem());
+        assertEquals(Collections.singletonList("PICKAXE"),
+                definitions.blocks().get(ContentID.of("voxel", "ruby_ore")).get().breakTools());
+        assertEquals("IRON",
+                definitions.blocks().get(ContentID.of("voxel", "ruby_ore")).get().minimumToolTier());
     }
 
     @Test

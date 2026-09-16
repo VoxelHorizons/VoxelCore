@@ -69,7 +69,8 @@ public final class BlockCommand implements SubCommand {
             BlockAllocation allocation = VoxelCore.getInstance().getContentRuntime().current().blockAllocations().get(id).orElse(null);
             if (definition == null) { sender.sendMessage("Unknown block: " + id); return; }
             sender.sendMessage(id + " method=" + definition.method() + " model=" + definition.model()
-                    + " hardness=" + definition.hardness() + " allocation="
+                    + " hardness=" + definition.hardness() + " breakTools=" + definition.breakTools()
+                    + " minimumToolTier=" + definition.minimumToolTier() + " allocation="
                     + (allocation == null ? "none" : allocation.method() + ":" + allocation.slot()));
         }
     }
