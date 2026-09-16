@@ -34,6 +34,16 @@ permissions:
     default: op
   voxelcore.admin.item.verify:
     default: op
+  voxelcore.admin.block:
+    default: op
+  voxelcore.admin.block.list:
+    default: op
+  voxelcore.admin.block.info:
+    default: op
+  voxelcore.admin.block.give:
+    default: op
+  voxelcore.admin.block.identify:
+    default: op
   voxelcore.admin.pack:
     default: op
   voxelcore.admin.pack.info:

@@ -20,8 +20,27 @@ items:
       custom_model_data:
         variant: ignored-before-1.14
         powered: true
+    events:
+      interact:
+        right:
+          actions:
+            - type: set_block
+              block: red_ore
+              target: relative
+              replace: air_only
+              consume: 1
 
   child_item:
     extends: red_item
     display_name: Inherited Test Item
     bound: false
+
+blocks:
+  red_ore:
+    method: auto
+    model: cube_all
+    texture: minecraft:block/redstone_ore
+    drop: red_item
+    silk_touch: red_item
+    hardness: 3.0
+    blast_resistance: 3.0

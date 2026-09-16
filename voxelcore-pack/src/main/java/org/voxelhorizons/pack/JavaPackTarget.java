@@ -47,6 +47,7 @@ public final class JavaPackTarget {
     public boolean usesRangeMetadata() { return rangeMetadata; }
     public JavaPackMode mode() { return mode; }
     public boolean supportsUiFonts() { return packFormat >= 4; }
+    public boolean supportsFlattenedBlockStates() { return packFormat >= 4; }
 
     /**
      * Returns the atlas definition used by item models for this target, or {@code null}
