@@ -3,6 +3,7 @@ package org.voxelhorizons.command.commands;
 import org.bukkit.command.CommandSender;
 import org.voxelhorizons.VoxelCore;
 import org.voxelhorizons.command.SubCommand;
+import org.voxelhorizons.content.runtime.ContentReloadResult;
 import org.voxelhorizons.pack.JavaPackBuildResult;
 import org.voxelhorizons.pack.JavaPackTarget;
 import org.voxelhorizons.pack.PackManager;
@@ -101,9 +102,18 @@ public final class PackCommand implements SubCommand {
             JavaPackTarget target = target(sender, args);
             if (target == null) return;
             try {
-                JavaPackBuildResult result = VoxelCore.getInstance().getPackManager().build(target);
+                VoxelCore plugin = VoxelCore.getInstance();
+                JavaPackBuildResult result = plugin.getPackManager().build(target);
                 sender.sendMessage("VoxelCore pack built for " + target.id() + ": " + result.output()
                         + " (" + result.renderedItems() + " rendered items, " + result.copiedAssets() + " authored assets)");
+                ContentReloadResult reload = plugin.onReload();
+                if (reload.success()) {
+                    sender.sendMessage("Published content revision " + reload.activeRevision() + " with "
+                            + reload.itemCount() + " items; UI placeholders are now active.");
+                } else {
+                    sender.sendMessage("Pack built, but live content reload failed; revision "
+                            + reload.activeRevision() + " remains active: " + reload.message());
+                }
             } catch (RuntimeException exception) {
                 sender.sendMessage("VoxelCore pack build failed for " + target.id() + ": " + exception.getMessage());
             }
