@@ -62,10 +62,10 @@ public class JavaPackCompilerTest {
                 JavaPackTarget.legacyDamage("1.12-test", 3));
         assertEquals(2, damageResult.renderedItems());
         String hoeDamage = zipText(damage, "assets/minecraft/models/item/diamond_hoe.json");
-        assertTrue(hoeDamage.contains("\"damaged\": 0"));
-        assertTrue(hoeDamage.contains("\"model\": \"mypack:item/ruby\""));
-        assertTrue(hoeDamage.contains("\"damage\": 0.0044843"));
-        assertTrue(hoeDamage.contains("\"damage\": 0.00704676"));
+        assertTrue(hoeDamage.contains("\"damaged\":0"));
+        assertTrue(hoeDamage.contains("\"model\":\"mypack:item/ruby\""));
+        assertTrue(hoeDamage.contains("\"damage\":0.0044843"));
+        assertTrue(hoeDamage.contains("\"damage\":0.00704676"));
         assertTrue(!hoeDamage.contains("1001"));
         assertTrue(!hoeDamage.contains("1002"));
 
@@ -79,9 +79,9 @@ public class JavaPackCompilerTest {
         Path numeric = build.resolve("numeric.zip");
         compiler.compile(contentRoot.toPath(), numeric, allocations, JavaPackTarget.numericCmd("1.14-test", 4));
         String hoeNumeric = zipText(numeric, "assets/minecraft/models/item/diamond_hoe.json");
-        assertTrue(hoeNumeric.contains("\"custom_model_data\": 1001"));
-        assertTrue(hoeNumeric.contains("\"custom_model_data\": 1002"));
-        assertTrue(!hoeNumeric.contains("\"damage\": 0.0044843"));
+        assertTrue(hoeNumeric.contains("\"custom_model_data\":1001"));
+        assertTrue(hoeNumeric.contains("\"custom_model_data\":1002"));
+        assertTrue(!hoeNumeric.contains("\"damage\":0.0044843"));
 
         Path modern = build.resolve("modern.zip");
         compiler.compile(contentRoot.toPath(), modern, allocations, JavaPackTarget.modern("1.21.4-test", 46));
@@ -103,8 +103,8 @@ public class JavaPackCompilerTest {
         Path zip = build.resolve("mc-26.2.zip");
         new JavaPackCompiler().compile(contentRoot.toPath(), zip, build.resolve("allocations.yml"), JavaPackTarget.MC_26_2);
         String metadata = zipText(zip, "pack.mcmeta");
-        assertTrue(metadata.contains("\"min_format\": [88, 0]"));
-        assertTrue(metadata.contains("\"max_format\": [88, 0]"));
+        assertTrue(metadata.contains("\"min_format\":[88,0]"));
+        assertTrue(metadata.contains("\"max_format\":[88,0]"));
         assertTrue(!metadata.contains("\"pack_format\""));
     }
 
@@ -181,7 +181,7 @@ public class JavaPackCompilerTest {
         new JavaPackCompiler().compile(contentRoot.toPath(), legacy, allocations,
                 JavaPackTarget.legacyDamage("legacy", 3));
         String json = zipText(legacy, "assets/minecraft/models/item/diamond_hoe.json");
-        assertTrue(json.contains("\"damage\": 0.0044843"));
+        assertTrue(json.contains("\"damage\":0.0044843"));
         assertTrue(!json.contains("custom_model_data"));
     }
 
@@ -222,15 +222,15 @@ public class JavaPackCompilerTest {
         Path combined = build.resolve("mc-1.21.4.zip");
         compiler.compile(contentRoot.toPath(), combined, allocations, JavaPackTarget.MC_1_21_4);
         String blocksAtlas = zipText(combined, "assets/minecraft/atlases/blocks.json");
-        assertTrue(blocksAtlas.contains("\"source\": \"ui\""));
-        assertTrue(blocksAtlas.contains("\"prefix\": \"ui/\""));
-        assertTrue(!blocksAtlas.contains("\"source\": \"item\""));
+        assertTrue(blocksAtlas.contains("\"source\":\"ui\""));
+        assertTrue(blocksAtlas.contains("\"prefix\":\"ui/\""));
+        assertTrue(!blocksAtlas.contains("\"source\":\"item\""));
         assertTrue(!hasEntry(combined, "assets/minecraft/atlases/items.json"));
 
         Path split = build.resolve("mc-26.2.zip");
         compiler.compile(contentRoot.toPath(), split, allocations, JavaPackTarget.MC_26_2);
         String itemsAtlas = zipText(split, "assets/minecraft/atlases/items.json");
-        assertTrue(itemsAtlas.contains("\"source\": \"ui\""));
+        assertTrue(itemsAtlas.contains("\"source\":\"ui\""));
         assertTrue(!hasEntry(split, "assets/minecraft/atlases/blocks.json"));
 
         Path legacy = build.resolve("mc-1.14.4.zip");

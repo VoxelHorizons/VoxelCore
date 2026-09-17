@@ -84,9 +84,9 @@ public class JavaPackAuthoredAssetsTest {
                 build.resolve("render-allocations.yml"), JavaPackTarget.MC_1_19_4);
 
         String defaultFont = zipText(output, "assets/minecraft/font/default.json");
-        assertTrue(defaultFont.contains("\"type\": \"reference\""));
-        assertTrue(defaultFont.contains("\"id\": \"voxel:branding\""));
-        assertTrue(defaultFont.contains("\"type\": \"space\""));
+        assertTrue(defaultFont.contains("\"type\":\"reference\""));
+        assertTrue(defaultFont.contains("\"id\":\"voxel:branding\""));
+        assertTrue(defaultFont.contains("\"type\":\"space\""));
         assertTrue(zipText(output, "assets/voxel/font/branding.json").contains("\\uEF00"));
         assertTrue(zipText(output, "assets/minecraft/lang/en_nz.json").contains("\\uEF00"));
     }

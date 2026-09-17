@@ -19,13 +19,11 @@ import org.voxelhorizons.content.block.BlockDefinitionRegistry;
 import org.voxelhorizons.content.block.BlockDefinition;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -34,9 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
-import java.util.zip.CRC32;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
 /** Internal deterministic Java pack compiler using the common render allocation authority. */
 final class JavaPackCompilerEngine {
@@ -631,21 +626,7 @@ final class JavaPackCompilerEngine {
     }
 
     private static void writeDeterministicZip(Path output, TreeMap<String, byte[]> entries) {
-        try {
-            Path parent = output.getParent();
-            if (parent != null) Files.createDirectories(parent);
-            try (OutputStream raw = Files.newOutputStream(output, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-                 ZipOutputStream zip = new ZipOutputStream(raw)) {
-                for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
-                    byte[] bytes = entry.getValue();
-                    CRC32 crc = new CRC32(); crc.update(bytes);
-                    ZipEntry zipEntry = new ZipEntry(entry.getKey());
-                    zipEntry.setMethod(ZipEntry.STORED); zipEntry.setSize(bytes.length); zipEntry.setCompressedSize(bytes.length);
-                    zipEntry.setCrc(crc.getValue()); zipEntry.setTime(0L);
-                    zip.putNextEntry(zipEntry); zip.write(bytes); zip.closeEntry();
-                }
-            }
-        } catch (IOException exception) { throw new JavaPackCompileException("Unable to write generated resource pack " + output, exception); }
+        DeterministicZipWriter.write(output, entries);
     }
 
     private static void putEntry(Map<String, byte[]> entries, String path, byte[] content) {
