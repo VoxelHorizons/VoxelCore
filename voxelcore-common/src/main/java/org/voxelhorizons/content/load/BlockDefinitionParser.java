@@ -25,7 +25,7 @@ public final class BlockDefinitionParser {
     private static final Set<String> KEYS = new HashSet<String>(Arrays.asList(
             "extends", "abstract", "method", "model", "display_name", "texture", "textures", "hardness",
             "blast_resistance", "break_tools", "minimum_tool_tier", "explosion_immune",
-            "drop_when_mined", "drop", "silk_touch", "events"
+            "stackable", "drop_when_mined", "drop", "silk_touch", "events"
     ));
     private final ActionDefinitionParser actions = new ActionDefinitionParser();
 
@@ -102,13 +102,15 @@ public final class BlockDefinitionParser {
         if (minimumToolTier != null && !Arrays.asList("WOOD", "GOLD", "STONE", "IRON", "DIAMOND", "NETHERITE").contains(minimumToolTier)) {
             throw new ContentLoadException("minimum_tool_tier must be WOOD, GOLD, STONE, IRON, DIAMOND, or NETHERITE for " + id + " in " + file);
         }
+        Boolean stackable = bool(map, "stackable", file, id);
         Boolean explosionImmune = bool(map, "explosion_immune", file, id);
         Boolean dropWhenMined = bool(map, "drop_when_mined", file, id);
         ContentID drop = contentId(map, "drop", pack, file, id);
         ContentID silk = contentId(map, "silk_touch", pack, file, id);
         EventActions events = map.containsKey("events") ? actions.parse(map.get("events"), id, file) : null;
         return new RawBlockDefinition(id, parent, abstractDefinition, method, model, displayName, texture, textures,
-                hardness, resistance, breakTools, minimumToolTier, explosionImmune, dropWhenMined, drop, silk, events);
+                hardness, resistance, breakTools, minimumToolTier, stackable, explosionImmune,
+                dropWhenMined, drop, silk, events);
     }
 
     private static void rejectUnknown(Map<?, ?> map, Path file, ContentID id) {

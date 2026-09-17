@@ -2,6 +2,7 @@ package org.voxelhorizons.platform.v1_12;
 
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.voxelhorizons.content.ContentID;
 import org.voxelhorizons.content.item.ItemDefinition;
@@ -21,7 +22,9 @@ public final class v1_12_ItemAdapter implements ItemPlatformAdapter {
 
     @Override
     public ItemStack createItem(ItemDefinition definition, int quantity, RenderAllocation allocation) {
-        String materialName = definition.material().replace("minecraft:", "").toUpperCase(Locale.ROOT);
+        boolean generatedBlockItem = isGeneratedBlockItem(definition);
+        String materialName = generatedBlockItem ? "DIAMOND_HOE"
+                : definition.material().replace("minecraft:", "").toUpperCase(Locale.ROOT);
         Material material = Material.matchMaterial(materialName);
         if (material == null) throw new IllegalArgumentException("Unknown Minecraft material: " + definition.material());
 
@@ -30,13 +33,16 @@ public final class v1_12_ItemAdapter implements ItemPlatformAdapter {
         Integer durability = null;
 
         if (meta != null) {
-            if (definition.displayName() != null) meta.setDisplayName(definition.displayName());
-            if (!definition.lore().isEmpty()) meta.setLore(definition.lore());
+            ItemMetadataSupport.applyText(meta, definition);
             ItemMetadataSupport.applyCommon(meta, definition.render());
+            if (generatedBlockItem) {
+                meta.setUnbreakable(true);
+                meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_UNBREAKABLE);
+            }
             if (definition.render() != null && definition.render().durability() != null) {
                 durability = definition.render().durability();
                 validateDurability(material, durability.intValue(), definition);
-            } else if (isGeneratedBlockItem(definition) && allocation != null) {
+            } else if (generatedBlockItem && allocation != null) {
                 durability = Integer.valueOf(allocation.customModelData());
                 validateDurability(material, durability.intValue(), definition);
             }

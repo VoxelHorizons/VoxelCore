@@ -70,6 +70,7 @@ public final class BlockDefinitionCompiler {
                 child.texture() != null ? child.texture() : parent.texture(), textures,
                 choose(child.hardness(), parent.hardness()), choose(child.blastResistance(), parent.blastResistance()),
                 choose(child.breakTools(), parent.breakTools()), choose(child.minimumToolTier(), parent.minimumToolTier()),
+                choose(child.stackable(), parent.stackable()),
                 choose(child.explosionImmune(), parent.explosionImmune()),
                 choose(child.dropWhenMined(), parent.dropWhenMined()),
                 child.dropItem() != null ? child.dropItem() : parent.dropItem(),
@@ -92,7 +93,8 @@ public final class BlockDefinitionCompiler {
         return new BlockDefinition(raw.id(), Optional.ofNullable(raw.parent()), abstractDefinition, method, model,
                 textures, raw.displayName(), hardness, resistance,
                 raw.breakTools() == null ? Collections.<String>emptyList() : raw.breakTools(),
-                raw.minimumToolTier(), Boolean.TRUE.equals(raw.explosionImmune()), drop, dropItem, silk,
+                raw.minimumToolTier(), !Boolean.FALSE.equals(raw.stackable()),
+                Boolean.TRUE.equals(raw.explosionImmune()), drop, dropItem, silk,
                 raw.events() == null ? EventActions.empty() : raw.events());
     }
 

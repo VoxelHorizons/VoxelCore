@@ -1,12 +1,16 @@
 package org.voxelhorizons.platform.item;
 
+import org.bukkit.ChatColor;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.voxelhorizons.content.item.ItemDefinition;
 import org.voxelhorizons.content.item.ItemRenderDefinition;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public final class ItemMetadataSupport {
@@ -21,6 +25,20 @@ public final class ItemMetadataSupport {
     }
 
     private ItemMetadataSupport() {}
+
+    public static void applyText(ItemMeta meta, ItemDefinition definition) {
+        if (meta == null || definition == null) return;
+        if (definition.displayName() != null) meta.setDisplayName(colorize(definition.displayName()));
+        if (!definition.lore().isEmpty()) {
+            List<String> lore = new ArrayList<String>();
+            for (String line : definition.lore()) lore.add(colorize(line));
+            meta.setLore(lore);
+        }
+    }
+
+    static String colorize(String value) {
+        return ChatColor.translateAlternateColorCodes('&', value);
+    }
 
     public static void applyCommon(ItemMeta meta, ItemRenderDefinition render) {
         if (meta == null || render == null) return;

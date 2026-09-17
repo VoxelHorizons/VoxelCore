@@ -1,14 +1,17 @@
 package org.voxelhorizons.command.commands;
 
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import net.md_5.bungee.api.ChatColor;
+import net.md_5.bungee.api.chat.BaseComponent;
+import net.md_5.bungee.api.chat.ClickEvent;
+import net.md_5.bungee.api.chat.HoverEvent;
+import net.md_5.bungee.api.chat.TextComponent;
 import org.voxelhorizons.VoxelCore;
 import org.voxelhorizons.command.SubCommand;
 import org.voxelhorizons.content.ContentID;
 import org.voxelhorizons.pack.UiGlyphDefinition;
 import org.voxelhorizons.pack.UiGlyphRegistry;
-import org.voxelhorizons.platform.Version;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -139,17 +142,41 @@ public final class UiCommand implements SubCommand {
             UiGlyphDefinition glyph = find(sender, args, true);
             if (glyph == null) return;
             String escaped = String.format("\\u%04X", glyph.codePoint());
-            if (sender instanceof Player && VoxelCore.getInstance().getVersionAdapter().version()
-                    .compareTo(Version.of(1, 15, 0)) >= 0) {
-                Player player = (Player) sender;
-                String json = "{\"text\":\"[Copy " + glyph.id() + " " + glyph.escapedCodePoint()
-                        + "]\",\"color\":\"aqua\",\"underlined\":true,\"clickEvent\":{\"action\":\"copy_to_clipboard\",\"value\":\""
-                        + glyph.character() + "\"},\"hoverEvent\":{\"action\":\"show_text\",\"value\":\"Click to copy the UI character\"}}";
-                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "tellraw " + player.getName() + " " + json);
+            if (sender instanceof Player) {
+                sendCopyMessage((Player) sender, glyph);
             } else {
                 sender.sendMessage("UI character for " + glyph.id() + ": " + glyph.character());
             }
             sender.sendMessage("Codepoint: " + glyph.escapedCodePoint() + " | escaped: " + escaped);
+        }
+
+        private static void sendCopyMessage(Player player, UiGlyphDefinition glyph) {
+            TextComponent message = new TextComponent("[Copy " + glyph.id() + " "
+                    + glyph.escapedCodePoint() + "]");
+            message.setColor(ChatColor.AQUA);
+            message.setUnderlined(true);
+            message.setInsertion(glyph.character());
+
+            ClickEvent.Action action = enumAction("COPY_TO_CLIPBOARD", ClickEvent.Action.SUGGEST_COMMAND);
+            message.setClickEvent(new ClickEvent(action, glyph.character()));
+            String instruction = action == ClickEvent.Action.SUGGEST_COMMAND
+                    ? "Click to put the character in chat, then copy it. Shift-click also inserts it."
+                    : "Click to copy the UI character. Shift-click inserts it into chat.";
+            message.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                    new BaseComponent[] { new TextComponent(instruction) }));
+            player.spigot().sendMessage(message);
+
+            // Keep a literal copy in chat too. This makes the result inspectable on clients which
+            // suppress click events and makes it obvious which single character is being copied.
+            player.sendMessage("Literal character: [" + glyph.character() + "]");
+        }
+
+        private static ClickEvent.Action enumAction(String name, ClickEvent.Action fallback) {
+            try {
+                return Enum.valueOf(ClickEvent.Action.class, name);
+            } catch (IllegalArgumentException ignored) {
+                return fallback;
+            }
         }
     }
 }
