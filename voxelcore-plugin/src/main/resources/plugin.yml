@@ -2,6 +2,7 @@ name: VoxelCore
 version: ${project.version}
 main: org.voxelhorizons.VoxelCore
 api-version: '${voxelcore.api.version}'
+softdepend: [PlaceholderAPI]
 
 commands:
   voxelcore:
