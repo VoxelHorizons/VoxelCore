@@ -42,6 +42,7 @@ import org.voxelhorizons.platform.server.ServerPlatformCapabilitiesFactory;
 import org.voxelhorizons.text.ChatPlaceholderListener;
 import org.voxelhorizons.text.InventoryTitlePlaceholderListener;
 import org.voxelhorizons.text.PaperChatPlaceholderBridge;
+import org.voxelhorizons.text.PlaceholderApiIntegration;
 import org.voxelhorizons.text.PlayerListPlaceholderSynchronizer;
 import org.voxelhorizons.text.TextPlaceholderService;
 
@@ -167,6 +168,7 @@ public final class VoxelCore extends JavaPlugin {
             getServer().getPluginManager().registerEvents(
                     new InventoryTitlePlaceholderListener(this, textPlaceholderService), this);
             new PlayerListPlaceholderSynchronizer(this, textPlaceholderService).start();
+            PlaceholderApiIntegration.registerIfAvailable(this, textPlaceholderService);
         }
 
         logger.info("VoxelCore platform ready on " + serverPlatformCapabilities.platformName()
