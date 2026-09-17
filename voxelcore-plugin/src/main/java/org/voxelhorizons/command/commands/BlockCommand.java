@@ -70,7 +70,8 @@ public final class BlockCommand implements SubCommand {
             if (definition == null) { sender.sendMessage("Unknown block: " + id); return; }
             sender.sendMessage(id + " method=" + definition.method() + " model=" + definition.model()
                     + " hardness=" + definition.hardness() + " breakTools=" + definition.breakTools()
-                    + " minimumToolTier=" + definition.minimumToolTier() + " allocation="
+                    + " minimumToolTier=" + definition.minimumToolTier()
+                    + " stackable=" + definition.stackable() + " allocation="
                     + (allocation == null ? "none" : allocation.method() + ":" + allocation.slot()));
         }
     }

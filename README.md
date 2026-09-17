@@ -288,9 +288,11 @@ blocks:
       down: mypack:block/ore_bottom
 ```
 
-Supported block fields are `extends`, `abstract`, `display_name`, `method`, `model`, `texture`, `textures`, `hardness`, `blast_resistance`, `break_tools`, `minimum_tool_tier`, `explosion_immune`, `drop_when_mined`, `drop`, `silk_touch`, and `events`. Block definitions support the same bounded, cycle-aware inheritance rules as items.
+Supported block fields are `extends`, `abstract`, `display_name`, `method`, `model`, `texture`, `textures`, `hardness`, `blast_resistance`, `break_tools`, `minimum_tool_tier`, `stackable`, `explosion_immune`, `drop_when_mined`, `drop`, `silk_touch`, and `events`. Block definitions support the same bounded, cycle-aware inheritance rules as items.
 
 `break_tools` is an optional whitelist. Category entries `PICKAXE`, `AXE`, `SHOVEL`, `HOE`, `SWORD`, `SHEARS`, and `HAND` match the corresponding family, while a material such as `DIAMOND_PICKAXE` matches only that exact vanilla item. Namespaced VoxelCore item IDs such as `voxel:ruby_drill` are also supported. `minimum_tool_tier` can be `WOOD`, `GOLD`, `STONE`, `IRON`, `DIAMOND`, or `NETHERITE`; combine `PICKAXE` with `IRON` for vanilla gold/diamond-ore behavior. Omitting both fields permits any item, and Creative players always bypass the restriction without receiving a drop.
+
+Generated block items are stackable by default and use a clean stackable carrier on modern versions. Set `stackable: false` to opt into a non-stackable carrier. Minecraft 1.12–1.13 automatically use a hidden damageable carrier because those clients require durability predicates for custom inventory models. `display_name` and inherited item lore accept legacy `&` formatting codes on every supported server version.
 
 Carrier methods in this first implementation:
 

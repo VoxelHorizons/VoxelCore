@@ -143,11 +143,20 @@ public final class ContentLoader {
                 new ActionDefinition(ActionType.SET_BLOCK, parameters)));
 
         String model = block.id().namespace() + ":block/" + block.id().value();
-        return new RawItemDefinition(block.id(), null, ItemType.ITEM, "minecraft:diamond_hoe",
+        return new RawItemDefinition(block.id(), null, ItemType.BLOCK,
+                block.stackable() ? "minecraft:paper" : "minecraft:diamond_hoe",
                 block.displayName(), Collections.<String>emptyList(), Boolean.FALSE, Boolean.FALSE,
-                new RawItemRenderDefinition(model, Boolean.TRUE, null, null, null),
+                new RawItemRenderDefinition(model, block.stackable() ? null : Boolean.TRUE, null,
+                        block.stackable() ? null : hiddenCarrierFlags(), null),
                 Collections.<String, Object>emptyMap(),
                 new EventActions(eventMap));
+    }
+
+    private static Map<String, Boolean> hiddenCarrierFlags() {
+        Map<String, Boolean> flags = new LinkedHashMap<String, Boolean>();
+        flags.put("HIDE_ATTRIBUTES", Boolean.TRUE);
+        flags.put("HIDE_UNBREAKABLE", Boolean.TRUE);
+        return flags;
     }
 
     private static Map<String, ContentPack> indexAndValidatePacks(List<ContentPack> packs) {
