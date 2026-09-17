@@ -29,6 +29,13 @@ public final class UiGlyphLoader {
 
     public UiGlyphRegistry load(Path contentRoot, Path allocationFile, boolean persist) {
         List<ContentPack> packs = new ContentPackDiscovery().discover(contentRoot);
+        Set<Integer> authoredSymbols = AuthoredFontSupport.reservedCodePoints(packs);
+        for (Integer spacing : UiSpacingGlyphs.advances().keySet()) {
+            if (authoredSymbols.contains(spacing)) {
+                throw new ContentLoadException("Authored font symbol " + codePoint(spacing.intValue())
+                        + " collides with a VoxelCore spacing glyph");
+            }
+        }
         Map<ContentID, RawGlyph> raw = new LinkedHashMap<ContentID, RawGlyph>();
         for (ContentPack pack : packs) {
             Path root = pack.root().resolve("content");
@@ -37,7 +44,7 @@ public final class UiGlyphLoader {
         }
 
         AllocationState state = readAllocations(allocationFile);
-        Set<Integer> used = new HashSet<Integer>();
+        Set<Integer> used = new HashSet<Integer>(authoredSymbols);
         Map<ContentID, Integer> active = new LinkedHashMap<ContentID, Integer>();
         List<ContentID> ids = new ArrayList<ContentID>(raw.keySet());
         Collections.sort(ids, byId());
@@ -52,6 +59,10 @@ public final class UiGlyphLoader {
             Integer allocated = glyph.explicitCodePoint == null ? previous : glyph.explicitCodePoint;
             if (allocated != null) {
                 requirePrivateUse(allocated.intValue(), id);
+                if (authoredSymbols.contains(allocated)) {
+                    throw new ContentLoadException("UI glyph " + id + " symbol "
+                            + codePoint(allocated.intValue()) + " is reserved by an authored font");
+                }
                 for (Map.Entry<ContentID, Integer> reserved : state.inactive.entrySet()) {
                     if (!reserved.getKey().equals(id) && reserved.getValue().equals(allocated)) {
                         throw new ContentLoadException("UI glyph codepoint " + codePoint(allocated.intValue())
