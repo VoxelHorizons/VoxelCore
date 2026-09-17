@@ -22,6 +22,7 @@ public final class RawBlockDefinition {
     private final Double blastResistance;
     private final List<String> breakTools;
     private final String minimumToolTier;
+    private final Boolean stackable;
     private final Boolean explosionImmune;
     private final Boolean dropWhenMined;
     private final ContentID dropItem;
@@ -34,7 +35,7 @@ public final class RawBlockDefinition {
                               Boolean explosionImmune, Boolean dropWhenMined, ContentID dropItem,
                               ContentID silkTouchItem, EventActions events) {
         this(id, parent, abstractDefinition, method, model, null, texture, textures, hardness,
-                blastResistance, null, null, explosionImmune, dropWhenMined, dropItem, silkTouchItem, events);
+                blastResistance, null, null, null, explosionImmune, dropWhenMined, dropItem, silkTouchItem, events);
     }
 
     public RawBlockDefinition(ContentID id, ContentID parent, Boolean abstractDefinition,
@@ -43,13 +44,14 @@ public final class RawBlockDefinition {
                               Boolean explosionImmune, Boolean dropWhenMined, ContentID dropItem,
                               ContentID silkTouchItem, EventActions events) {
         this(id, parent, abstractDefinition, method, model, displayName, texture, textures, hardness,
-                blastResistance, null, null, explosionImmune, dropWhenMined, dropItem, silkTouchItem, events);
+                blastResistance, null, null, null, explosionImmune, dropWhenMined, dropItem, silkTouchItem, events);
     }
 
     public RawBlockDefinition(ContentID id, ContentID parent, Boolean abstractDefinition,
                               BlockMethod method, BlockModelPreset model, String displayName, String texture,
                               Map<String, String> textures, Double hardness, Double blastResistance,
                               List<String> breakTools, String minimumToolTier,
+                              Boolean stackable,
                               Boolean explosionImmune, Boolean dropWhenMined, ContentID dropItem,
                               ContentID silkTouchItem, EventActions events) {
         this.id = id;
@@ -65,6 +67,7 @@ public final class RawBlockDefinition {
         this.breakTools = breakTools == null ? null : Collections.unmodifiableList(
                 new java.util.ArrayList<String>(breakTools));
         this.minimumToolTier = minimumToolTier;
+        this.stackable = stackable;
         this.explosionImmune = explosionImmune;
         this.dropWhenMined = dropWhenMined;
         this.dropItem = dropItem;
@@ -84,6 +87,7 @@ public final class RawBlockDefinition {
     public Double blastResistance() { return blastResistance; }
     public List<String> breakTools() { return breakTools; }
     public String minimumToolTier() { return minimumToolTier; }
+    public Boolean stackable() { return stackable; }
     public Boolean explosionImmune() { return explosionImmune; }
     public Boolean dropWhenMined() { return dropWhenMined; }
     public ContentID dropItem() { return dropItem; }

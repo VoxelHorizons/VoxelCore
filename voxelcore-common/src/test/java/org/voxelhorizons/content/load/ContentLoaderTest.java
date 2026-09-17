@@ -6,6 +6,7 @@ import org.junit.rules.TemporaryFolder;
 import org.voxelhorizons.content.ContentID;
 import org.voxelhorizons.content.item.ItemDefinition;
 import org.voxelhorizons.content.item.ItemDefinitionRegistry;
+import org.voxelhorizons.content.item.ItemType;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -45,6 +46,8 @@ public class ContentLoaderTest {
         ContentDefinitions definitions = new ContentLoader().loadDefinitions(root.toPath());
         ItemDefinition item = definitions.items().get(ContentID.of("voxel", "ruby_ore")).get();
         assertEquals("&cRuby Ore", item.displayName());
+        assertEquals(ItemType.BLOCK, item.type());
+        assertEquals("minecraft:paper", item.material());
         assertEquals("voxel:block/ruby_ore", item.render().model());
         assertEquals("voxel:ruby_ore",
                 item.events().forEvent("interact.right").get(0).string("block"));
@@ -54,6 +57,23 @@ public class ContentLoaderTest {
                 definitions.blocks().get(ContentID.of("voxel", "ruby_ore")).get().breakTools());
         assertEquals("IRON",
                 definitions.blocks().get(ContentID.of("voxel", "ruby_ore")).get().minimumToolTier());
+        assertTrue(definitions.blocks().get(ContentID.of("voxel", "ruby_ore")).get().stackable());
+    }
+
+    @Test
+    public void allowsBlockItemsToOptOutOfStacking() throws Exception {
+        File root = temporaryFolder.newFolder("non-stackable-block-item");
+        File pack = new File(root, "pack");
+        File content = new File(pack, "content");
+        assertTrue(content.mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: test\n");
+        write(new File(content, "blocks.yml"),
+                "blocks:\n  relic:\n    texture: minecraft:block/stone\n    stackable: false\n");
+
+        ContentDefinitions definitions = new ContentLoader().loadDefinitions(root.toPath());
+        assertFalse(definitions.blocks().get(ContentID.of("test", "relic")).get().stackable());
+        assertEquals("minecraft:diamond_hoe",
+                definitions.items().get(ContentID.of("test", "relic")).get().material());
     }
 
     @Test
