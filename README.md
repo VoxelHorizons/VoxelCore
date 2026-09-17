@@ -507,6 +507,8 @@ When `[target]` is omitted, VoxelCore uses the current server version only when 
 
 `pack build` publishes the completed ZIP atomically, preserving the previous successful artifact when compilation fails. After a successful build it also performs the safe content reload below, so new items and `:name:` UI placeholders become active without a second command. If live reload validation fails, the built ZIP is retained while the previous runtime revision stays active and the command reports both outcomes.
 
+The final pack is size-optimized deterministically: JSON and `pack.mcmeta` whitespace is removed without modifying string values, PNGs are losslessly re-encoded only when the result is smaller, and each ZIP entry uses maximum DEFLATE compression only when it beats storing the optimized bytes directly. Rebuilding identical content therefore produces identical pack bytes without inflating already-compressed images.
+
 `item list` reports only concrete definitions. Abstract definitions can still be inspected directly with `item info` and used as inheritance parents; `bound` does not affect list visibility.
 
 ## Safe reloads
