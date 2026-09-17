@@ -28,8 +28,7 @@ public final class v1_19_4_ItemAdapter implements ItemPlatformAdapter {
         ItemStack stack = new ItemStack(material, quantity);
         ItemMeta meta = stack.getItemMeta();
         if (meta != null) {
-            if (definition.displayName() != null) meta.setDisplayName(definition.displayName());
-            if (!definition.lore().isEmpty()) meta.setLore(definition.lore());
+            ItemMetadataSupport.applyText(meta, definition);
             ItemMetadataSupport.applyCommon(meta, definition.render());
             if (definition.render() != null && definition.render().durability() != null) applyDurability(meta, material, definition.render().durability().intValue(), definition);
             if (definition.render() != null && definition.render().customModelData() != null && definition.render().customModelData().isStructured()) {

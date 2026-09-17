@@ -9,6 +9,11 @@ import static org.junit.Assert.assertNull;
 public class ItemMetadataSupportTest {
 
     @Test
+    public void translatesConfiguredLegacyColorCodes() {
+        assertEquals("\u00a7cRuby Ore", ItemMetadataSupport.colorize("&cRuby Ore"));
+    }
+
+    @Test
     public void resolvesBukkitEnumNamesWithoutHardCodedBranches() {
         assertEquals(ItemFlag.HIDE_ATTRIBUTES, ItemMetadataSupport.resolveFlag("hide_attributes"));
         assertEquals(ItemFlag.HIDE_UNBREAKABLE, ItemMetadataSupport.resolveFlag("HIDE_UNBREAKABLE"));

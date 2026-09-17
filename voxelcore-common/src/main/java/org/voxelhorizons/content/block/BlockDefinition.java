@@ -22,6 +22,7 @@ public final class BlockDefinition {
     private final double blastResistance;
     private final List<String> breakTools;
     private final String minimumToolTier;
+    private final boolean stackable;
     private final boolean explosionImmune;
     private final boolean dropWhenMined;
     private final ContentID dropItem;
@@ -53,6 +54,16 @@ public final class BlockDefinition {
                            List<String> breakTools, String minimumToolTier, boolean explosionImmune,
                            boolean dropWhenMined, ContentID dropItem, ContentID silkTouchItem,
                            EventActions events) {
+        this(id, parent, abstractDefinition, method, model, textures, displayName, hardness, blastResistance,
+                breakTools, minimumToolTier, true, explosionImmune, dropWhenMined, dropItem, silkTouchItem, events);
+    }
+
+    public BlockDefinition(ContentID id, Optional<ContentID> parent, boolean abstractDefinition,
+                           BlockMethod method, BlockModelPreset model, Map<String, String> textures,
+                           String displayName, double hardness, double blastResistance,
+                           List<String> breakTools, String minimumToolTier, boolean stackable,
+                           boolean explosionImmune, boolean dropWhenMined, ContentID dropItem,
+                           ContentID silkTouchItem, EventActions events) {
         this.id = id;
         this.parent = parent == null ? Optional.<ContentID>empty() : parent;
         this.abstractDefinition = abstractDefinition;
@@ -64,6 +75,7 @@ public final class BlockDefinition {
         this.blastResistance = blastResistance;
         this.breakTools = Collections.unmodifiableList(new java.util.ArrayList<String>(breakTools));
         this.minimumToolTier = minimumToolTier;
+        this.stackable = stackable;
         this.explosionImmune = explosionImmune;
         this.dropWhenMined = dropWhenMined;
         this.dropItem = dropItem;
@@ -82,6 +94,7 @@ public final class BlockDefinition {
     public double blastResistance() { return blastResistance; }
     public List<String> breakTools() { return breakTools; }
     public String minimumToolTier() { return minimumToolTier; }
+    public boolean stackable() { return stackable; }
     public boolean explosionImmune() { return explosionImmune; }
     public boolean dropWhenMined() { return dropWhenMined; }
     public ContentID dropItem() { return dropItem; }

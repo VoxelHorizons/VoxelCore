@@ -136,7 +136,10 @@ final class JavaPackCompilerEngine {
                         ? legacyPredicateValue(item, render, model, blocks, allocation)
                         : Integer.valueOf(allocation.customModelData());
                 if (predicateValue != null) {
-                    ResourceLocation material = ResourceLocation.parse(item.material(), "minecraft");
+                    ResourceLocation material = target.mode() == JavaPackMode.LEGACY_DAMAGE_UNBREAKABLE
+                            && isGeneratedBlockModel(model, item.id(), blocks)
+                            ? ResourceLocation.parse("minecraft:diamond_hoe", "minecraft")
+                            : ResourceLocation.parse(item.material(), "minecraft");
                     List<ModelOverride> materialOverrides = overrides.get(material);
                     if (materialOverrides == null) {
                         materialOverrides = new ArrayList<ModelOverride>();
