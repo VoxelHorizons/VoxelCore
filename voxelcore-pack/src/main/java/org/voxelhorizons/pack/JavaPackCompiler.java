@@ -7,13 +7,11 @@ import org.voxelhorizons.content.pack.ContentPackDiscovery;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -21,10 +19,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
-import java.util.zip.ZipOutputStream;
 
 /** Deterministic Java resource-pack compiler for VoxelCore authored packs. */
 public final class JavaPackCompiler {
@@ -300,27 +296,7 @@ public final class JavaPackCompiler {
     }
 
     private static void writeDeterministicZip(Path output, TreeMap<String, byte[]> entries) {
-        try {
-            try (OutputStream raw = Files.newOutputStream(output, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-                 ZipOutputStream zip = new ZipOutputStream(raw)) {
-                for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
-                    byte[] bytes = entry.getValue();
-                    CRC32 crc = new CRC32();
-                    crc.update(bytes);
-                    ZipEntry zipEntry = new ZipEntry(entry.getKey());
-                    zipEntry.setMethod(ZipEntry.STORED);
-                    zipEntry.setSize(bytes.length);
-                    zipEntry.setCompressedSize(bytes.length);
-                    zipEntry.setCrc(crc.getValue());
-                    zipEntry.setTime(0L);
-                    zip.putNextEntry(zipEntry);
-                    zip.write(bytes);
-                    zip.closeEntry();
-                }
-            }
-        } catch (IOException exception) {
-            throw new JavaPackCompileException("Unable to write generated resource pack " + output, exception);
-        }
+        DeterministicZipWriter.write(output, entries);
     }
 
     private static void deleteTree(Path root) throws IOException {
