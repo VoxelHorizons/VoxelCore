@@ -63,6 +63,8 @@ Both forms have tab completion. `ui list` and `ui info <content-id-or-alias>` ex
 
 VoxelCore automatically resolves UI placeholders in player chat, inventory titles, and Bukkit player-list display names, headers, and footers. The player-list synchronizer runs after server ticks so values supplied by ordinary tab-list plugins are processed without a plugin-specific dependency. Integrations writing packet-only or Adventure-only components should call `VoxelCore#getTextPlaceholderService()` before sending their text.
 
+When PlaceholderAPI is installed, VoxelCore registers an optional persistent `voxelcore` expansion. `%voxelcore_font_staff%` resolves exactly like `:staff:`, including GUI spacing behavior, while `%voxelcore_font_voxel/staff%` selects the explicit `voxel:staff` ContentID when aliases are ambiguous. Font names may contain underscores. Unknown or ambiguous names remain unresolved, and VoxelCore continues to work without PlaceholderAPI installed.
+
 ## Next development milestone
 
 The next recommended slice is **phase 3a: Java item actions and interaction dispatch**. It should add typed triggers and immutable compiled actions behind a central dispatcher while keeping menu session lifecycle in phase 3b.
