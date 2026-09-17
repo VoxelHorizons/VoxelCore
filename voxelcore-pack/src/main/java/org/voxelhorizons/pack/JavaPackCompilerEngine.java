@@ -502,7 +502,11 @@ final class JavaPackCompilerEngine {
                     .append(",\"chars\":[\"").append(glyph.character()).append("\"]}");
         }
         out.append("\n  ]\n}\n");
-        putEntry(entries, "assets/minecraft/font/default.json", utf8(out.toString()));
+        String path = AuthoredFontSupport.DEFAULT_FONT_PATH;
+        byte[] generated = utf8(out.toString());
+        byte[] authored = entries.get(path);
+        if (authored == null) putEntry(entries, path, generated);
+        else entries.put(path, AuthoredFontSupport.mergeDefault(authored, generated));
     }
 
 

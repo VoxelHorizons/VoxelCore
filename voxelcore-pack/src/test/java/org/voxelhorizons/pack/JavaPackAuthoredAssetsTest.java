@@ -7,6 +7,8 @@ import org.junit.rules.TemporaryFolder;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -59,6 +61,63 @@ public class JavaPackAuthoredAssetsTest {
                 JavaPackTarget.numericCmd("asset-validation-test", 22));
 
         assertEquals(1, result.copiedAssets());
+    }
+
+    @Test
+    public void mergesAuthoredDefaultFontsAndCopiesLanguageOverrides() throws Exception {
+        File contentRoot = temporaryFolder.newFolder("font-content");
+        File pack = new File(contentRoot, "voxel");
+        assertTrue(new File(pack, "content").mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
+        write(new File(pack, "assets/minecraft/font/default.json"),
+                "{\"providers\":[{\"type\":\"reference\",\"id\":\"voxel:branding\"}]}\n");
+        write(new File(pack, "assets/voxel/font/branding.json"),
+                "{\"providers\":[{\"type\":\"bitmap\",\"file\":\"voxel:brand/logo.png\","
+                        + "\"height\":64,\"ascent\":48,\"chars\":[\"\\uEF00\"]}]}\n");
+        write(new File(pack, "assets/minecraft/lang/en_nz.json"),
+                "{\"menu.game\":\"\\uEF00\",\"menu.returnToGame\":\"Back to VoxelHorizons\"}\n");
+        write(new File(pack, "assets/voxel/textures/brand/logo.png"), "logo-bytes");
+
+        Path build = temporaryFolder.newFolder("font-build").toPath();
+        Path output = build.resolve("pack.zip");
+        new JavaPackCompiler().compile(contentRoot.toPath(), output,
+                build.resolve("render-allocations.yml"), JavaPackTarget.MC_1_19_4);
+
+        String defaultFont = zipText(output, "assets/minecraft/font/default.json");
+        assertTrue(defaultFont.contains("\"type\": \"reference\""));
+        assertTrue(defaultFont.contains("\"id\": \"voxel:branding\""));
+        assertTrue(defaultFont.contains("\"type\": \"space\""));
+        assertTrue(zipText(output, "assets/voxel/font/branding.json").contains("\\uEF00"));
+        assertTrue(zipText(output, "assets/minecraft/lang/en_nz.json").contains("\\uEF00"));
+    }
+
+    @Test
+    public void rejectsUiSymbolsReservedByAuthoredFonts() throws Exception {
+        File contentRoot = temporaryFolder.newFolder("font-collision-content");
+        File pack = new File(contentRoot, "voxel");
+        assertTrue(new File(pack, "content").mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
+        write(new File(pack, "assets/voxel/font/branding.json"),
+                "{\"providers\":[{\"type\":\"bitmap\",\"file\":\"voxel:brand/logo.png\","
+                        + "\"height\":8,\"ascent\":8,\"chars\":[\"\\uEF00\"]}]}\n");
+        write(new File(pack, "content/ui.yml"),
+                "ui:\n  logo:\n    path: ui/logo.png\n    symbol: '\uEF00'\n");
+        File uiTexture = new File(pack, "assets/voxel/textures/ui/logo.png");
+        File parent = uiTexture.getParentFile();
+        if (!parent.exists()) assertTrue(parent.mkdirs());
+        BufferedImage image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        image.setRGB(0, 0, 0xFFFFFFFF);
+        assertTrue(ImageIO.write(image, "png", uiTexture));
+
+        Path build = temporaryFolder.newFolder("font-collision-build").toPath();
+        try {
+            new JavaPackCompiler().validate(contentRoot.toPath(), build.resolve("render-allocations.yml"),
+                    JavaPackTarget.MC_1_19_4);
+            fail("Expected authored font symbol collision to fail validation");
+        } catch (RuntimeException expected) {
+            assertTrue(expected.getMessage().contains("U+EF00"));
+            assertTrue(expected.getMessage().contains("authored font"));
+        }
     }
 
     @Test

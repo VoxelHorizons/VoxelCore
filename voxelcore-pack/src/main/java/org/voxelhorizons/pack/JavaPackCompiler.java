@@ -261,7 +261,9 @@ public final class JavaPackCompiler {
                 throw new JavaPackCompileException("Unable to read authored asset " + asset.source, exception);
             }
             byte[] previous = entries.put(asset.path, bytes);
-            if (previous != null && !Arrays.equals(previous, bytes)) {
+            if (previous != null && asset.path.equals(AuthoredFontSupport.DEFAULT_FONT_PATH)) {
+                entries.put(asset.path, AuthoredFontSupport.mergeDefault(bytes, previous));
+            } else if (previous != null && !Arrays.equals(previous, bytes)) {
                 throw new JavaPackCompileException("Resource pack path collision: " + asset.path);
             }
         }
