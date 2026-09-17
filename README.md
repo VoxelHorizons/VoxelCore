@@ -59,7 +59,9 @@ VoxelCore-owned UI and integrations should call `VoxelCore.getInstance().getText
 /voxelcore admin ui copy :warps_menu:
 ```
 
-Both forms have tab completion. `ui list` and `ui info <content-id-or-alias>` expose definitions and resolved metadata. On capable clients, `ui copy` sends a clickable clipboard component; legacy clients receive the literal character and codepoint.
+Both forms have tab completion. `ui list` and `ui info <content-id-or-alias>` expose definitions and resolved metadata. `ui copy` sends a clickable clipboard component, supports Shift-click insertion, and prints the literal character and codepoint. On clients without direct clipboard support, clicking puts the character into the chat input so it can be selected and copied.
+
+VoxelCore automatically resolves UI placeholders in player chat, inventory titles, and Bukkit player-list display names, headers, and footers. The player-list synchronizer runs after server ticks so values supplied by ordinary tab-list plugins are processed without a plugin-specific dependency. Integrations writing packet-only or Adventure-only components should call `VoxelCore#getTextPlaceholderService()` before sending their text.
 
 ## Next development milestone
 
