@@ -79,6 +79,8 @@ When ShopGUI+ is installed, VoxelCore registers an optional custom-item provider
 
 ShopGUI+ creates the same persistent item stack as `/vc admin item give voxel:item`. Buying, selling, and comparison use the VoxelCore ContentID rather than display name, lore, material, or model data. Unknown and abstract IDs are rejected during ShopGUI+ shop loading. VoxelCore continues to work when ShopGUI+ is absent.
 
+VoxelCore also resolves `:font_name:` and offset placeholders recursively throughout ShopGUI+'s live main, language, price-modifier, and shop configurations before shops are loaded. This includes strings nested in lore lists and maps, so the same syntax works in item names, lore, menu text, and language messages. The resolution is performed in memory—the authored ShopGUI+ YAML files retain their readable placeholders—and is repeated after ShopGUI+ shop reloads.
+
 ## Next development milestone
 
 The next recommended slice is **phase 3a: Java item actions and interaction dispatch**. It should add typed triggers and immutable compiled actions behind a central dispatcher while keeping menu session lifecycle in phase 3b.
