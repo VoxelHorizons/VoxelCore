@@ -43,6 +43,54 @@ public class ShopGuiConfigurationPlaceholderProcessorTest {
         assertEquals(":not_registered:", config.getString("message"));
     }
 
+    @Test
+    public void ignoresApiGettersMissingFromInstalledShopGuiVersion() {
+        assertEquals(null, ShopGuiConfigurationPlaceholderProcessor.config(
+                new ShopGuiWithoutAggregateConfig(), "getConfigShops"));
+    }
+
+    @Test
+    public void readsConfigurationFromNonPublicRuntimeWrapper() {
+        YamlConfiguration config = new YamlConfiguration();
+        config.set("message", ":shop_prefix: reloaded");
+        FileWrapperShopGui shopGui = new FileWrapperShopGui(config);
+
+        assertEquals(config, ShopGuiConfigurationPlaceholderProcessor.config(
+                shopGui, "getConfigLang"));
+        assertEquals(1, ShopGuiConfigurationPlaceholderProcessor.process(config, placeholders()));
+        assertEquals("\uE101 reloaded", config.getString("message"));
+    }
+
+    public static final class ShopGuiWithoutAggregateConfig {
+        public Object getConfigMain() {
+            return null;
+        }
+    }
+
+    public static final class FileWrapperShopGui {
+        private final HiddenConfigWrapper wrapper;
+
+        FileWrapperShopGui(YamlConfiguration config) {
+            this.wrapper = new HiddenConfigWrapper(config);
+        }
+
+        public Object getConfigLang() {
+            return wrapper;
+        }
+    }
+
+    private static final class HiddenConfigWrapper {
+        private final YamlConfiguration config;
+
+        HiddenConfigWrapper(YamlConfiguration config) {
+            this.config = config;
+        }
+
+        public YamlConfiguration getConfig() {
+            return config;
+        }
+    }
+
     private static ShopGuiConfigurationPlaceholderProcessor.Resolver placeholders() {
         return new ShopGuiConfigurationPlaceholderProcessor.Resolver() {
             @Override public String resolve(String input) {
