@@ -10,13 +10,12 @@ import java.util.Locale;
 final class BlockToolMatcher {
     private BlockToolMatcher() { }
 
-    static boolean canBreak(BlockDefinition block, String material, ContentID customItem, boolean creative) {
-        if (creative) return true;
-        return canBreak(block.breakTools(), block.minimumToolTier(), material,
+    static boolean canHarvest(BlockDefinition block, String material, ContentID customItem) {
+        return canHarvest(block.breakTools(), block.minimumToolTier(), material,
                 customItem == null ? null : customItem.toString());
     }
 
-    static boolean canBreak(List<String> whitelist, String minimumTier, String material, String customItem) {
+    static boolean canHarvest(List<String> whitelist, String minimumTier, String material, String customItem) {
         String held = normalizeMaterial(material);
         boolean matched = whitelist == null || whitelist.isEmpty();
         if (!matched) {
