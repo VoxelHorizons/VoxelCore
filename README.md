@@ -65,6 +65,20 @@ VoxelCore automatically resolves UI placeholders in player chat, inventory title
 
 When PlaceholderAPI is installed, VoxelCore registers an optional persistent `voxelcore` expansion. `%voxelcore_font_staff%` resolves exactly like `:staff:`, including GUI spacing behavior, while `%voxelcore_font_voxel/staff%` selects the explicit `voxel:staff` ContentID when aliases are ambiguous. Font names may contain underscores. Unknown or ambiguous names remain unresolved, and VoxelCore continues to work without PlaceholderAPI installed.
 
+When ShopGUI+ is installed, VoxelCore registers an optional custom-item provider during ShopGUI+'s supported post-enable lifecycle. A shop entry can reference any concrete VoxelCore item by ContentID:
+
+```yaml
+1:
+  type: item
+  item:
+    voxelcore: "voxel:item"
+  buyPrice: 50
+  sellPrice: 25
+  slot: 0
+```
+
+ShopGUI+ creates the same persistent item stack as `/vc admin item give voxel:item`. Buying, selling, and comparison use the VoxelCore ContentID rather than display name, lore, material, or model data. Unknown and abstract IDs are rejected during ShopGUI+ shop loading. VoxelCore continues to work when ShopGUI+ is absent.
+
 ## Next development milestone
 
 The next recommended slice is **phase 3a: Java item actions and interaction dispatch**. It should add typed triggers and immutable compiled actions behind a central dispatcher while keeping menu session lifecycle in phase 3b.
