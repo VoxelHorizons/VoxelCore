@@ -45,13 +45,11 @@ public final class BlockListener implements Listener {
         if (definition == null) return;
         ItemStack held = event.getPlayer().getInventory().getItemInMainHand();
         ContentID heldId = items.identify(held).orElse(null);
-        if (!BlockToolMatcher.canBreak(definition, held == null ? null : held.getType().name(), heldId,
-                event.getPlayer().getGameMode() == GameMode.CREATIVE)) {
-            event.setCancelled(true);
-            return;
-        }
+        boolean canHarvest = BlockToolMatcher.canHarvest(
+                definition, held == null ? null : held.getType().name(), heldId);
         suppressVanillaDrops(event);
-        if (definition.dropWhenMined() && event.getPlayer().getGameMode() != GameMode.CREATIVE) {
+        if (definition.dropWhenMined() && canHarvest
+                && event.getPlayer().getGameMode() != GameMode.CREATIVE) {
             ContentID drop = held != null && held.containsEnchantment(Enchantment.SILK_TOUCH)
                     ? definition.silkTouchItem() : definition.dropItem();
             if (drop != null && items.hasItem(drop)) {
