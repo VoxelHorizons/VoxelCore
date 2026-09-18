@@ -30,6 +30,7 @@ import org.voxelhorizons.content.runtime.ContentRuntimeReloader;
 import org.voxelhorizons.content.runtime.ContentSnapshot;
 import org.voxelhorizons.content.runtime.ContentSnapshotValidator;
 import org.voxelhorizons.item.ItemManager;
+import org.voxelhorizons.integration.shopgui.ShopGuiPlusIntegration;
 import org.voxelhorizons.block.BlockManager;
 import org.voxelhorizons.block.BlockListener;
 import org.voxelhorizons.action.ActionExecutor;
@@ -160,6 +161,9 @@ public final class VoxelCore extends JavaPlugin {
         itemManager = new ItemManager(contentRuntime, versionAdapter);
         blockManager = new BlockManager(contentRuntime, versionAdapter.version().atLeast(1, 13, 0));
         actionExecutor = new ActionExecutor(blockManager, itemManager);
+        if (getServer().getPluginManager().getPlugin("ShopGUIPlus") != null) {
+            ShopGuiPlusIntegration.register(this, itemManager, textPlaceholderService);
+        }
         getServer().getPluginManager().registerEvents(new ItemActionListener(itemManager, actionExecutor), this);
         getServer().getPluginManager().registerEvents(new BlockListener(blockManager, itemManager, actionExecutor), this);
         if (packManager.currentTarget().supportsUiFonts()) {

@@ -1,0 +1,85 @@
+package org.voxelhorizons.integration.shopgui;
+
+import net.brcdev.shopgui.ShopGuiPlugin;
+import net.brcdev.shopgui.core.BConfig;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.voxelhorizons.text.TextPlaceholderService;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+final class ShopGuiConfigurationPlaceholderProcessor {
+
+    private ShopGuiConfigurationPlaceholderProcessor() {
+    }
+
+    static int process(ShopGuiPlugin shopGui, TextPlaceholderService placeholders) {
+        if (shopGui == null || placeholders == null) return 0;
+
+        Resolver resolver = new Resolver() {
+            @Override public String resolve(String input) {
+                return placeholders.resolve(input);
+            }
+        };
+
+        int changed = 0;
+        changed += process(config(shopGui.getConfigMain()), resolver);
+        changed += process(config(shopGui.getConfigLang()), resolver);
+        changed += process(config(shopGui.getConfigPriceModifiers()), resolver);
+        changed += process(config(shopGui.getConfigShops()), resolver);
+        return changed;
+    }
+
+    static int process(FileConfiguration config, Resolver resolver) {
+        if (config == null || resolver == null) return 0;
+
+        int changed = 0;
+        // Copy first because ConfigurationSection#set mutates the backing map.
+        Map<String, Object> values = new LinkedHashMap<String, Object>(config.getValues(true));
+        for (Map.Entry<String, Object> entry : values.entrySet()) {
+            if (entry.getValue() instanceof ConfigurationSection) continue;
+            Object resolved = resolve(entry.getValue(), resolver);
+            if (!same(entry.getValue(), resolved)) {
+                config.set(entry.getKey(), resolved);
+                changed++;
+            }
+        }
+        return changed;
+    }
+
+    private static FileConfiguration config(BConfig config) {
+        return config == null ? null : config.getConfig();
+    }
+
+    private static Object resolve(Object value, Resolver resolver) {
+        if (value instanceof String) {
+            return resolver.resolve((String) value);
+        }
+        if (value instanceof List<?>) {
+            List<?> source = (List<?>) value;
+            List<Object> resolved = new ArrayList<Object>(source.size());
+            for (Object element : source) resolved.add(resolve(element, resolver));
+            return resolved;
+        }
+        if (value instanceof Map<?, ?>) {
+            Map<?, ?> source = (Map<?, ?>) value;
+            Map<Object, Object> resolved = new LinkedHashMap<Object, Object>();
+            for (Map.Entry<?, ?> entry : source.entrySet()) {
+                resolved.put(entry.getKey(), resolve(entry.getValue(), resolver));
+            }
+            return resolved;
+        }
+        return value;
+    }
+
+    private static boolean same(Object first, Object second) {
+        return first == null ? second == null : first.equals(second);
+    }
+
+    interface Resolver {
+        String resolve(String input);
+    }
+}
