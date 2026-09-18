@@ -79,11 +79,13 @@ When ShopGUI+ is installed, VoxelCore registers an optional custom-item provider
 
 ShopGUI+ creates the same persistent item stack as `/vc admin item give voxel:item`. Buying, selling, and comparison use the VoxelCore ContentID rather than display name, lore, material, or model data. Unknown and abstract IDs are rejected during ShopGUI+ shop loading. VoxelCore continues to work when ShopGUI+ is absent.
 
+The value normally uses the exact key beneath `items:` (for example `voxel:ui-blank`). ShopGUI+ configurations may also use resource-style slash shorthand such as `voxel:ui/blank`; the provider resolves that to the hyphenated VoxelCore ContentID. A present but invalid `voxelcore:` reference fails immediately with its configuration path instead of leaving ShopGUI+ with a null button or shop item.
+
 VoxelCore also resolves `:font_name:` and offset placeholders recursively throughout ShopGUI+'s live main, language, price-modifier, and shop configurations before shops are loaded. This includes strings nested in lore lists and maps, so the same syntax works in item names, lore, menu text, and language messages. The resolution is performed in memory—the authored ShopGUI+ YAML files retain their readable placeholders—and is repeated after ShopGUI+ shop reloads.
 
 Because some ShopGUI+ releases do not expose their individual shop-file configuration through the published API, VoxelCore also resolves the compiled shop titles, per-page titles, fill items, shop-item names/lore, and placeholder items after every shop load. Configuration capabilities are detected at runtime so an API mismatch disables only the unavailable source rather than interrupting ShopGUI+ startup.
 
-Player-specific lore that ShopGUI+ generates while opening a menu (including calculated buy/sell prices and currency suffixes) is resolved on the completed ShopGUI+ inventory one tick after opening. ShopGUI+ language values are accessed through runtime-compatible configuration discovery and reprocessed after shop reloads, covering command confirmations and transaction messages without intercepting unrelated server chat.
+Player-specific lore that ShopGUI+ generates while opening a menu (including calculated buy/sell prices and currency suffixes) is resolved on the live top inventory across a short ten-tick render window, so later ShopGUI+ stack replacement cannot restore unresolved text. Both legacy string metadata and modern Paper Adventure item components are supported. Only text containing a registered VoxelCore placeholder changes. ShopGUI+ language values are accessed through runtime-compatible configuration discovery and reprocessed after shop reloads, covering command confirmations and transaction messages without intercepting unrelated server chat.
 
 ## Next development milestone
 

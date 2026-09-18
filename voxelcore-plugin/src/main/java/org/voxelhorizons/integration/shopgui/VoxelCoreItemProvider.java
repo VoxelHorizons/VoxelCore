@@ -33,11 +33,26 @@ final class VoxelCoreItemProvider extends ItemProvider {
         if (configuredId == null || configuredId.trim().isEmpty()) return null;
 
         try {
-            return items.create(ContentID.parse(configuredId, "voxel"));
+            return items.create(parseReference(configuredId));
         } catch (IllegalArgumentException exception) {
-            logger.log(Level.WARNING, "ShopGUI+ references invalid VoxelCore item '"
-                    + configuredId + "' at " + section.getCurrentPath() + ": " + exception.getMessage());
-            return null;
+            String message = "ShopGUI+ references invalid VoxelCore item '" + configuredId
+                    + "' at " + section.getCurrentPath() + ": " + exception.getMessage();
+            logger.log(Level.SEVERE, message);
+            // Returning null here allows ShopGUI+ to retain an incomplete GuiButton and crash later
+            // in AmountSelectionGui. Fail at the authored configuration instead.
+            throw new IllegalArgumentException(message, exception);
+        }
+    }
+
+    static ContentID parseReference(String configuredId) {
+        String input = configuredId == null ? "" : configuredId.trim();
+        try {
+            return ContentID.parse(input, "voxel");
+        } catch (IllegalArgumentException exception) {
+            if (input.indexOf('/') < 0) throw exception;
+            // VoxelCore item keys use hyphens (ui-blank), while resource/model paths commonly use
+            // slashes (ui/blank). Accept the resource-style spelling as an integration shorthand.
+            return ContentID.parse(input.replace('/', '-'), "voxel");
         }
     }
 

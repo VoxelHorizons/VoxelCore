@@ -104,6 +104,7 @@ final class ShopGuiLoadedContentPlaceholderProcessor {
                 }
             }
         }
+        changed |= AdventureItemMetaPlaceholderProcessor.process(meta, placeholders);
         if (!changed) return 0;
         stack.setItemMeta(meta);
         return 1;

@@ -45,16 +45,34 @@ public class VoxelCoreItemProviderTest {
     }
 
     @Test
-    public void rejectsMissingAndInvalidReferencesWithoutCrashingShopLoad() {
+    public void acceptsResourceStylePathAsHyphenatedContentId() {
+        FakeResolver resolver = new FakeResolver();
+        VoxelCoreItemProvider provider = new VoxelCoreItemProvider(resolver, Logger.getAnonymousLogger());
+        YamlConfiguration config = new YamlConfiguration();
+        config.set("voxelcore", "voxel:ui/blank");
+
+        provider.loadItem(config);
+
+        assertEquals(ContentID.of("voxel", "ui-blank"), resolver.created);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsUnknownReferenceDuringShopLoad() {
         FakeResolver resolver = new FakeResolver();
         resolver.rejectCreates = true;
         VoxelCoreItemProvider provider = new VoxelCoreItemProvider(resolver, Logger.getAnonymousLogger());
-        YamlConfiguration missing = new YamlConfiguration();
         YamlConfiguration unknown = new YamlConfiguration();
         unknown.set("voxelcore", "voxel:missing");
 
-        assertNull(provider.loadItem(missing));
-        assertNull(provider.loadItem(unknown));
+        provider.loadItem(unknown);
+    }
+
+    @Test
+    public void ignoresSectionsOwnedByAnotherItemProvider() {
+        VoxelCoreItemProvider provider = new VoxelCoreItemProvider(
+                new FakeResolver(), Logger.getAnonymousLogger());
+
+        assertNull(provider.loadItem(new YamlConfiguration()));
     }
 
     private static final class FakeResolver implements VoxelCoreItemResolver {
