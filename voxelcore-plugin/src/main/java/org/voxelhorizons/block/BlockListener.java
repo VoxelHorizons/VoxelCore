@@ -30,28 +30,30 @@ public final class BlockListener implements Listener {
     private final BlockManager blocks;
     private final ItemManager items;
     private final ActionExecutor actions;
+    private final BlockMiningSpeedController miningSpeed;
 
-    public BlockListener(BlockManager blocks, ItemManager items, ActionExecutor actions) {
+    public BlockListener(BlockManager blocks, ItemManager items, ActionExecutor actions,
+                         BlockMiningSpeedController miningSpeed) {
         this.blocks = blocks;
         this.items = items;
         this.actions = actions;
+        this.miningSpeed = miningSpeed;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
+        miningSpeed.clear(event.getPlayer());
         Optional<ContentID> id = blocks.identify(event.getBlock());
         if (!id.isPresent()) return;
         BlockDefinition definition = blocks.getDefinition(id.get()).orElse(null);
         if (definition == null) return;
         ItemStack held = event.getPlayer().getInventory().getItemInMainHand();
         ContentID heldId = items.identify(held).orElse(null);
-        if (!BlockToolMatcher.canBreak(definition, held == null ? null : held.getType().name(), heldId,
-                event.getPlayer().getGameMode() == GameMode.CREATIVE)) {
-            event.setCancelled(true);
-            return;
-        }
+        boolean canHarvest = BlockToolMatcher.canHarvest(
+                definition, held == null ? null : held.getType().name(), heldId);
         suppressVanillaDrops(event);
-        if (definition.dropWhenMined() && event.getPlayer().getGameMode() != GameMode.CREATIVE) {
+        if (definition.dropWhenMined() && canHarvest
+                && event.getPlayer().getGameMode() != GameMode.CREATIVE) {
             ContentID drop = held != null && held.containsEnchantment(Enchantment.SILK_TOUCH)
                     ? definition.silkTouchItem() : definition.dropItem();
             if (drop != null && items.hasItem(drop)) {
