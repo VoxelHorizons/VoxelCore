@@ -46,6 +46,8 @@ public final class ShopGuiPlusIntegration implements Listener {
 
         int resolved = ShopGuiConfigurationPlaceholderProcessor.process(
                 ShopGuiPlusApi.getPlugin(), placeholders);
+        resolved += ShopGuiEconomyPlaceholderProcessor.process(
+                ShopGuiPlusApi.getPlugin(), placeholders);
 
         VoxelCoreItemResolver resolver = new VoxelCoreItemResolver() {
             @Override public org.bukkit.inventory.ItemStack create(ContentID id) {
@@ -67,6 +69,8 @@ public final class ShopGuiPlusIntegration implements Listener {
         int resolved = ShopGuiConfigurationPlaceholderProcessor.process(
                 ShopGuiPlusApi.getPlugin(), placeholders);
         resolved += ShopGuiLoadedContentPlaceholderProcessor.process(
+                ShopGuiPlusApi.getPlugin(), placeholders);
+        resolved += ShopGuiEconomyPlaceholderProcessor.process(
                 ShopGuiPlusApi.getPlugin(), placeholders);
         if (resolved > 0) {
             plugin.getLogger().info("Resolved " + resolved
