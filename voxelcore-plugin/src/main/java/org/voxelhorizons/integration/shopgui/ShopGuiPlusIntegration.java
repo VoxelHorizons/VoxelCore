@@ -7,6 +7,8 @@ import org.bukkit.entity.HumanEntity;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
@@ -80,10 +82,29 @@ public final class ShopGuiPlusIntegration implements Listener {
      */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onShopInventoryOpen(InventoryOpenEvent event) {
-        final HumanEntity viewer = event.getPlayer();
-        final Inventory opened = event.getInventory();
+        scheduleInventoryResolution(event.getPlayer(), event.getInventory(), 10);
+    }
+
+    /**
+     * Amount-selection controls rebuild their preview stack after the inventory has already opened.
+     * ShopGUI+ also cancels its own control clicks, so observe cancelled events at MONITOR and begin
+     * resolving on the following tick, after ShopGUI+ has installed the replacement stack.
+     */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onShopInventoryClick(InventoryClickEvent event) {
+        scheduleInventoryResolution(event.getWhoClicked(), event.getView().getTopInventory(), 5);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onShopInventoryDrag(InventoryDragEvent event) {
+        scheduleInventoryResolution(event.getWhoClicked(), event.getView().getTopInventory(), 5);
+    }
+
+    private void scheduleInventoryResolution(final HumanEntity viewer, final Inventory opened,
+                                             final int passes) {
+        if (opened == null) return;
         new BukkitRunnable() {
-            private int remainingPasses = 10;
+            private int remainingPasses = passes;
 
             @Override public void run() {
                 InventoryView view = viewer.getOpenInventory();
