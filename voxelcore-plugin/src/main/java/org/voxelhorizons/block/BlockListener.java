@@ -30,15 +30,19 @@ public final class BlockListener implements Listener {
     private final BlockManager blocks;
     private final ItemManager items;
     private final ActionExecutor actions;
+    private final BlockMiningSpeedController miningSpeed;
 
-    public BlockListener(BlockManager blocks, ItemManager items, ActionExecutor actions) {
+    public BlockListener(BlockManager blocks, ItemManager items, ActionExecutor actions,
+                         BlockMiningSpeedController miningSpeed) {
         this.blocks = blocks;
         this.items = items;
         this.actions = actions;
+        this.miningSpeed = miningSpeed;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
+        miningSpeed.clear(event.getPlayer());
         Optional<ContentID> id = blocks.identify(event.getBlock());
         if (!id.isPresent()) return;
         BlockDefinition definition = blocks.getDefinition(id.get()).orElse(null);

@@ -33,6 +33,7 @@ import org.voxelhorizons.item.ItemManager;
 import org.voxelhorizons.integration.shopgui.ShopGuiPlusIntegration;
 import org.voxelhorizons.block.BlockManager;
 import org.voxelhorizons.block.BlockListener;
+import org.voxelhorizons.block.BlockMiningSpeedController;
 import org.voxelhorizons.action.ActionExecutor;
 import org.voxelhorizons.action.ItemActionListener;
 import org.voxelhorizons.pack.PackManager;
@@ -72,6 +73,7 @@ public final class VoxelCore extends JavaPlugin {
     private ContentRuntimeReloader contentReloader;
     private ItemManager itemManager;
     private BlockManager blockManager;
+    private BlockMiningSpeedController blockMiningSpeedController;
     private ActionExecutor actionExecutor;
     private PackManager packManager;
     private TextPlaceholderService textPlaceholderService;
@@ -160,12 +162,16 @@ public final class VoxelCore extends JavaPlugin {
 
         itemManager = new ItemManager(contentRuntime, versionAdapter);
         blockManager = new BlockManager(contentRuntime, versionAdapter.version().atLeast(1, 13, 0));
+        blockMiningSpeedController = new BlockMiningSpeedController(this, blockManager,
+                versionAdapter.version().atLeast(1, 20, 5));
         actionExecutor = new ActionExecutor(blockManager, itemManager);
         if (getServer().getPluginManager().getPlugin("ShopGUIPlus") != null) {
             ShopGuiPlusIntegration.register(this, itemManager, textPlaceholderService);
         }
         getServer().getPluginManager().registerEvents(new ItemActionListener(itemManager, actionExecutor), this);
-        getServer().getPluginManager().registerEvents(new BlockListener(blockManager, itemManager, actionExecutor), this);
+        blockMiningSpeedController.register();
+        getServer().getPluginManager().registerEvents(
+                new BlockListener(blockManager, itemManager, actionExecutor, blockMiningSpeedController), this);
         if (packManager.currentTarget().supportsUiFonts()) {
             getServer().getPluginManager().registerEvents(new ChatPlaceholderListener(textPlaceholderService), this);
             PaperChatPlaceholderBridge.registerIfAvailable(this, textPlaceholderService);
@@ -205,6 +211,7 @@ public final class VoxelCore extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (blockMiningSpeedController != null) blockMiningSpeedController.clearAll();
         if (config == null || configFile == null) return;
         try { config.save(configFile); }
         catch (IOException exception) { logger.log(Level.SEVERE, "Unable to save VoxelCore configuration", exception); }
@@ -224,6 +231,7 @@ public final class VoxelCore extends JavaPlugin {
         }
         ContentReloadResult result = contentReloader.reload();
         if (result.success()) {
+            blockMiningSpeedController.clearAll();
             textPlaceholderService.update(packManager.uiGlyphs(true));
             logger.info("Published content revision " + result.activeRevision() + " (" + result.itemCount()
                     + " items, " + result.blockCount() + " blocks)");
