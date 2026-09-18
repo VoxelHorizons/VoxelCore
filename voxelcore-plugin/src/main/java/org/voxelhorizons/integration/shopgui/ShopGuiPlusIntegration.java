@@ -57,6 +57,8 @@ public final class ShopGuiPlusIntegration implements Listener {
     public void onShopsPostLoad(ShopsPostLoadEvent event) {
         int resolved = ShopGuiConfigurationPlaceholderProcessor.process(
                 ShopGuiPlusApi.getPlugin(), placeholders);
+        resolved += ShopGuiLoadedContentPlaceholderProcessor.process(
+                ShopGuiPlusApi.getPlugin(), placeholders);
         if (resolved > 0) {
             plugin.getLogger().info("Resolved " + resolved
                     + " VoxelCore placeholder value(s) after the ShopGUI+ reload.");
