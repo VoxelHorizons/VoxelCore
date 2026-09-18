@@ -60,9 +60,11 @@ final class ShopGuiConfigurationPlaceholderProcessor {
         if (shopGui == null) return null;
         try {
             Method getter = shopGui.getClass().getMethod(getterName);
+            if (!getter.isAccessible()) getter.setAccessible(true);
             Object wrapper = getter.invoke(shopGui);
             if (wrapper == null) return null;
             Method getConfig = wrapper.getClass().getMethod("getConfig");
+            if (!getConfig.isAccessible()) getConfig.setAccessible(true);
             Object config = getConfig.invoke(wrapper);
             return config instanceof FileConfiguration ? (FileConfiguration) config : null;
         } catch (NoSuchMethodException ignored) {
