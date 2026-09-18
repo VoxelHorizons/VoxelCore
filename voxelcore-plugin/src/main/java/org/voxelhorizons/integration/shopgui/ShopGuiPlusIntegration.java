@@ -3,9 +3,6 @@ package org.voxelhorizons.integration.shopgui;
 import net.brcdev.shopgui.ShopGuiPlusApi;
 import net.brcdev.shopgui.event.ShopGUIPlusPostEnableEvent;
 import net.brcdev.shopgui.event.ShopsPostLoadEvent;
-import net.brcdev.shopgui.exception.player.PlayerDataNotLoadedException;
-import net.brcdev.shopgui.gui.gui.OpenGui;
-import net.brcdev.shopgui.player.PlayerData;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -14,6 +11,7 @@ import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.voxelhorizons.VoxelCore;
 import org.voxelhorizons.content.ContentID;
 import org.voxelhorizons.item.ItemManager;
@@ -76,18 +74,23 @@ public final class ShopGuiPlusIntegration implements Listener {
 
     /**
      * ShopGUI+ builds player-specific price and action lore while opening the inventory, after its
-     * stored ShopItem has been loaded. Resolve the final rendered stacks on the following tick,
-     * scoped to inventories tracked as ShopGUI+ sessions.
+     * stored ShopItem has been loaded. ShopGUI+ can replace those stacks during the first several
+     * ticks of its open animation/session setup, so resolve the live top inventory repeatedly for a
+     * short bounded window. Only text containing a registered VoxelCore placeholder is changed.
      */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onShopInventoryOpen(InventoryOpenEvent event) {
         final HumanEntity viewer = event.getPlayer();
         final Inventory opened = event.getInventory();
-        plugin.getServer().getScheduler().runTask(plugin, new Runnable() {
+        new BukkitRunnable() {
+            private int remainingPasses = 10;
+
             @Override public void run() {
                 InventoryView view = viewer.getOpenInventory();
-                if (view == null || !sameInventory(view.getTopInventory(), opened)) return;
-                if (!isShopGuiInventory(viewer, opened)) return;
+                if (view == null || !sameInventory(view.getTopInventory(), opened)) {
+                    cancel();
+                    return;
+                }
 
                 for (int slot = 0; slot < opened.getSize(); slot++) {
                     ItemStack stack = opened.getItem(slot);
@@ -95,27 +98,11 @@ public final class ShopGuiPlusIntegration implements Listener {
                         opened.setItem(slot, stack);
                     }
                 }
-            }
-        });
-    }
 
-    private static boolean isShopGuiInventory(HumanEntity viewer, Inventory inventory) {
-        if (!(viewer instanceof org.bukkit.entity.Player)) return false;
-        try {
-            org.bukkit.entity.Player player = (org.bukkit.entity.Player) viewer;
-            if (ShopGuiPlusApi.getPlugin().getPlayerManager() == null
-                    || !ShopGuiPlusApi.getPlugin().getPlayerManager().isPlayerLoaded(player)) return false;
-            PlayerData data = ShopGuiPlusApi.getPlugin().getPlayerManager().getPlayerData(player);
-            if (data == null || !data.hasOpenGui()) return false;
-            OpenGui gui = data.getOpenGui();
-            if (gui == null) return false;
-            return sameInventory(inventory, gui.getOpenInventory())
-                    || sameInventory(inventory, gui.getInventory());
-        } catch (PlayerDataNotLoadedException ignored) {
-            return false;
-        } catch (LinkageError ignored) {
-            return false;
-        }
+                remainingPasses--;
+                if (remainingPasses <= 0) cancel();
+            }
+        }.runTaskTimer(plugin, 0L, 1L);
     }
 
     private static boolean sameInventory(Inventory first, Inventory second) {
