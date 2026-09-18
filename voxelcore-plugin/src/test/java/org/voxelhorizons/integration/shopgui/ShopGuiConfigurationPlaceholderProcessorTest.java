@@ -43,6 +43,18 @@ public class ShopGuiConfigurationPlaceholderProcessorTest {
         assertEquals(":not_registered:", config.getString("message"));
     }
 
+    @Test
+    public void ignoresApiGettersMissingFromInstalledShopGuiVersion() {
+        assertEquals(null, ShopGuiConfigurationPlaceholderProcessor.config(
+                new ShopGuiWithoutAggregateConfig(), "getConfigShops"));
+    }
+
+    public static final class ShopGuiWithoutAggregateConfig {
+        public Object getConfigMain() {
+            return null;
+        }
+    }
+
     private static ShopGuiConfigurationPlaceholderProcessor.Resolver placeholders() {
         return new ShopGuiConfigurationPlaceholderProcessor.Resolver() {
             @Override public String resolve(String input) {

@@ -1,11 +1,12 @@
 package org.voxelhorizons.integration.shopgui;
 
 import net.brcdev.shopgui.ShopGuiPlugin;
-import net.brcdev.shopgui.core.BConfig;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.voxelhorizons.text.TextPlaceholderService;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,10 +27,10 @@ final class ShopGuiConfigurationPlaceholderProcessor {
         };
 
         int changed = 0;
-        changed += process(config(shopGui.getConfigMain()), resolver);
-        changed += process(config(shopGui.getConfigLang()), resolver);
-        changed += process(config(shopGui.getConfigPriceModifiers()), resolver);
-        changed += process(config(shopGui.getConfigShops()), resolver);
+        changed += process(config(shopGui, "getConfigMain"), resolver);
+        changed += process(config(shopGui, "getConfigLang"), resolver);
+        changed += process(config(shopGui, "getConfigPriceModifiers"), resolver);
+        changed += process(config(shopGui, "getConfigShops"), resolver);
         return changed;
     }
 
@@ -50,8 +51,29 @@ final class ShopGuiConfigurationPlaceholderProcessor {
         return changed;
     }
 
-    private static FileConfiguration config(BConfig config) {
-        return config == null ? null : config.getConfig();
+    /**
+     * ShopGUI+'s published API has exposed getters that are absent from some matching plugin
+     * releases (notably getConfigShops in 1.113.0). Discover both getter levels at runtime so an
+     * optional configuration domain can never fail the ShopGUI+ load event with NoSuchMethodError.
+     */
+    static FileConfiguration config(Object shopGui, String getterName) {
+        if (shopGui == null) return null;
+        try {
+            Method getter = shopGui.getClass().getMethod(getterName);
+            Object wrapper = getter.invoke(shopGui);
+            if (wrapper == null) return null;
+            Method getConfig = wrapper.getClass().getMethod("getConfig");
+            Object config = getConfig.invoke(wrapper);
+            return config instanceof FileConfiguration ? (FileConfiguration) config : null;
+        } catch (NoSuchMethodException ignored) {
+            return null;
+        } catch (IllegalAccessException ignored) {
+            return null;
+        } catch (InvocationTargetException ignored) {
+            return null;
+        } catch (LinkageError ignored) {
+            return null;
+        }
     }
 
     private static Object resolve(Object value, Resolver resolver) {
