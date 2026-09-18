@@ -162,7 +162,7 @@ public final class VoxelCore extends JavaPlugin {
         blockManager = new BlockManager(contentRuntime, versionAdapter.version().atLeast(1, 13, 0));
         actionExecutor = new ActionExecutor(blockManager, itemManager);
         if (getServer().getPluginManager().getPlugin("ShopGUIPlus") != null) {
-            ShopGuiPlusIntegration.register(this, itemManager);
+            ShopGuiPlusIntegration.register(this, itemManager, textPlaceholderService);
         }
         getServer().getPluginManager().registerEvents(new ItemActionListener(itemManager, actionExecutor), this);
         getServer().getPluginManager().registerEvents(new BlockListener(blockManager, itemManager, actionExecutor), this);
