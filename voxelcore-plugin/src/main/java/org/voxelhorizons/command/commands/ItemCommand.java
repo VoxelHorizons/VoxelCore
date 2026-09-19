@@ -99,6 +99,13 @@ public final class ItemCommand implements SubCommand {
         @Override public List<String> getAliases() { return Collections.emptyList(); }
         @Override public String getPermission() { return "voxelcore.admin.item.give"; }
         @Override public boolean playerOnly() { return false; }
+        @Override public List<String> onTabComplete(CommandSender sender, String[] args) {
+            List<String> ids = new ArrayList<String>();
+            if (args.length == 1) {
+                for (ContentID id : listableItemIds(VoxelCore.getInstance().getItemRegistry())) ids.add(id.toString());
+            }
+            return GiveCompletions.complete(args, ids);
+        }
         @Override public void execute(CommandSender sender, String[] args) {
             if (args.length < 1) {
                 sender.sendMessage("Usage: /voxelcore admin item give <content-id> [amount] [player]");
