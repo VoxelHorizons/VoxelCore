@@ -25,6 +25,7 @@ public final class ItemCommand implements SubCommand {
         register(new ListCommand());
         register(new InfoCommand());
         register(new GiveCommand());
+        register(new BrowserCommand());
         register(new IdentifyCommand());
         register(new VerifyCommand());
     }
@@ -40,7 +41,7 @@ public final class ItemCommand implements SubCommand {
     @Override public boolean playerOnly() { return false; }
     @Override public Map<String, SubCommand> getChildren() { return children; }
     @Override public void execute(CommandSender sender, String[] args) {
-        sender.sendMessage("Usage: /voxelcore admin item <list|info|give|identify|verify>");
+        sender.sendMessage("Usage: /voxelcore admin item <list|info|give|ui|identify|verify>");
     }
 
     private static ContentID parse(String value) {
@@ -136,6 +137,16 @@ public final class ItemCommand implements SubCommand {
             } catch (IllegalArgumentException ex) {
                 sender.sendMessage(ex.getMessage());
             }
+        }
+    }
+
+    private static final class BrowserCommand implements SubCommand {
+        @Override public String getName() { return "ui"; }
+        @Override public List<String> getAliases() { return java.util.Arrays.asList("gui", "menu"); }
+        @Override public String getPermission() { return "voxelcore.admin.item.ui"; }
+        @Override public boolean playerOnly() { return true; }
+        @Override public void execute(CommandSender sender, String[] args) {
+            VoxelCore.getInstance().getContentBrowser().openItems((Player) sender);
         }
     }
 
