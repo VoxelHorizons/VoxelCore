@@ -42,6 +42,10 @@ public final class BlockPickListener implements Listener {
             plugin.getServer().getPluginManager().registerEvent((Class<? extends Event>) eventType, this,
                     EventPriority.HIGHEST, new EventExecutor() {
                         @Override public void execute(Listener listener, Event event) throws EventException {
+                            // Paper's pick-block and pick-entity events can share the
+                            // same HandlerList. Ignore sibling event types before
+                            // invoking methods reflected from PlayerPickBlockEvent.
+                            if (!acceptsEvent(eventType, event)) return;
                             try {
                                 Player player = (Player) getPlayer.invoke(event);
                                 if (player.getGameMode() != GameMode.CREATIVE) return;
@@ -64,6 +68,10 @@ public final class BlockPickListener implements Listener {
         } catch (ReflectiveOperationException exception) {
             plugin.getLogger().warning("Unable to register Creative pick-block support: " + exception.getMessage());
         }
+    }
+
+    static boolean acceptsEvent(Class<?> eventType, Object event) {
+        return eventType != null && event != null && eventType.isInstance(event);
     }
 
     private void selectItem(final Player player, final ContentID id, final int targetSlot) {
