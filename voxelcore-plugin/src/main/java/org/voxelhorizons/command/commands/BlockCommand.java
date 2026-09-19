@@ -23,7 +23,8 @@ public final class BlockCommand implements SubCommand {
     private final Map<String, SubCommand> children = new HashMap<String, SubCommand>();
 
     public BlockCommand() {
-        register(new ListCommand()); register(new InfoCommand()); register(new GiveCommand()); register(new IdentifyCommand());
+        register(new ListCommand()); register(new InfoCommand()); register(new GiveCommand());
+        register(new BrowserCommand()); register(new IdentifyCommand());
     }
     private void register(SubCommand command) {
         children.put(command.getName(), command);
@@ -35,7 +36,7 @@ public final class BlockCommand implements SubCommand {
     @Override public boolean playerOnly() { return false; }
     @Override public Map<String, SubCommand> getChildren() { return children; }
     @Override public void execute(CommandSender sender, String[] args) {
-        sender.sendMessage("Usage: /voxelcore admin block <list|info|give|identify>");
+        sender.sendMessage("Usage: /voxelcore admin block <list|info|give|ui|identify>");
     }
 
     private static ContentID id(String value) { return ContentID.parse(value, "voxelhorizons"); }
@@ -108,6 +109,16 @@ public final class BlockCommand implements SubCommand {
             } catch (IllegalArgumentException exception) {
                 sender.sendMessage("Block " + id + " needs a matching item definition before it can be given.");
             }
+        }
+    }
+
+    private static final class BrowserCommand implements SubCommand {
+        @Override public String getName() { return "ui"; }
+        @Override public List<String> getAliases() { return java.util.Arrays.asList("gui", "menu"); }
+        @Override public String getPermission() { return "voxelcore.admin.block.ui"; }
+        @Override public boolean playerOnly() { return true; }
+        @Override public void execute(CommandSender sender, String[] args) {
+            VoxelCore.getInstance().getContentBrowser().openBlocks((Player) sender);
         }
     }
 
