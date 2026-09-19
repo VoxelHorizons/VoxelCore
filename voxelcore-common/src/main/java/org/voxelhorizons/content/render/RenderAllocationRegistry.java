@@ -175,14 +175,14 @@ public final class RenderAllocationRegistry {
     }
 
     private static String modelOf(ItemDefinition definition) {
-        if (definition == null || definition.abstractDefinition()) return null;
+        if (definition == null || definition.material() == null || definition.material().trim().isEmpty()) return null;
         ItemRenderDefinition render = definition.render();
         if (render == null || render.model() == null || render.model().trim().isEmpty()) return null;
         return normalizeModel(render.model());
     }
 
     private static String materialOf(ItemDefinition definition) {
-        if (definition == null || definition.abstractDefinition() || definition.material() == null) return null;
+        if (definition == null || definition.material() == null) return null;
         String material = definition.material().trim().toLowerCase(java.util.Locale.ROOT);
         if (material.isEmpty()) return null;
         return material.indexOf(':') < 0 ? "minecraft:" + material : material;

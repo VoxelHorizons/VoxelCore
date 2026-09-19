@@ -19,6 +19,24 @@ public class RenderAllocationRegistryTest {
     @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
     @Test
+    public void allocatesAbstractVariantsWithMaterialAndModel() throws Exception {
+        File root = temporaryFolder.newFolder("abstract-furniture");
+        File pack = new File(root, "pack");
+        File content = new File(pack, "content");
+        assertTrue(content.mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: test\n");
+        write(new File(content, "items.yml"),
+                "items:\n  table:\n    material: minecraft:paper\n    render:\n      model: test:furniture/table\n"
+                + "  table_end:\n    extends: table\n    abstract: true\n    render:\n"
+                + "      model: test:furniture/table_end\n");
+        ItemDefinitionRegistry items = new ContentLoader().load(root.toPath());
+        RenderAllocationRegistry allocations = RenderAllocationRegistry.reconcile(items, RenderAllocationRegistry.empty());
+        assertTrue(items.get(ContentID.of("test", "table_end")).get().abstractDefinition());
+        assertTrue(allocations.get(ContentID.of("test", "table_end")).get().active());
+        assertEquals("test:furniture/table_end", allocations.get(ContentID.of("test", "table_end")).get().model());
+    }
+
+    @Test
     public void allocatesPersistsAndTombstonesStableNumericValues() throws Exception {
         File root = temporaryFolder.newFolder("content");
         File pack = new File(root, "pack");

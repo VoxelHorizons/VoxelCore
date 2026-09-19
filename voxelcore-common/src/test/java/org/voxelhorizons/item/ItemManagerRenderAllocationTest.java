@@ -20,8 +20,31 @@ import java.util.Collections;
 import java.util.Optional;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 public class ItemManagerRenderAllocationTest {
+    @Test
+    public void abstractModelCanRenderInternallyButCannotBeGiven() {
+        ContentID id = ContentID.of("test", "table_end");
+        ItemDefinition definition = new ItemDefinition(id, ItemType.ITEM, "minecraft:paper", "Table End",
+                Collections.<String>emptyList(), false, true, Optional.<ContentID>empty(),
+                new ItemRenderDefinition("test:furniture/table_end", null), Collections.<String, Object>emptyMap());
+        ItemDefinitionRegistry items = new ItemDefinitionRegistry(Collections.singletonMap(id, definition));
+        RenderAllocation allocation = new RenderAllocation(1000, "test:furniture/table_end", true);
+        ContentRuntime runtime = new ContentRuntime(new ContentSnapshot(1L, items,
+                new RenderAllocationRegistry(1001, Collections.singletonMap(id, allocation))));
+        CapturingItems adapter = new CapturingItems();
+        ItemManager manager = new ItemManager(runtime, new StubVersionAdapter(adapter));
+        manager.createRenderItem(id);
+        assertEquals(1000, adapter.allocation.customModelData());
+        try {
+            manager.createItem(id);
+            fail("Abstract models must not be given to players");
+        } catch (IllegalArgumentException expected) {
+            assertEquals("Cannot create abstract item: " + id, expected.getMessage());
+        }
+    }
+
     @Test
     public void passesSnapshotAllocationToPlatformAdapter() {
         ContentID id = ContentID.of("test", "ruby");

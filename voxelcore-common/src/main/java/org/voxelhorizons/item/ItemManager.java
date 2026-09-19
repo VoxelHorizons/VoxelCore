@@ -33,12 +33,25 @@ public final class ItemManager {
     }
 
     public ItemStack createItem(ContentID id, int quantity) {
+        return create(id, quantity, false);
+    }
+
+    /** Creates an internal display-only model. Abstract definitions are never exposed through give commands. */
+    public ItemStack createRenderItem(ContentID id) {
+        return create(id, 1, true);
+    }
+
+    private ItemStack create(ContentID id, int quantity, boolean allowAbstract) {
         ContentSnapshot snapshot = content.current();
         ItemDefinition definition = snapshot.items().get(id).orElseThrow(() ->
                 new IllegalArgumentException("Unknown item: " + id)
         );
-        if (definition.abstractDefinition()) {
+        if (definition.abstractDefinition() && !allowAbstract) {
             throw new IllegalArgumentException("Cannot create abstract item: " + id);
+        }
+        if (definition.abstractDefinition() && (definition.render() == null || definition.render().model() == null
+                || definition.material() == null)) {
+            throw new IllegalArgumentException("Abstract item has no renderable model and material: " + id);
         }
         RenderAllocation allocation = snapshot.renderAllocations().get(id).orElse(null);
         return platform.items().createItem(definition, quantity, allocation);
