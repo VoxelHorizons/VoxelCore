@@ -335,6 +335,8 @@ On Minecraft 1.20.5 and newer, `hardness` controls survival mining time through 
 
 The resource-pack compiler generates the block model, inventory model, and complete carrier blockstate tables. Authors only supply the referenced texture PNGs. Every concrete block automatically receives a matching placeable inventory item, and its default drop is that item. An explicit `items:` definition with the same content ID overrides the generated item when a special 2D icon or custom item behavior is required.
 
+On Paper versions with `PlayerPickBlockEvent`, Creative middle-click on a placed custom block selects its matching VoxelCore item from the inventory, or creates one in the selected hotbar slot if absent. Older server APIs continue to load without this optional pick-block behavior.
+
 ## Actions
 
 Items and blocks can declare reusable event actions. For example, a 2D ore item can place its corresponding block:

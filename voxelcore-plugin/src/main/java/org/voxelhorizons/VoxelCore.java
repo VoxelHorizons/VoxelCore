@@ -33,6 +33,7 @@ import org.voxelhorizons.item.ItemManager;
 import org.voxelhorizons.integration.shopgui.ShopGuiPlusIntegration;
 import org.voxelhorizons.block.BlockManager;
 import org.voxelhorizons.block.BlockListener;
+import org.voxelhorizons.block.BlockPickListener;
 import org.voxelhorizons.block.BlockMiningSpeedController;
 import org.voxelhorizons.action.ActionExecutor;
 import org.voxelhorizons.action.ItemActionListener;
@@ -172,6 +173,7 @@ public final class VoxelCore extends JavaPlugin {
         blockMiningSpeedController.register();
         getServer().getPluginManager().registerEvents(
                 new BlockListener(blockManager, itemManager, actionExecutor, blockMiningSpeedController), this);
+        new BlockPickListener(this, blockManager, itemManager).registerIfAvailable();
         if (packManager.currentTarget().supportsUiFonts()) {
             getServer().getPluginManager().registerEvents(new ChatPlaceholderListener(textPlaceholderService), this);
             PaperChatPlaceholderBridge.registerIfAvailable(this, textPlaceholderService);
