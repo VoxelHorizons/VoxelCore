@@ -243,7 +243,7 @@ Unknown keys and malformed values are rejected rather than ignored.
 
 ### Abstract definitions and bound state
 
-`abstract` is an inherited scalar for reusable definitions that must not become game items. A resolved `abstract: true` definition remains available as an inheritance parent and through `item info`, but it is hidden from `item list`, cannot be created by `item give` or `item verify`, receives no active render allocation, and emits no generated item model. Abstract definitions may omit `material`; concrete definitions may not.
+`abstract` is an inherited scalar for reusable definitions that must not become game items. A resolved `abstract: true` definition remains available as an inheritance parent and through `item info`, but it is hidden from `item list` and cannot be created by `item give` or `item verify`. Abstract definitions with both `material` and `render.model` receive a stable render allocation and pack model for addon use (for example VoxelFurniture neighbor variants); the internal `ItemManager.createRenderItem` API is not a player give command. Abstract definitions without a render model may omit `material`; concrete definitions may not.
 
 Because `abstract` is inherited, a concrete child of an abstract parent must explicitly set `abstract: false`.
 

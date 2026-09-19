@@ -90,7 +90,8 @@ final class JavaPackCompilerEngine {
         int renderedItems = 0;
 
         for (ItemDefinition item : items) {
-            if (item.abstractDefinition()) continue;
+            // Abstract variants may have authored models used by addons; they remain non-giveable.
+            if (item.abstractDefinition() && (item.render() == null || item.render().model() == null)) continue;
             ItemRenderDefinition render = item.render();
             if (render == null) continue;
             if (render.model() == null || render.model().trim().isEmpty()) {
@@ -98,6 +99,9 @@ final class JavaPackCompilerEngine {
                     throw new JavaPackCompileException("Item " + item.id() + " defines render state without render.model");
                 }
                 continue;
+            }
+            if (item.abstractDefinition() && (item.material() == null || item.material().trim().isEmpty())) {
+                throw new JavaPackCompileException("Abstract render model requires a material for " + item.id());
             }
 
             ContentPack itemPack = packsByNamespace.get(item.id().namespace());
