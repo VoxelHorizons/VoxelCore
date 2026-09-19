@@ -81,6 +81,16 @@ public final class BlockCommand implements SubCommand {
         @Override public List<String> getAliases() { return Collections.emptyList(); }
         @Override public String getPermission() { return "voxelcore.admin.block.give"; }
         @Override public boolean playerOnly() { return false; }
+        @Override public List<String> onTabComplete(CommandSender sender, String[] args) {
+            List<String> ids = new ArrayList<String>();
+            if (args.length == 1) {
+                for (BlockDefinition definition : VoxelCore.getInstance().getBlockRegistry().entries().values()) {
+                    if (!definition.abstractDefinition() && VoxelCore.getInstance().getItemRegistry().get(definition.id())
+                            .filter(item -> !item.abstractDefinition()).isPresent()) ids.add(definition.id().toString());
+                }
+            }
+            return GiveCompletions.complete(args, ids);
+        }
         @Override public void execute(CommandSender sender, String[] args) {
             if (args.length < 1) { sender.sendMessage("Usage: /voxelcore admin block give <content-id> [amount] [player]"); return; }
             ContentID id = id(args[0]);
