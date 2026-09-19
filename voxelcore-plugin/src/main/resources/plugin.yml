@@ -31,6 +31,8 @@ permissions:
     default: op
   voxelcore.admin.item.give:
     default: op
+  voxelcore.admin.item.ui:
+    default: op
   voxelcore.admin.item.identify:
     default: op
   voxelcore.admin.item.verify:
@@ -42,6 +44,8 @@ permissions:
   voxelcore.admin.block.info:
     default: op
   voxelcore.admin.block.give:
+    default: op
+  voxelcore.admin.block.ui:
     default: op
   voxelcore.admin.block.identify:
     default: op
