@@ -26,6 +26,7 @@ import java.util.Optional;
 public final class v1_21_4_ItemAdapter implements ItemPlatformAdapter {
     private final NamespacedKey contentIdKey;
     public v1_21_4_ItemAdapter(Plugin plugin) { this.contentIdKey = new NamespacedKey(plugin, "content_id"); }
+    @Override public boolean supportsDynamicItemColors() { return true; }
 
     @Override public ItemStack createItem(ItemDefinition definition, int quantity) { return createItem(definition, quantity, null); }
 
@@ -124,5 +125,25 @@ public final class v1_21_4_ItemAdapter implements ItemPlatformAdapter {
             stack.setItemMeta(meta);
         }
         return stack;
+    }
+
+    @Override public Optional<Integer> getCustomModelColor(ItemStack stack, RenderAllocation allocation, String key) {
+        if (stack == null || !stack.hasItemMeta() || allocation == null) return Optional.empty();
+        Integer index = allocation.structuredModelData().index(CustomModelDataDefinition.ValueType.COLOR, key).orElse(null);
+        if (index == null) return Optional.empty();
+        List<Color> colors = stack.getItemMeta().getCustomModelDataComponent().getColors();
+        return index.intValue() < colors.size() ? Optional.of(Integer.valueOf(colors.get(index.intValue()).asRGB())) : Optional.<Integer>empty();
+    }
+
+    @Override public ItemStack setCustomModelColor(ItemStack stack, RenderAllocation allocation, String key, int rgb) {
+        if (stack == null || allocation == null) throw new IllegalArgumentException("Missing item or render allocation");
+        Integer index = allocation.structuredModelData().index(CustomModelDataDefinition.ValueType.COLOR, key).orElse(null);
+        if (index == null) throw new IllegalArgumentException("No structured color key '" + key + "' is allocated");
+        ItemMeta meta = stack.getItemMeta();
+        CustomModelDataComponent component = meta.getCustomModelDataComponent();
+        List<Color> colors = new ArrayList<Color>(component.getColors());
+        while (colors.size() <= index.intValue()) colors.add(Color.WHITE);
+        colors.set(index.intValue(), Color.fromRGB(rgb & 0xFFFFFF));
+        component.setColors(colors); meta.setCustomModelDataComponent(component); stack.setItemMeta(meta); return stack;
     }
 }

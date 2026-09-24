@@ -446,6 +446,30 @@ render:
 
 Rule nodes support `select`, `condition`, `range`, and `model`. Pre-1.21.4 pack targets reject `render.rule` rather than silently discarding it.
 
+### Dyeable custom items — 1.21.4+
+
+An item whose model faces use `tintindex: 0` can expose a mutable per-stack colour:
+
+```yaml
+render:
+  model: voxel:furniture/curtain/curtain_closed
+  custom_model_data:
+    color: '#FFFFFF'
+  rule:
+    model:
+      id: voxel:furniture/curtain/curtain_closed
+      tint: color
+properties:
+  dyeable:
+    key: color
+    color: '#FFFFFF'
+```
+
+Players can place a vanilla dye onto the item in an inventory to recolour it. The selected RGB value is stored in
+structured Custom Model Data, so the content ID remains unchanged and differently coloured stacks remain variants of
+the same item. Addons can use `ItemManager.getDyeColor`, `setDyeColor`, and `createRenderItem(id, source)` to preserve
+the mutable colour in their own renderers. Dynamic tinting is disabled safely before 1.21.4.
+
 ## Assets
 
 Authored model reference:
@@ -514,7 +538,6 @@ plugins/VoxelCore/build/resource-packs/<target>.zip
 /voxelcore admin item list
 /voxelcore admin item info <content-id>
 /voxelcore admin item give <content-id> [amount] [player]
-/voxelcore admin item ui
 /voxelcore admin item identify
 /voxelcore admin item id
 /voxelcore admin item verify <content-id>
@@ -523,7 +546,6 @@ plugins/VoxelCore/build/resource-packs/<target>.zip
 /voxelcore admin block list
 /voxelcore admin block info <content-id>
 /voxelcore admin block give <content-id> [amount] [player]
-/voxelcore admin block ui
 /voxelcore admin block identify
 
 /voxelcore admin pack info
@@ -538,19 +560,6 @@ When `[target]` is omitted, VoxelCore uses the current server version only when 
 The final pack is size-optimized deterministically: JSON and `pack.mcmeta` whitespace is removed without modifying string values, PNGs are losslessly re-encoded only when the result is smaller, and each ZIP entry uses maximum DEFLATE compression only when it beats storing the optimized bytes directly. Rebuilding identical content therefore produces identical pack bytes without inflating already-compressed images.
 
 `item list` reports only concrete definitions. Abstract definitions can still be inspected directly with `item info` and used as inheritance parents; `bound` does not affect list visibility.
-
-`item ui` and `block ui` open a six-row administrative content browser. The first five rows contain up to 45
-real VoxelCore item previews per page; the bottom row is reserved for navigation and close controls. Item browsing
-shows every concrete item definition. Block browsing shows every concrete custom block that has a giveable matching
-item definition.
-
-Clicking a content entry creates a fresh canonical ItemStack through `ItemManager`; the preview's informational lore
-is never copied into the received item. A normal click takes one item and Shift-click takes one full natural stack.
-Previous/next page controls occupy the bottom-left and bottom-right slots. The browser is read-only, so players cannot
-move preview/control items into their inventory.
-
-Browser contents are rebuilt from the active runtime snapshot whenever a page opens. If a content reload publishes a
-new revision while a browser is already open, the next click refreshes that browser before performing an action.
 
 ## Safe reloads
 

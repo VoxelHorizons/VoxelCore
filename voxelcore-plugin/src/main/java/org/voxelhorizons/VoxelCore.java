@@ -9,7 +9,6 @@ import org.voxelhorizons.command.CommandRegistry;
 import org.voxelhorizons.command.RootCommand;
 import org.voxelhorizons.command.commands.AdminCommand;
 import org.voxelhorizons.command.commands.BaseCommand;
-import org.voxelhorizons.command.ui.ContentBrowser;
 import org.voxelhorizons.config.ConfigMigrationSupport;
 import org.voxelhorizons.content.item.ItemDefinition;
 import org.voxelhorizons.content.item.ItemDefinitionRegistry;
@@ -31,6 +30,7 @@ import org.voxelhorizons.content.runtime.ContentRuntimeReloader;
 import org.voxelhorizons.content.runtime.ContentSnapshot;
 import org.voxelhorizons.content.runtime.ContentSnapshotValidator;
 import org.voxelhorizons.item.ItemManager;
+import org.voxelhorizons.item.DyeableItemListener;
 import org.voxelhorizons.integration.shopgui.ShopGuiPlusIntegration;
 import org.voxelhorizons.block.BlockManager;
 import org.voxelhorizons.block.BlockListener;
@@ -79,7 +79,6 @@ public final class VoxelCore extends JavaPlugin {
     private ActionExecutor actionExecutor;
     private PackManager packManager;
     private TextPlaceholderService textPlaceholderService;
-    private ContentBrowser contentBrowser;
     private Path contentRoot;
 
     public static VoxelCore getInstance() { return instance; }
@@ -165,8 +164,6 @@ public final class VoxelCore extends JavaPlugin {
 
         itemManager = new ItemManager(contentRuntime, versionAdapter);
         blockManager = new BlockManager(contentRuntime, versionAdapter.version().atLeast(1, 13, 0));
-        contentBrowser = new ContentBrowser(this);
-        getServer().getPluginManager().registerEvents(contentBrowser, this);
         blockMiningSpeedController = new BlockMiningSpeedController(this, blockManager,
                 versionAdapter.version().atLeast(1, 20, 5));
         actionExecutor = new ActionExecutor(blockManager, itemManager);
@@ -174,6 +171,7 @@ public final class VoxelCore extends JavaPlugin {
             ShopGuiPlusIntegration.register(this, itemManager, textPlaceholderService);
         }
         getServer().getPluginManager().registerEvents(new ItemActionListener(itemManager, actionExecutor), this);
+        getServer().getPluginManager().registerEvents(new DyeableItemListener(itemManager), this);
         blockMiningSpeedController.register();
         getServer().getPluginManager().registerEvents(
                 new BlockListener(blockManager, itemManager, actionExecutor, blockMiningSpeedController), this);
@@ -256,7 +254,6 @@ public final class VoxelCore extends JavaPlugin {
     public BlockDefinitionRegistry getBlockRegistry() { return contentRuntime.current().blocks(); }
     public PackManager getPackManager() { return packManager; }
     public TextPlaceholderService getTextPlaceholderService() { return textPlaceholderService; }
-    public ContentBrowser getContentBrowser() { return contentBrowser; }
 
     private void validateForPlatform(ItemDefinitionRegistry items, RenderAllocationRegistry allocations) {
         for (ItemDefinition definition : items.entries().values()) {
