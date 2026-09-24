@@ -31,6 +31,7 @@ import org.voxelhorizons.content.runtime.ContentRuntimeReloader;
 import org.voxelhorizons.content.runtime.ContentSnapshot;
 import org.voxelhorizons.content.runtime.ContentSnapshotValidator;
 import org.voxelhorizons.item.ItemManager;
+import org.voxelhorizons.item.DyeableItemListener;
 import org.voxelhorizons.integration.shopgui.ShopGuiPlusIntegration;
 import org.voxelhorizons.block.BlockManager;
 import org.voxelhorizons.block.BlockListener;
@@ -174,6 +175,7 @@ public final class VoxelCore extends JavaPlugin {
             ShopGuiPlusIntegration.register(this, itemManager, textPlaceholderService);
         }
         getServer().getPluginManager().registerEvents(new ItemActionListener(itemManager, actionExecutor), this);
+        getServer().getPluginManager().registerEvents(new DyeableItemListener(itemManager), this);
         blockMiningSpeedController.register();
         getServer().getPluginManager().registerEvents(
                 new BlockListener(blockManager, itemManager, actionExecutor, blockMiningSpeedController), this);
