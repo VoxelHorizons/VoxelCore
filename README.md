@@ -446,6 +446,30 @@ render:
 
 Rule nodes support `select`, `condition`, `range`, and `model`. Pre-1.21.4 pack targets reject `render.rule` rather than silently discarding it.
 
+### Dyeable custom items — 1.21.4+
+
+An item whose model faces use `tintindex: 0` can expose a mutable per-stack colour:
+
+```yaml
+render:
+  model: voxel:furniture/curtain/curtain_closed
+  custom_model_data:
+    color: '#FFFFFF'
+  rule:
+    model:
+      id: voxel:furniture/curtain/curtain_closed
+      tint: color
+properties:
+  dyeable:
+    key: color
+    color: '#FFFFFF'
+```
+
+Players can place a vanilla dye onto the item in an inventory to recolour it. The selected RGB value is stored in
+structured Custom Model Data, so the content ID remains unchanged and differently coloured stacks remain variants of
+the same item. Addons can use `ItemManager.getDyeColor`, `setDyeColor`, and `createRenderItem(id, source)` to preserve
+the mutable colour in their own renderers. Dynamic tinting is disabled safely before 1.21.4.
+
 ## Assets
 
 Authored model reference:
