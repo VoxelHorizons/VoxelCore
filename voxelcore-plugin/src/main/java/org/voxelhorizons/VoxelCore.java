@@ -50,6 +50,7 @@ import org.voxelhorizons.text.PaperChatPlaceholderBridge;
 import org.voxelhorizons.text.PlaceholderApiIntegration;
 import org.voxelhorizons.text.PlayerListPlaceholderSynchronizer;
 import org.voxelhorizons.text.TextPlaceholderService;
+import org.voxelhorizons.text.TooltipRenderer;
 
 import java.io.File;
 import java.io.IOException;
@@ -80,6 +81,7 @@ public final class VoxelCore extends JavaPlugin {
     private ActionExecutor actionExecutor;
     private PackManager packManager;
     private TextPlaceholderService textPlaceholderService;
+    private TooltipRenderer tooltipRenderer;
     private ContentBrowser contentBrowser;
     private Path contentRoot;
 
@@ -96,6 +98,7 @@ public final class VoxelCore extends JavaPlugin {
 
         try {
             if (!getDataFolder().exists()) getDataFolder().mkdirs();
+            ensureDefaultAssetTemplates();
             configFile = new File(getDataFolder(), "config.yml");
             if (!configFile.exists()) {
                 logger.info("No Configuration File Found. Generating A New One...");
@@ -150,6 +153,7 @@ public final class VoxelCore extends JavaPlugin {
                     }, blockAllocationStore, modernBlockStates);
             packManager = new PackManager(getDataFolder().toPath(), contentRoot, versionAdapter.version());
             textPlaceholderService = new TextPlaceholderService(packManager.uiGlyphs(true));
+            tooltipRenderer = new TooltipRenderer(textPlaceholderService);
         } catch (IOException exception) {
             logger.log(Level.SEVERE, "Unable to create VoxelCore content directory " + contentRoot, exception);
             getServer().getPluginManager().disablePlugin(this);
@@ -258,6 +262,7 @@ public final class VoxelCore extends JavaPlugin {
     public BlockDefinitionRegistry getBlockRegistry() { return contentRuntime.current().blocks(); }
     public PackManager getPackManager() { return packManager; }
     public TextPlaceholderService getTextPlaceholderService() { return textPlaceholderService; }
+    public TooltipRenderer getTooltipRenderer() { return tooltipRenderer; }
     public ContentBrowser getContentBrowser() { return contentBrowser; }
 
     private void validateForPlatform(ItemDefinitionRegistry items, RenderAllocationRegistry allocations) {
@@ -303,6 +308,22 @@ public final class VoxelCore extends JavaPlugin {
                 }
             }
         }
+    }
+
+    private void ensureDefaultAssetTemplates() {
+        saveResourceIfMissing("assets/tooltip/left.png");
+        saveResourceIfMissing("assets/tooltip/center.png");
+        saveResourceIfMissing("assets/tooltip/right.png");
+    }
+
+    private void saveResourceIfMissing(String resourcePath) {
+        File target = new File(getDataFolder(), resourcePath.replace('/', File.separatorChar));
+        if (target.isFile()) return;
+        File parent = target.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs() && !parent.isDirectory()) {
+            throw new IllegalStateException("Unable to create asset template directory " + parent);
+        }
+        saveResource(resourcePath, false);
     }
 
     private void migrateConfig(int defaultVersion) {

@@ -11,6 +11,7 @@ public final class PackManager {
     private final Path allocationManifest;
     private final Path outputRoot;
     private final Path glyphAllocationManifest;
+    private final Path tooltipAssetsRoot;
     private final Version serverVersion;
 
     public PackManager(Path dataRoot, Path contentRoot, Version serverVersion) {
@@ -20,6 +21,7 @@ public final class PackManager {
         this.allocationManifest = dataRoot.resolve("render-allocations.yml");
         this.outputRoot = dataRoot.resolve("build").resolve("resource-packs");
         this.glyphAllocationManifest = dataRoot.resolve("glyph-allocations.yml");
+        this.tooltipAssetsRoot = dataRoot.resolve("assets").resolve("tooltip");
         this.serverVersion = serverVersion;
     }
 
@@ -34,12 +36,12 @@ public final class PackManager {
 
     public JavaPackBuildResult validate(JavaPackTarget target) {
         if (target == null) throw new IllegalArgumentException("Pack target cannot be null");
-        return compiler.validate(contentRoot, allocationManifest, target);
+        return compiler.validate(contentRoot, allocationManifest, target, tooltipAssetsRoot);
     }
 
     public JavaPackBuildResult build(JavaPackTarget target) {
         if (target == null) throw new IllegalArgumentException("Pack target cannot be null");
         Path output = outputRoot.resolve(target.id() + ".zip");
-        return compiler.compile(contentRoot, output, allocationManifest, target);
+        return compiler.compile(contentRoot, output, allocationManifest, target, tooltipAssetsRoot);
     }
 }

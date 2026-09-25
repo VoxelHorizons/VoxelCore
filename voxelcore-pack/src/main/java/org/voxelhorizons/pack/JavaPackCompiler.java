@@ -7,6 +7,8 @@ import org.voxelhorizons.content.pack.ContentPackDiscovery;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,10 +39,17 @@ public final class JavaPackCompiler {
     }
 
     public JavaPackBuildResult compile(Path contentRoot, Path outputZip, Path allocationManifestPath, JavaPackTarget target) {
+        return compile(contentRoot, outputZip, allocationManifestPath, target, null);
+    }
+
+    public JavaPackBuildResult compile(Path contentRoot, Path outputZip, Path allocationManifestPath,
+                                       JavaPackTarget target, Path tooltipAssetsRoot) {
         Path stagedOutput = prepareStagedOutput(outputZip);
         try {
+            validateTooltipAssets(tooltipAssetsRoot);
             JavaPackBuildResult result = compileWithAllAuthoredAssets(
                     contentRoot, stagedOutput, allocationManifestPath, target, true);
+            mergeTooltipAssets(stagedOutput, tooltipAssetsRoot);
             publishOutput(stagedOutput, outputZip);
             return new JavaPackBuildResult(outputZip, result.allocationManifest(), result.renderedItems(),
                     result.copiedAssets(), result.renderedBlocks());
@@ -59,6 +68,12 @@ public final class JavaPackCompiler {
 
     /** Runs the complete pack validation/compiler pipeline without mutating the manifest or writing a ZIP. */
     public JavaPackBuildResult validate(Path contentRoot, Path allocationManifestPath, JavaPackTarget target) {
+        return validate(contentRoot, allocationManifestPath, target, null);
+    }
+
+    public JavaPackBuildResult validate(Path contentRoot, Path allocationManifestPath,
+                                        JavaPackTarget target, Path tooltipAssetsRoot) {
+        validateTooltipAssets(tooltipAssetsRoot);
         return compileWithAllAuthoredAssets(contentRoot, null, allocationManifestPath, target, false);
     }
 
@@ -264,6 +279,59 @@ public final class JavaPackCompiler {
             }
         }
         writeDeterministicZip(outputZip, entries);
+    }
+
+    private static void validateTooltipAssets(Path tooltipAssetsRoot) {
+        if (tooltipAssetsRoot == null || !Files.exists(tooltipAssetsRoot)) return;
+        if (!Files.isDirectory(tooltipAssetsRoot)) {
+            throw new JavaPackCompileException("Tooltip assets path is not a directory: " + tooltipAssetsRoot);
+        }
+        validateTooltipPng(tooltipAssetsRoot.resolve("left.png"), 2, 38);
+        validateTooltipPng(tooltipAssetsRoot.resolve("center.png"), 2, 38);
+        validateTooltipPng(tooltipAssetsRoot.resolve("right.png"), 2, 38);
+        Path rightOffset = tooltipAssetsRoot.resolve("right_offset.png");
+        if (Files.exists(rightOffset)) validateTooltipPng(rightOffset, 4, 38);
+    }
+
+    private static void validateTooltipPng(Path file, int width, int height) {
+        if (!Files.exists(file)) return;
+        if (!Files.isRegularFile(file) || Files.isSymbolicLink(file)) {
+            throw new JavaPackCompileException("Tooltip asset must be a regular PNG file: " + file);
+        }
+        try {
+            BufferedImage image = ImageIO.read(file.toFile());
+            if (image == null) throw new JavaPackCompileException("Tooltip asset is not a readable PNG: " + file);
+            if (image.getWidth() != width || image.getHeight() != height) {
+                throw new JavaPackCompileException("Tooltip asset " + file.getFileName()
+                        + " must remain " + width + "x" + height + " pixels; found "
+                        + image.getWidth() + "x" + image.getHeight());
+            }
+        } catch (IOException exception) {
+            throw new JavaPackCompileException("Unable to inspect tooltip asset " + file, exception);
+        }
+    }
+
+    private static void mergeTooltipAssets(Path outputZip, Path tooltipAssetsRoot) {
+        if (tooltipAssetsRoot == null || !Files.isDirectory(tooltipAssetsRoot)) return;
+        TreeMap<String, byte[]> entries = readZip(outputZip);
+        mergeTooltipAsset(entries, tooltipAssetsRoot.resolve("left.png"),
+                "assets/voxelcore/textures/ui/tooltip/left.png");
+        mergeTooltipAsset(entries, tooltipAssetsRoot.resolve("center.png"),
+                "assets/voxelcore/textures/ui/tooltip/center.png");
+        mergeTooltipAsset(entries, tooltipAssetsRoot.resolve("right.png"),
+                "assets/voxelcore/textures/ui/tooltip/right.png");
+        mergeTooltipAsset(entries, tooltipAssetsRoot.resolve("right_offset.png"),
+                "assets/voxelcore/textures/ui/tooltip/right_offset.png");
+        writeDeterministicZip(outputZip, entries);
+    }
+
+    private static void mergeTooltipAsset(TreeMap<String, byte[]> entries, Path source, String target) {
+        if (!Files.isRegularFile(source)) return;
+        try {
+            entries.put(target, Files.readAllBytes(source));
+        } catch (IOException exception) {
+            throw new JavaPackCompileException("Unable to read editable tooltip asset " + source, exception);
+        }
     }
 
     private static TreeMap<String, byte[]> readZip(Path zipPath) {
