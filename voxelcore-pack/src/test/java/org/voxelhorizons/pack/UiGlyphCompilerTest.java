@@ -83,9 +83,9 @@ public class UiGlyphCompilerTest {
         assertTrue(font.contains(glyph.character()));
         assertTrue(font.contains("voxelcore:ui/tooltip/left.png"));
         assertTrue(font.contains(String.valueOf((char) TooltipGlyphs.BACKGROUND_LEFT)));
-        assertTrue(zipText(output, "assets/voxelcore/font/tooltip_line1.json").contains("\\"ascent\\":4"));
-        assertTrue(zipText(output, "assets/voxelcore/font/tooltip_line2.json").contains("\\"ascent\\":-1"));
-        assertTrue(zipText(output, "assets/voxelcore/font/tooltip_line3.json").contains("\\"ascent\\":-6"));
+        assertTrue(zipText(output, "assets/voxelcore/font/tooltip_line1.json").contains("\"ascent\":4"));
+        assertTrue(zipText(output, "assets/voxelcore/font/tooltip_line2.json").contains("\"ascent\":-1"));
+        assertTrue(zipText(output, "assets/voxelcore/font/tooltip_line3.json").contains("\"ascent\":-6"));
 
         String firstManifest = new String(Files.readAllBytes(build.resolve("glyph-allocations.yml")), StandardCharsets.UTF_8);
         compiler.compile(contentRoot.toPath(), build.resolve("second.zip"), renderAllocations, JavaPackTarget.MC_1_14_4);
