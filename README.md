@@ -63,6 +63,16 @@ Both forms have tab completion. `ui list` and `ui info <content-id-or-alias>` ex
 
 VoxelCore automatically resolves UI placeholders in player chat, inventory titles, and Bukkit player-list display names, headers, and footers. The player-list synchronizer runs after server ticks so values supplied by ordinary tab-list plugins are processed without a plugin-specific dependency. Integrations writing packet-only or Adventure-only components should call `VoxelCore#getTextPlaceholderService()` before sending their text.
 
+VoxelCore also compiles a built-in three-line popup-tooltip font set and border slices for every resource-pack target that supports bitmap fonts. The renderer maps ordinary ASCII onto three private-use rows with ascents `4`, `-1`, and `-6`, then overlays them on a dynamically sized background using the same generated spacing glyphs as `:offset_<pixels>:`. Because the row variants are also appended to `minecraft:default`, runtime popups work through Bukkit's cross-version title/subtitle API without requiring Adventure font components. The generated pack additionally exposes `voxelcore:tooltip_line1`, `voxelcore:tooltip_line2`, and `voxelcore:tooltip_line3` for integrations that want the named fonts directly.
+
+For live testing, use three text sections separated with `|`:
+
+```text
+/voxelcore admin ui tooltip 3 &fTiki Coffee Table | &7Price: 250 | &6(Click to purchase)
+```
+
+The first argument is the display duration in seconds, from greater than zero through 300 seconds. The tooltip appears to the right of the crosshair using the built-in default horizontal offset. The current generated resource pack must be built and applied to the client before the compiler-owned glyphs can render.
+
 When PlaceholderAPI is installed, VoxelCore registers an optional persistent `voxelcore` expansion. `%voxelcore_font_staff%` resolves exactly like `:staff:`, including GUI spacing behavior, while `%voxelcore_font_voxel/staff%` selects the explicit `voxel:staff` ContentID when aliases are ambiguous. Font names may contain underscores. Unknown or ambiguous names remain unresolved, and VoxelCore continues to work without PlaceholderAPI installed.
 
 When ShopGUI+ is installed, VoxelCore registers an optional custom-item provider during ShopGUI+'s supported post-enable lifecycle. A shop entry can reference any concrete VoxelCore item by ContentID:
