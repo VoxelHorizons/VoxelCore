@@ -36,6 +36,12 @@ public final class UiGlyphLoader {
                         + " collides with a VoxelCore spacing glyph");
             }
         }
+        for (Integer tooltip : TooltipGlyphs.reservedCodePoints()) {
+            if (authoredSymbols.contains(tooltip)) {
+                throw new ContentLoadException("Authored font symbol " + codePoint(tooltip.intValue())
+                        + " collides with a VoxelCore tooltip glyph");
+            }
+        }
         Map<ContentID, RawGlyph> raw = new LinkedHashMap<ContentID, RawGlyph>();
         for (ContentPack pack : packs) {
             Path root = pack.root().resolve("content");
@@ -45,6 +51,7 @@ public final class UiGlyphLoader {
 
         AllocationState state = readAllocations(allocationFile);
         Set<Integer> used = new HashSet<Integer>(authoredSymbols);
+        used.addAll(TooltipGlyphs.reservedCodePoints());
         Map<ContentID, Integer> active = new LinkedHashMap<ContentID, Integer>();
         List<ContentID> ids = new ArrayList<ContentID>(raw.keySet());
         Collections.sort(ids, byId());
