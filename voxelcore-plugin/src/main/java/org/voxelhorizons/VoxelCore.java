@@ -98,6 +98,7 @@ public final class VoxelCore extends JavaPlugin {
 
         try {
             if (!getDataFolder().exists()) getDataFolder().mkdirs();
+            ensureDefaultAssetTemplates();
             configFile = new File(getDataFolder(), "config.yml");
             if (!configFile.exists()) {
                 logger.info("No Configuration File Found. Generating A New One...");
@@ -307,6 +308,22 @@ public final class VoxelCore extends JavaPlugin {
                 }
             }
         }
+    }
+
+    private void ensureDefaultAssetTemplates() {
+        saveResourceIfMissing("assets/tooltip/left.png");
+        saveResourceIfMissing("assets/tooltip/center.png");
+        saveResourceIfMissing("assets/tooltip/right.png");
+    }
+
+    private void saveResourceIfMissing(String resourcePath) {
+        File target = new File(getDataFolder(), resourcePath.replace('/', File.separatorChar));
+        if (target.isFile()) return;
+        File parent = target.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs() && !parent.isDirectory()) {
+            throw new IllegalStateException("Unable to create asset template directory " + parent);
+        }
+        saveResource(resourcePath, false);
     }
 
     private void migrateConfig(int defaultVersion) {
