@@ -50,6 +50,7 @@ import org.voxelhorizons.text.PaperChatPlaceholderBridge;
 import org.voxelhorizons.text.PlaceholderApiIntegration;
 import org.voxelhorizons.text.PlayerListPlaceholderSynchronizer;
 import org.voxelhorizons.text.TextPlaceholderService;
+import org.voxelhorizons.text.TooltipRenderer;
 
 import java.io.File;
 import java.io.IOException;
@@ -80,6 +81,7 @@ public final class VoxelCore extends JavaPlugin {
     private ActionExecutor actionExecutor;
     private PackManager packManager;
     private TextPlaceholderService textPlaceholderService;
+    private TooltipRenderer tooltipRenderer;
     private ContentBrowser contentBrowser;
     private Path contentRoot;
 
@@ -150,6 +152,7 @@ public final class VoxelCore extends JavaPlugin {
                     }, blockAllocationStore, modernBlockStates);
             packManager = new PackManager(getDataFolder().toPath(), contentRoot, versionAdapter.version());
             textPlaceholderService = new TextPlaceholderService(packManager.uiGlyphs(true));
+            tooltipRenderer = new TooltipRenderer(textPlaceholderService);
         } catch (IOException exception) {
             logger.log(Level.SEVERE, "Unable to create VoxelCore content directory " + contentRoot, exception);
             getServer().getPluginManager().disablePlugin(this);
@@ -258,6 +261,7 @@ public final class VoxelCore extends JavaPlugin {
     public BlockDefinitionRegistry getBlockRegistry() { return contentRuntime.current().blocks(); }
     public PackManager getPackManager() { return packManager; }
     public TextPlaceholderService getTextPlaceholderService() { return textPlaceholderService; }
+    public TooltipRenderer getTooltipRenderer() { return tooltipRenderer; }
     public ContentBrowser getContentBrowser() { return contentBrowser; }
 
     private void validateForPlatform(ItemDefinitionRegistry items, RenderAllocationRegistry allocations) {
