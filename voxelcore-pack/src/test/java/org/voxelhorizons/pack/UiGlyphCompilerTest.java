@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -90,6 +91,34 @@ public class UiGlyphCompilerTest {
         String firstManifest = new String(Files.readAllBytes(build.resolve("glyph-allocations.yml")), StandardCharsets.UTF_8);
         compiler.compile(contentRoot.toPath(), build.resolve("second.zip"), renderAllocations, JavaPackTarget.MC_1_14_4);
         assertEquals(firstManifest, new String(Files.readAllBytes(build.resolve("glyph-allocations.yml")), StandardCharsets.UTF_8));
+    }
+
+    @Test
+    public void editableTooltipAssetsOverrideCompilerDefaults() throws Exception {
+        File contentRoot = temporaryFolder.newFolder("tooltip-content");
+        File pack = new File(contentRoot, "voxel");
+        assertTrue(new File(pack, "content").mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
+
+        File editable = temporaryFolder.newFolder("tooltip-assets");
+        File left = new File(editable, "left.png");
+        File center = new File(editable, "center.png");
+        File right = new File(editable, "right.png");
+        writePng(left, 2, 38);
+        writePng(center, 2, 38);
+        writePng(right, 2, 38);
+
+        Path build = temporaryFolder.newFolder("tooltip-build").toPath();
+        Path output = build.resolve("pack.zip");
+        new JavaPackCompiler().compile(contentRoot.toPath(), output,
+                build.resolve("render-allocations.yml"), JavaPackTarget.MC_1_14_4, editable.toPath());
+
+        assertArrayEquals(Files.readAllBytes(left.toPath()),
+                zipBytes(output, "assets/voxelcore/textures/ui/tooltip/left.png"));
+        assertArrayEquals(Files.readAllBytes(center.toPath()),
+                zipBytes(output, "assets/voxelcore/textures/ui/tooltip/center.png"));
+        assertArrayEquals(Files.readAllBytes(right.toPath()),
+                zipBytes(output, "assets/voxelcore/textures/ui/tooltip/right.png"));
     }
 
     @Test
@@ -174,6 +203,22 @@ public class UiGlyphCompilerTest {
             for (int x = 0; x < width; x++) image.setRGB(x, y, 0xFFFFFFFF);
         }
         assertTrue(ImageIO.write(image, "png", file));
+    }
+
+    private static byte[] zipBytes(Path zip, String name) throws Exception {
+        ZipFile file = new ZipFile(zip.toFile());
+        try {
+            ZipEntry entry = file.getEntry(name);
+            if (entry == null) throw new AssertionError("Missing zip entry " + name);
+            InputStream input = file.getInputStream(entry);
+            try {
+                ByteArrayOutputStream output = new ByteArrayOutputStream();
+                byte[] buffer = new byte[1024];
+                int read;
+                while ((read = input.read(buffer)) >= 0) output.write(buffer, 0, read);
+                return output.toByteArray();
+            } finally { input.close(); }
+        } finally { file.close(); }
     }
 
     private static String zipText(Path zip, String name) throws Exception {
