@@ -57,6 +57,16 @@ permissions:
     default: op
   voxelcore.admin.pack.build:
     default: op
+  voxelcore.admin.ui:
+    default: op
+  voxelcore.admin.ui.list:
+    default: op
+  voxelcore.admin.ui.info:
+    default: op
+  voxelcore.admin.ui.copy:
+    default: op
+  voxelcore.admin.ui.tooltip:
+    default: op
 
   voxelcore.placeholders:
     default: op
