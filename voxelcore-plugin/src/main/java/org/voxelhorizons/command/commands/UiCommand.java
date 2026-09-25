@@ -28,6 +28,7 @@ public final class UiCommand implements SubCommand {
         register(new ListCommand());
         register(new InfoCommand());
         register(new CopyCommand());
+        register(new TooltipCommand());
     }
 
     private void register(SubCommand command) {
@@ -41,7 +42,7 @@ public final class UiCommand implements SubCommand {
     @Override public boolean playerOnly() { return false; }
     @Override public Map<String, SubCommand> getChildren() { return children; }
     @Override public void execute(CommandSender sender, String[] args) {
-        sender.sendMessage("Usage: /voxelcore admin ui <list|info|copy> [content-id]");
+        sender.sendMessage("Usage: /voxelcore admin ui <list|info|copy|tooltip> ...");
     }
 
     private static UiGlyphRegistry registry(boolean persist) {
@@ -127,6 +128,54 @@ public final class UiCommand implements SubCommand {
                     + ", y_position=" + glyph.yPosition()
                     + ", advance=" + glyph.advance() + ", gui=" + glyph.gui()
                     + ", character=" + glyph.character() + " (" + glyph.escapedCodePoint() + ")");
+        }
+    }
+
+    private static final class TooltipCommand implements SubCommand {
+        @Override public String getName() { return "tooltip"; }
+        @Override public List<String> getAliases() { return Collections.singletonList("popup"); }
+        @Override public String getPermission() { return "voxelcore.admin.ui.tooltip"; }
+        @Override public boolean playerOnly() { return true; }
+
+        @Override public void execute(CommandSender sender, String[] args) {
+            Player player = (Player) sender;
+            if (args.length < 2) {
+                player.sendMessage("Usage: /voxelcore admin ui tooltip <seconds> <line1> | <line2> | <line3>");
+                return;
+            }
+            if (!VoxelCore.getInstance().getPackManager().currentTarget().supportsUiFonts()) {
+                player.sendMessage("Popup tooltips require a resource-pack target with bitmap font support.");
+                return;
+            }
+
+            final double seconds;
+            try {
+                seconds = Double.parseDouble(args[0]);
+            } catch (NumberFormatException exception) {
+                player.sendMessage("Tooltip duration must be a number of seconds.");
+                return;
+            }
+            if (!Double.isFinite(seconds) || seconds <= 0.0D || seconds > 300.0D) {
+                player.sendMessage("Tooltip duration must be greater than 0 and no more than 300 seconds.");
+                return;
+            }
+
+            StringBuilder raw = new StringBuilder();
+            for (int index = 1; index < args.length; index++) {
+                if (raw.length() > 0) raw.append(' ');
+                raw.append(args[index]);
+            }
+            String[] supplied = raw.toString().split("\\s*\\|\\s*", -1);
+            if (supplied.length > 3) {
+                player.sendMessage("Popup tooltips support up to three lines separated with |.");
+                return;
+            }
+            String[] lines = {"", "", ""};
+            System.arraycopy(supplied, 0, lines, 0, supplied.length);
+
+            int ticks = Math.max(1, (int) Math.round(seconds * 20.0D));
+            VoxelCore.getInstance().getTooltipRenderer().show(player, lines[0], lines[1], lines[2], ticks);
+            player.sendMessage("Showing popup tooltip for " + seconds + "s.");
         }
     }
 
