@@ -48,13 +48,6 @@ final class JavaPackCompilerEngine {
 
     JavaPackBuildResult compile(Path contentRoot, Path outputZip, Path allocationManifestPath,
                                 JavaPackTarget target, boolean writeOutput) {
-        return compile(contentRoot, outputZip, allocationManifestPath, target, writeOutput,
-                ContainerGuiLayout.defaults());
-    }
-
-    JavaPackBuildResult compile(Path contentRoot, Path outputZip, Path allocationManifestPath,
-                                JavaPackTarget target, boolean writeOutput,
-                                ContainerGuiLayout containerGuiLayout) {
         if (contentRoot == null || allocationManifestPath == null || target == null) {
             throw new IllegalArgumentException("Compiler arguments cannot be null");
         }
@@ -86,8 +79,7 @@ final class JavaPackCompilerEngine {
         writeCustomTextureAtlas(packs, target, entries);
         if (target.supportsUiFonts()) {
             writeTooltipResources(entries);
-            writeContainerGuiResources(entries);
-            writeUiFont(entries, glyphs, containerGuiLayout);
+            writeUiFont(entries, glyphs);
         }
 
         List<ItemDefinition> items = new ArrayList<ItemDefinition>(registry.entries().values());
@@ -487,8 +479,7 @@ final class JavaPackCompilerEngine {
         putEntry(entries, atlasPath, utf8(atlas.toString()));
     }
 
-    private static void writeUiFont(Map<String, byte[]> entries, UiGlyphRegistry glyphs,
-                                    ContainerGuiLayout containerGuiLayout) {
+    private static void writeUiFont(Map<String, byte[]> entries, UiGlyphRegistry glyphs) {
         StringBuilder out = new StringBuilder("{\n  \"providers\": [\n");
         out.append("    {\"type\":\"space\",\"advances\":{");
         boolean firstAdvance = true;
@@ -514,8 +505,6 @@ final class JavaPackCompilerEngine {
         }
         String tooltipProviders = TooltipPackResources.defaultProviders();
         if (!tooltipProviders.isEmpty()) out.append(",\n    ").append(tooltipProviders);
-        String containerProviders = ContainerGuiPackResources.defaultProviders(containerGuiLayout);
-        if (!containerProviders.isEmpty()) out.append(",\n    ").append(containerProviders);
         out.append("\n  ]\n}\n");
         String path = AuthoredFontSupport.DEFAULT_FONT_PATH;
         byte[] generated = utf8(out.toString());
@@ -527,12 +516,6 @@ final class JavaPackCompilerEngine {
 
     private static void writeTooltipResources(Map<String, byte[]> entries) {
         for (Map.Entry<String, byte[]> resource : TooltipPackResources.entries().entrySet()) {
-            putEntry(entries, resource.getKey(), resource.getValue());
-        }
-    }
-
-    private static void writeContainerGuiResources(Map<String, byte[]> entries) {
-        for (Map.Entry<String, byte[]> resource : ContainerGuiPackResources.entries().entrySet()) {
             putEntry(entries, resource.getKey(), resource.getValue());
         }
     }
