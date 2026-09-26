@@ -188,7 +188,13 @@ public final class VoxelCore extends JavaPlugin {
             getServer().getPluginManager().registerEvents(new ChatPlaceholderListener(textPlaceholderService), this);
             PaperChatPlaceholderBridge.registerIfAvailable(this, textPlaceholderService);
             getServer().getPluginManager().registerEvents(
-                    new InventoryTitlePlaceholderListener(this, textPlaceholderService), this);
+                    new InventoryTitlePlaceholderListener(
+                            this,
+                            textPlaceholderService,
+                            config.getBoolean("ui.chest_prefixes.enabled", false),
+                            config.getString("ui.chest_prefixes.single", ""),
+                            config.getString("ui.chest_prefixes.double", "")),
+                    this);
             new PlayerListPlaceholderSynchronizer(this, textPlaceholderService).start();
             PlaceholderApiIntegration.registerIfAvailable(this, textPlaceholderService);
         }
