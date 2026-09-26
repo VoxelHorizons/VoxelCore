@@ -7,6 +7,7 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.voxelhorizons.VoxelCore;
 import org.voxelhorizons.platform.network.PacketChannelAdapter;
 
@@ -107,10 +108,25 @@ public final class AdvancementsMenuOverride implements Listener {
 
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (!player.isOnline()) return;
-            boolean result = player.performCommand(command);
+
+            PlayerCommandPreprocessEvent commandEvent =
+                    new PlayerCommandPreprocessEvent(player, "/" + command);
+            Bukkit.getPluginManager().callEvent(commandEvent);
+
+            boolean consumedByListener = commandEvent.isCancelled();
+            boolean dispatched = false;
+
+            if (!consumedByListener) {
+                String message = commandEvent.getMessage();
+                String normalized = message.startsWith("/") ? message.substring(1) : message;
+                dispatched = player.performCommand(normalized);
+            }
+
             if (debug) {
                 plugin.getLogger().info("[PacketDebug] Executed /" + command + " as "
-                        + player.getName() + " result=" + result);
+                        + player.getName()
+                        + " consumedByListener=" + consumedByListener
+                        + " dispatched=" + dispatched);
             }
         });
 
