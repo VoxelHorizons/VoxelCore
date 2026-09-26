@@ -49,12 +49,21 @@ public final class JavaPackCompiler {
 
     public JavaPackBuildResult compile(Path contentRoot, Path outputZip, Path allocationManifestPath,
                                        JavaPackTarget target, Path tooltipAssetsRoot, Path containerGuiAssetsRoot) {
+        return compile(contentRoot, outputZip, allocationManifestPath, target,
+                tooltipAssetsRoot, containerGuiAssetsRoot, ContainerGuiSettings.defaults());
+    }
+
+    public JavaPackBuildResult compile(Path contentRoot, Path outputZip, Path allocationManifestPath,
+                                       JavaPackTarget target, Path tooltipAssetsRoot, Path containerGuiAssetsRoot,
+                                       ContainerGuiSettings containerGuiSettings) {
         Path stagedOutput = prepareStagedOutput(outputZip);
         try {
             validateTooltipAssets(tooltipAssetsRoot);
             validateContainerGuiAssets(containerGuiAssetsRoot);
+            ContainerGuiLayout containerGuiLayout = ContainerGuiLayout.load(
+                    containerGuiAssetsRoot, containerGuiSettings);
             JavaPackBuildResult result = compileWithAllAuthoredAssets(
-                    contentRoot, stagedOutput, allocationManifestPath, target, true);
+                    contentRoot, stagedOutput, allocationManifestPath, target, true, containerGuiLayout);
             mergeTooltipAssets(stagedOutput, tooltipAssetsRoot);
             mergeContainerGuiAssets(stagedOutput, containerGuiAssetsRoot);
             publishOutput(stagedOutput, outputZip);
@@ -85,9 +94,19 @@ public final class JavaPackCompiler {
 
     public JavaPackBuildResult validate(Path contentRoot, Path allocationManifestPath,
                                         JavaPackTarget target, Path tooltipAssetsRoot, Path containerGuiAssetsRoot) {
+        return validate(contentRoot, allocationManifestPath, target,
+                tooltipAssetsRoot, containerGuiAssetsRoot, ContainerGuiSettings.defaults());
+    }
+
+    public JavaPackBuildResult validate(Path contentRoot, Path allocationManifestPath,
+                                        JavaPackTarget target, Path tooltipAssetsRoot, Path containerGuiAssetsRoot,
+                                        ContainerGuiSettings containerGuiSettings) {
         validateTooltipAssets(tooltipAssetsRoot);
         validateContainerGuiAssets(containerGuiAssetsRoot);
-        return compileWithAllAuthoredAssets(contentRoot, null, allocationManifestPath, target, false);
+        ContainerGuiLayout containerGuiLayout = ContainerGuiLayout.load(
+                containerGuiAssetsRoot, containerGuiSettings);
+        return compileWithAllAuthoredAssets(contentRoot, null, allocationManifestPath, target, false,
+                containerGuiLayout);
     }
 
     /**
@@ -128,11 +147,13 @@ public final class JavaPackCompiler {
     private JavaPackBuildResult compileWithAllAuthoredAssets(Path contentRoot, Path outputZip,
                                                               Path allocationManifestPath,
                                                               JavaPackTarget target,
-                                                              boolean writeOutput) {
+                                                              boolean writeOutput,
+                                                              ContainerGuiLayout containerGuiLayout) {
         List<ContentPack> packs = packDiscovery.discover(contentRoot);
         List<AuthoredAsset> additionalAssets = collectAdditionalAssets(packs);
         if (additionalAssets.isEmpty()) {
-            return engine.compile(contentRoot, outputZip, allocationManifestPath, target, writeOutput);
+            return engine.compile(contentRoot, outputZip, allocationManifestPath, target, writeOutput,
+                    containerGuiLayout);
         }
 
         Path stagedRoot = null;
@@ -141,7 +162,8 @@ public final class JavaPackCompiler {
             copyTree(contentRoot, stagedRoot);
             removeAdditionalNamespaces(contentRoot, stagedRoot, packs);
 
-            JavaPackBuildResult result = engine.compile(stagedRoot, outputZip, allocationManifestPath, target, writeOutput);
+            JavaPackBuildResult result = engine.compile(stagedRoot, outputZip, allocationManifestPath, target,
+                    writeOutput, containerGuiLayout);
             if (writeOutput) mergeAdditionalAssets(outputZip, additionalAssets);
             return new JavaPackBuildResult(result.output(), result.allocationManifest(), result.renderedItems(),
                     result.copiedAssets() + additionalAssets.size(), result.renderedBlocks());
@@ -352,8 +374,6 @@ public final class JavaPackCompiler {
         if (!Files.isDirectory(containerGuiAssetsRoot)) {
             throw new JavaPackCompileException("Container GUI assets path is not a directory: " + containerGuiAssetsRoot);
         }
-        validatePng(containerGuiAssetsRoot.resolve("generic_27_top.png"), 176, 85, "Container GUI");
-        validatePng(containerGuiAssetsRoot.resolve("generic_54_top.png"), 176, 139, "Container GUI");
     }
 
     private static void validatePng(Path file, int width, int height, String label) {
