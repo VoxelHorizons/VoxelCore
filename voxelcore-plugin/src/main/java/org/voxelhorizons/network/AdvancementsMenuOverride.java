@@ -90,21 +90,31 @@ public final class AdvancementsMenuOverride implements Listener {
         if (packet == null || player == null) return false;
 
         String packetName = packet.getClass().getSimpleName();
+        String action = readAction(packet);
         if (debug && packetName.toLowerCase(Locale.ROOT).contains("advancement")) {
             plugin.getLogger().info("[PacketDebug] " + player.getName() + " -> "
-                    + packet.getClass().getName() + " action=" + readAction(packet));
+                    + packet.getClass().getName() + " action=" + action
+                    + " overrideEnabled=" + enabled);
         }
 
         if (!enabled || !ADVANCEMENT_PACKET.equals(packetName)) return false;
-
-        String action = readAction(packet);
         if (!"OPENED_TAB".equalsIgnoreCase(action)) return false;
 
+        if (debug) {
+            plugin.getLogger().info("[PacketDebug] Intercepting Advancements OPENED_TAB for "
+                    + player.getName() + "; scheduling /" + command);
+        }
+
         Bukkit.getScheduler().runTask(plugin, () -> {
-            if (player.isOnline()) player.performCommand(command);
+            if (!player.isOnline()) return;
+            boolean result = player.performCommand(command);
+            if (debug) {
+                plugin.getLogger().info("[PacketDebug] Executed /" + command + " as "
+                        + player.getName() + " result=" + result);
+            }
         });
 
-        // Consume the advancement-tab packet so vanilla server handling does not proceed.
+        // Consume only this packet. Every unrelated inbound packet is forwarded by the Netty handler.
         return true;
     }
 
