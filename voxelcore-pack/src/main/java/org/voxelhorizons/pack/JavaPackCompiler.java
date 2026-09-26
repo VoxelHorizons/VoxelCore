@@ -44,28 +44,12 @@ public final class JavaPackCompiler {
 
     public JavaPackBuildResult compile(Path contentRoot, Path outputZip, Path allocationManifestPath,
                                        JavaPackTarget target, Path tooltipAssetsRoot) {
-        return compile(contentRoot, outputZip, allocationManifestPath, target, tooltipAssetsRoot, null);
-    }
-
-    public JavaPackBuildResult compile(Path contentRoot, Path outputZip, Path allocationManifestPath,
-                                       JavaPackTarget target, Path tooltipAssetsRoot, Path containerGuiAssetsRoot) {
-        return compile(contentRoot, outputZip, allocationManifestPath, target,
-                tooltipAssetsRoot, containerGuiAssetsRoot, ContainerGuiSettings.defaults());
-    }
-
-    public JavaPackBuildResult compile(Path contentRoot, Path outputZip, Path allocationManifestPath,
-                                       JavaPackTarget target, Path tooltipAssetsRoot, Path containerGuiAssetsRoot,
-                                       ContainerGuiSettings containerGuiSettings) {
         Path stagedOutput = prepareStagedOutput(outputZip);
         try {
             validateTooltipAssets(tooltipAssetsRoot);
-            validateContainerGuiAssets(containerGuiAssetsRoot);
-            ContainerGuiLayout containerGuiLayout = ContainerGuiLayout.load(
-                    containerGuiAssetsRoot, containerGuiSettings);
             JavaPackBuildResult result = compileWithAllAuthoredAssets(
-                    contentRoot, stagedOutput, allocationManifestPath, target, true, containerGuiLayout);
+                    contentRoot, stagedOutput, allocationManifestPath, target, true);
             mergeTooltipAssets(stagedOutput, tooltipAssetsRoot);
-            mergeContainerGuiAssets(stagedOutput, containerGuiAssetsRoot);
             publishOutput(stagedOutput, outputZip);
             return new JavaPackBuildResult(outputZip, result.allocationManifest(), result.renderedItems(),
                     result.copiedAssets(), result.renderedBlocks());
@@ -89,24 +73,8 @@ public final class JavaPackCompiler {
 
     public JavaPackBuildResult validate(Path contentRoot, Path allocationManifestPath,
                                         JavaPackTarget target, Path tooltipAssetsRoot) {
-        return validate(contentRoot, allocationManifestPath, target, tooltipAssetsRoot, null);
-    }
-
-    public JavaPackBuildResult validate(Path contentRoot, Path allocationManifestPath,
-                                        JavaPackTarget target, Path tooltipAssetsRoot, Path containerGuiAssetsRoot) {
-        return validate(contentRoot, allocationManifestPath, target,
-                tooltipAssetsRoot, containerGuiAssetsRoot, ContainerGuiSettings.defaults());
-    }
-
-    public JavaPackBuildResult validate(Path contentRoot, Path allocationManifestPath,
-                                        JavaPackTarget target, Path tooltipAssetsRoot, Path containerGuiAssetsRoot,
-                                        ContainerGuiSettings containerGuiSettings) {
         validateTooltipAssets(tooltipAssetsRoot);
-        validateContainerGuiAssets(containerGuiAssetsRoot);
-        ContainerGuiLayout containerGuiLayout = ContainerGuiLayout.load(
-                containerGuiAssetsRoot, containerGuiSettings);
-        return compileWithAllAuthoredAssets(contentRoot, null, allocationManifestPath, target, false,
-                containerGuiLayout);
+        return compileWithAllAuthoredAssets(contentRoot, null, allocationManifestPath, target, false);
     }
 
     /**
@@ -147,13 +115,11 @@ public final class JavaPackCompiler {
     private JavaPackBuildResult compileWithAllAuthoredAssets(Path contentRoot, Path outputZip,
                                                               Path allocationManifestPath,
                                                               JavaPackTarget target,
-                                                              boolean writeOutput,
-                                                              ContainerGuiLayout containerGuiLayout) {
+                                                              boolean writeOutput) {
         List<ContentPack> packs = packDiscovery.discover(contentRoot);
         List<AuthoredAsset> additionalAssets = collectAdditionalAssets(packs);
         if (additionalAssets.isEmpty()) {
-            return engine.compile(contentRoot, outputZip, allocationManifestPath, target, writeOutput,
-                    containerGuiLayout);
+            return engine.compile(contentRoot, outputZip, allocationManifestPath, target, writeOutput);
         }
 
         Path stagedRoot = null;
@@ -162,8 +128,7 @@ public final class JavaPackCompiler {
             copyTree(contentRoot, stagedRoot);
             removeAdditionalNamespaces(contentRoot, stagedRoot, packs);
 
-            JavaPackBuildResult result = engine.compile(stagedRoot, outputZip, allocationManifestPath, target,
-                    writeOutput, containerGuiLayout);
+            JavaPackBuildResult result = engine.compile(stagedRoot, outputZip, allocationManifestPath, target, writeOutput);
             if (writeOutput) mergeAdditionalAssets(outputZip, additionalAssets);
             return new JavaPackBuildResult(result.output(), result.allocationManifest(), result.renderedItems(),
                     result.copiedAssets() + additionalAssets.size(), result.renderedBlocks());
@@ -366,51 +331,6 @@ public final class JavaPackCompiler {
             entries.put(target, Files.readAllBytes(source));
         } catch (IOException exception) {
             throw new JavaPackCompileException("Unable to read editable tooltip asset " + source, exception);
-        }
-    }
-
-    private static void validateContainerGuiAssets(Path containerGuiAssetsRoot) {
-        if (containerGuiAssetsRoot == null || !Files.exists(containerGuiAssetsRoot)) return;
-        if (!Files.isDirectory(containerGuiAssetsRoot)) {
-            throw new JavaPackCompileException("Container GUI assets path is not a directory: " + containerGuiAssetsRoot);
-        }
-    }
-
-    private static void validatePng(Path file, int width, int height, String label) {
-        if (!Files.exists(file)) return;
-        if (!Files.isRegularFile(file) || Files.isSymbolicLink(file)) {
-            throw new JavaPackCompileException(label + " asset must be a regular PNG file: " + file);
-        }
-        try {
-            BufferedImage image = ImageIO.read(file.toFile());
-            if (image == null) throw new JavaPackCompileException(label + " asset is not a readable PNG: " + file);
-            if (image.getWidth() != width || image.getHeight() != height) {
-                throw new JavaPackCompileException(label + " asset " + file.getFileName()
-                        + " must remain " + width + "x" + height + " pixels; found "
-                        + image.getWidth() + "x" + image.getHeight());
-            }
-        } catch (IOException exception) {
-            throw new JavaPackCompileException("Unable to inspect " + label.toLowerCase(java.util.Locale.ROOT)
-                    + " asset " + file, exception);
-        }
-    }
-
-    private static void mergeContainerGuiAssets(Path outputZip, Path containerGuiAssetsRoot) {
-        if (containerGuiAssetsRoot == null || !Files.isDirectory(containerGuiAssetsRoot)) return;
-        TreeMap<String, byte[]> entries = readZip(outputZip);
-        mergeRuntimeAsset(entries, containerGuiAssetsRoot.resolve("generic_27_top.png"),
-                "assets/voxelcore/textures/container/gui/generic_27_top.png", "container GUI");
-        mergeRuntimeAsset(entries, containerGuiAssetsRoot.resolve("generic_54_top.png"),
-                "assets/voxelcore/textures/container/gui/generic_54_top.png", "container GUI");
-        writeDeterministicZip(outputZip, entries);
-    }
-
-    private static void mergeRuntimeAsset(TreeMap<String, byte[]> entries, Path source, String target, String label) {
-        if (!Files.isRegularFile(source)) return;
-        try {
-            entries.put(target, Files.readAllBytes(source));
-        } catch (IOException exception) {
-            throw new JavaPackCompileException("Unable to read editable " + label + " asset " + source, exception);
         }
     }
 
