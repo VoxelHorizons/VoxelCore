@@ -188,7 +188,13 @@ public final class VoxelCore extends JavaPlugin {
             getServer().getPluginManager().registerEvents(new ChatPlaceholderListener(textPlaceholderService), this);
             PaperChatPlaceholderBridge.registerIfAvailable(this, textPlaceholderService);
             getServer().getPluginManager().registerEvents(
-                    new InventoryTitlePlaceholderListener(this, textPlaceholderService), this);
+                    new InventoryTitlePlaceholderListener(
+                            this,
+                            textPlaceholderService,
+                            config.getBoolean("ui.chest_prefixes.enabled", true),
+                            config.getString("ui.chest_prefixes.single", ":offset_-8::generic_27_top::offset_8:"),
+                            config.getString("ui.chest_prefixes.double", ":offset_-8::generic_54_top::offset_8:")),
+                    this);
             new PlayerListPlaceholderSynchronizer(this, textPlaceholderService).start();
             PlaceholderApiIntegration.registerIfAvailable(this, textPlaceholderService);
         }
@@ -314,6 +320,8 @@ public final class VoxelCore extends JavaPlugin {
         saveResourceIfMissing("assets/tooltip/left.png");
         saveResourceIfMissing("assets/tooltip/center.png");
         saveResourceIfMissing("assets/tooltip/right.png");
+        saveResourceIfMissing("assets/container/gui/generic_27_top.png");
+        saveResourceIfMissing("assets/container/gui/generic_54_top.png");
     }
 
     private void saveResourceIfMissing(String resourcePath) {
