@@ -1,3 +1,10 @@
-version: 1 # DO NOT CHANGE
+version: 2 # DO NOT CHANGE
 game:
   bedrock_support: false # Reserved for a future integration; currently has no runtime effect
+
+ui:
+  chest_prefixes:
+    enabled: true
+    # These are applied only to physical chest inventories, not plugin-created virtual chest GUIs.
+    single: ':offset_-8::generic_27_top::offset_8:'
+    double: ':offset_-8::generic_54_top::offset_8:'
