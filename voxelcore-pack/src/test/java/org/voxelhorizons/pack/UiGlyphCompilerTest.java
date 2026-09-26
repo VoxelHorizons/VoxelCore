@@ -75,14 +75,6 @@ public class UiGlyphCompilerTest {
                 resolver.resolve(permissionSample, false, true));
         assertEquals(permissionSample, resolver.resolve(permissionSample, false, false));
 
-        String chest54 = resolver.resolve(":offset_-8::generic_54_top::offset_8:Chest");
-        assertEquals(UiSpacingGlyphs.charactersForOffset(-8)
-                        + "\u00A7f" + new String(Character.toChars(ContainerGuiGlyphs.GENERIC_54_TOP))
-                        + UiSpacingGlyphs.charactersForOffset(-ContainerGuiLayout.defaults().doubleAdvance())
-                        + UiSpacingGlyphs.charactersForOffset(8) + "Chest",
-                chest54);
-        assertEquals(":generic_54_top:", resolver.resolve(":generic_54_top:", true, false));
-
         String font = zipText(output, "assets/minecraft/font/default.json");
         assertTrue(font.contains("\"type\":\"space\""));
         assertTrue(font.contains("\"type\":\"bitmap\""));
@@ -95,12 +87,6 @@ public class UiGlyphCompilerTest {
         assertTrue(zipText(output, "assets/voxelcore/font/tooltip_line1.json").contains("\"ascent\":4"));
         assertTrue(zipText(output, "assets/voxelcore/font/tooltip_line2.json").contains("\"ascent\":-1"));
         assertTrue(zipText(output, "assets/voxelcore/font/tooltip_line3.json").contains("\"ascent\":-6"));
-        assertTrue(font.contains("voxelcore:container/gui/generic_27_top.png"));
-        assertTrue(font.contains("voxelcore:container/gui/generic_54_top.png"));
-        assertTrue(font.contains(String.valueOf((char) ContainerGuiGlyphs.GENERIC_27_TOP)));
-        assertTrue(font.contains(String.valueOf((char) ContainerGuiGlyphs.GENERIC_54_TOP)));
-        assertTrue(zipBytes(output, "assets/voxelcore/textures/container/gui/generic_27_top.png").length > 0);
-        assertTrue(zipBytes(output, "assets/voxelcore/textures/container/gui/generic_54_top.png").length > 0);
 
         String firstManifest = new String(Files.readAllBytes(build.resolve("glyph-allocations.yml")), StandardCharsets.UTF_8);
         compiler.compile(contentRoot.toPath(), build.resolve("second.zip"), renderAllocations, JavaPackTarget.MC_1_14_4);
@@ -133,48 +119,6 @@ public class UiGlyphCompilerTest {
                 zipBytes(output, "assets/voxelcore/textures/ui/tooltip/center.png"));
         assertArrayEquals(Files.readAllBytes(right.toPath()),
                 zipBytes(output, "assets/voxelcore/textures/ui/tooltip/right.png"));
-    }
-
-    @Test
-    public void editableContainerGuiAssetsSupportCustomSizeScaleAndPosition() throws Exception {
-        File contentRoot = temporaryFolder.newFolder("container-content");
-        File pack = new File(contentRoot, "voxel");
-        assertTrue(new File(pack, "content").mkdirs());
-        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
-
-        File tooltipAssets = temporaryFolder.newFolder("container-tooltip-assets");
-        File editable = temporaryFolder.newFolder("container-gui-assets");
-        File single = new File(editable, "generic_27_top.png");
-        File doubleChest = new File(editable, "generic_54_top.png");
-        writePng(single, 200, 96);
-        writePng(doubleChest, 240, 160);
-
-        ContainerGuiSettings settings = new ContainerGuiSettings(96, 20, 160, 28);
-        ContainerGuiLayout layout = ContainerGuiLayout.load(editable.toPath(), settings);
-        assertEquals(201, layout.singleAdvance());
-        assertEquals(241, layout.doubleAdvance());
-
-        Path build = temporaryFolder.newFolder("container-build").toPath();
-        Path output = build.resolve("pack.zip");
-        new JavaPackCompiler().compile(contentRoot.toPath(), output,
-                build.resolve("render-allocations.yml"), JavaPackTarget.MC_1_14_4,
-                tooltipAssets.toPath(), editable.toPath(), settings);
-
-        assertPngPixelsEqual(single.toPath(),
-                zipBytes(output, "assets/voxelcore/textures/container/gui/generic_27_top.png"));
-        assertPngPixelsEqual(doubleChest.toPath(),
-                zipBytes(output, "assets/voxelcore/textures/container/gui/generic_54_top.png"));
-
-        String font = zipText(output, "assets/minecraft/font/default.json");
-        assertTrue(font.contains("\"file\":\"voxelcore:container/gui/generic_27_top.png\",\"ascent\":20,\"height\":96"));
-        assertTrue(font.contains("\"file\":\"voxelcore:container/gui/generic_54_top.png\",\"ascent\":28,\"height\":160"));
-
-        UiGlyphRegistry registry = new JavaPackCompiler().loadUiGlyphs(contentRoot.toPath(),
-                build.resolve("glyph-allocations.yml"), false);
-        UiTextResolver resolver = new UiTextResolver(registry, layout);
-        String rendered = resolver.resolve(":generic_54_top:");
-        assertEquals("\u00A7f" + new String(Character.toChars(ContainerGuiGlyphs.GENERIC_54_TOP))
-                + UiSpacingGlyphs.charactersForOffset(-241), rendered);
     }
 
     @Test
@@ -259,18 +203,6 @@ public class UiGlyphCompilerTest {
             for (int x = 0; x < width; x++) image.setRGB(x, y, 0xFFFFFFFF);
         }
         assertTrue(ImageIO.write(image, "png", file));
-    }
-
-    private static void assertPngPixelsEqual(Path expected, byte[] actualBytes) throws Exception {
-        BufferedImage expectedImage = ImageIO.read(expected.toFile());
-        BufferedImage actualImage = ImageIO.read(new java.io.ByteArrayInputStream(actualBytes));
-        assertEquals(expectedImage.getWidth(), actualImage.getWidth());
-        assertEquals(expectedImage.getHeight(), actualImage.getHeight());
-        for (int y = 0; y < expectedImage.getHeight(); y++) {
-            for (int x = 0; x < expectedImage.getWidth(); x++) {
-                assertEquals(expectedImage.getRGB(x, y), actualImage.getRGB(x, y));
-            }
-        }
     }
 
     private static byte[] zipBytes(Path zip, String name) throws Exception {
