@@ -29,7 +29,8 @@ public final class UiTextResolver {
      */
     public String resolve(String input, boolean allowInline, boolean allowGui) {
         if (input == null || input.indexOf(':') < 0) return input;
-        String resolved = glyphs.resolveAliases(input, true, allowInline, allowGui);
+        String resolved = allowGui ? ContainerGuiGlyphs.resolveAliases(input, true) : input;
+        resolved = glyphs.resolveAliases(resolved, true, allowInline, allowGui);
         if (!allowGui) return resolved;
         Matcher matcher = OFFSET.matcher(resolved);
         StringBuffer output = new StringBuffer();
