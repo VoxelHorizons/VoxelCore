@@ -48,6 +48,8 @@ public final class JavaPackTarget {
     public JavaPackMode mode() { return mode; }
     public boolean supportsUiFonts() { return packFormat >= 4; }
     public boolean supportsFlattenedBlockStates() { return packFormat >= 4; }
+    /** oversized_in_gui was added to item definitions after the 1.21.4 format. */
+    public boolean supportsOversizedInGui() { return packFormat >= 63; }
 
     /**
      * Returns the atlas definition used by item models for this target, or {@code null}
