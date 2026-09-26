@@ -75,6 +75,14 @@ public class UiGlyphCompilerTest {
                 resolver.resolve(permissionSample, false, true));
         assertEquals(permissionSample, resolver.resolve(permissionSample, false, false));
 
+        String chest54 = resolver.resolve(":offset_-8::generic_54_top::offset_8:Chest");
+        assertEquals(UiSpacingGlyphs.charactersForOffset(-8)
+                        + "\u00A7f" + new String(Character.toChars(ContainerGuiGlyphs.GENERIC_54_TOP))
+                        + UiSpacingGlyphs.charactersForOffset(-ContainerGuiGlyphs.ADVANCE)
+                        + UiSpacingGlyphs.charactersForOffset(8) + "Chest",
+                chest54);
+        assertEquals(":generic_54_top:", resolver.resolve(":generic_54_top:", true, false));
+
         String font = zipText(output, "assets/minecraft/font/default.json");
         assertTrue(font.contains("\"type\":\"space\""));
         assertTrue(font.contains("\"type\":\"bitmap\""));
@@ -87,6 +95,12 @@ public class UiGlyphCompilerTest {
         assertTrue(zipText(output, "assets/voxelcore/font/tooltip_line1.json").contains("\"ascent\":4"));
         assertTrue(zipText(output, "assets/voxelcore/font/tooltip_line2.json").contains("\"ascent\":-1"));
         assertTrue(zipText(output, "assets/voxelcore/font/tooltip_line3.json").contains("\"ascent\":-6"));
+        assertTrue(font.contains("voxelcore:container/gui/generic_27_top.png"));
+        assertTrue(font.contains("voxelcore:container/gui/generic_54_top.png"));
+        assertTrue(font.contains(String.valueOf((char) ContainerGuiGlyphs.GENERIC_27_TOP)));
+        assertTrue(font.contains(String.valueOf((char) ContainerGuiGlyphs.GENERIC_54_TOP)));
+        assertTrue(zipBytes(output, "assets/voxelcore/textures/container/gui/generic_27_top.png").length > 0);
+        assertTrue(zipBytes(output, "assets/voxelcore/textures/container/gui/generic_54_top.png").length > 0);
 
         String firstManifest = new String(Files.readAllBytes(build.resolve("glyph-allocations.yml")), StandardCharsets.UTF_8);
         compiler.compile(contentRoot.toPath(), build.resolve("second.zip"), renderAllocations, JavaPackTarget.MC_1_14_4);
@@ -119,6 +133,32 @@ public class UiGlyphCompilerTest {
                 zipBytes(output, "assets/voxelcore/textures/ui/tooltip/center.png"));
         assertArrayEquals(Files.readAllBytes(right.toPath()),
                 zipBytes(output, "assets/voxelcore/textures/ui/tooltip/right.png"));
+    }
+
+    @Test
+    public void editableContainerGuiAssetsOverrideCompilerDefaults() throws Exception {
+        File contentRoot = temporaryFolder.newFolder("container-content");
+        File pack = new File(contentRoot, "voxel");
+        assertTrue(new File(pack, "content").mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
+
+        File tooltipAssets = temporaryFolder.newFolder("container-tooltip-assets");
+        File editable = temporaryFolder.newFolder("container-gui-assets");
+        File single = new File(editable, "generic_27_top.png");
+        File doubleChest = new File(editable, "generic_54_top.png");
+        writePng(single, 176, 85);
+        writePng(doubleChest, 176, 139);
+
+        Path build = temporaryFolder.newFolder("container-build").toPath();
+        Path output = build.resolve("pack.zip");
+        new JavaPackCompiler().compile(contentRoot.toPath(), output,
+                build.resolve("render-allocations.yml"), JavaPackTarget.MC_1_14_4,
+                tooltipAssets.toPath(), editable.toPath());
+
+        assertArrayEquals(Files.readAllBytes(single.toPath()),
+                zipBytes(output, "assets/voxelcore/textures/container/gui/generic_27_top.png"));
+        assertArrayEquals(Files.readAllBytes(doubleChest.toPath()),
+                zipBytes(output, "assets/voxelcore/textures/container/gui/generic_54_top.png"));
     }
 
     @Test
