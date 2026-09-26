@@ -44,12 +44,19 @@ public final class JavaPackCompiler {
 
     public JavaPackBuildResult compile(Path contentRoot, Path outputZip, Path allocationManifestPath,
                                        JavaPackTarget target, Path tooltipAssetsRoot) {
+        return compile(contentRoot, outputZip, allocationManifestPath, target, tooltipAssetsRoot, null);
+    }
+
+    public JavaPackBuildResult compile(Path contentRoot, Path outputZip, Path allocationManifestPath,
+                                       JavaPackTarget target, Path tooltipAssetsRoot, Path containerGuiAssetsRoot) {
         Path stagedOutput = prepareStagedOutput(outputZip);
         try {
             validateTooltipAssets(tooltipAssetsRoot);
+            validateContainerGuiAssets(containerGuiAssetsRoot);
             JavaPackBuildResult result = compileWithAllAuthoredAssets(
                     contentRoot, stagedOutput, allocationManifestPath, target, true);
             mergeTooltipAssets(stagedOutput, tooltipAssetsRoot);
+            mergeContainerGuiAssets(stagedOutput, containerGuiAssetsRoot);
             publishOutput(stagedOutput, outputZip);
             return new JavaPackBuildResult(outputZip, result.allocationManifest(), result.renderedItems(),
                     result.copiedAssets(), result.renderedBlocks());
@@ -73,7 +80,13 @@ public final class JavaPackCompiler {
 
     public JavaPackBuildResult validate(Path contentRoot, Path allocationManifestPath,
                                         JavaPackTarget target, Path tooltipAssetsRoot) {
+        return validate(contentRoot, allocationManifestPath, target, tooltipAssetsRoot, null);
+    }
+
+    public JavaPackBuildResult validate(Path contentRoot, Path allocationManifestPath,
+                                        JavaPackTarget target, Path tooltipAssetsRoot, Path containerGuiAssetsRoot) {
         validateTooltipAssets(tooltipAssetsRoot);
+        validateContainerGuiAssets(containerGuiAssetsRoot);
         return compileWithAllAuthoredAssets(contentRoot, null, allocationManifestPath, target, false);
     }
 
@@ -331,6 +344,53 @@ public final class JavaPackCompiler {
             entries.put(target, Files.readAllBytes(source));
         } catch (IOException exception) {
             throw new JavaPackCompileException("Unable to read editable tooltip asset " + source, exception);
+        }
+    }
+
+    private static void validateContainerGuiAssets(Path containerGuiAssetsRoot) {
+        if (containerGuiAssetsRoot == null || !Files.exists(containerGuiAssetsRoot)) return;
+        if (!Files.isDirectory(containerGuiAssetsRoot)) {
+            throw new JavaPackCompileException("Container GUI assets path is not a directory: " + containerGuiAssetsRoot);
+        }
+        validatePng(containerGuiAssetsRoot.resolve("generic_27_top.png"), 176, 85, "Container GUI");
+        validatePng(containerGuiAssetsRoot.resolve("generic_54_top.png"), 176, 139, "Container GUI");
+    }
+
+    private static void validatePng(Path file, int width, int height, String label) {
+        if (!Files.exists(file)) return;
+        if (!Files.isRegularFile(file) || Files.isSymbolicLink(file)) {
+            throw new JavaPackCompileException(label + " asset must be a regular PNG file: " + file);
+        }
+        try {
+            BufferedImage image = ImageIO.read(file.toFile());
+            if (image == null) throw new JavaPackCompileException(label + " asset is not a readable PNG: " + file);
+            if (image.getWidth() != width || image.getHeight() != height) {
+                throw new JavaPackCompileException(label + " asset " + file.getFileName()
+                        + " must remain " + width + "x" + height + " pixels; found "
+                        + image.getWidth() + "x" + image.getHeight());
+            }
+        } catch (IOException exception) {
+            throw new JavaPackCompileException("Unable to inspect " + label.toLowerCase(java.util.Locale.ROOT)
+                    + " asset " + file, exception);
+        }
+    }
+
+    private static void mergeContainerGuiAssets(Path outputZip, Path containerGuiAssetsRoot) {
+        if (containerGuiAssetsRoot == null || !Files.isDirectory(containerGuiAssetsRoot)) return;
+        TreeMap<String, byte[]> entries = readZip(outputZip);
+        mergeRuntimeAsset(entries, containerGuiAssetsRoot.resolve("generic_27_top.png"),
+                "assets/voxelcore/textures/container/gui/generic_27_top.png", "container GUI");
+        mergeRuntimeAsset(entries, containerGuiAssetsRoot.resolve("generic_54_top.png"),
+                "assets/voxelcore/textures/container/gui/generic_54_top.png", "container GUI");
+        writeDeterministicZip(outputZip, entries);
+    }
+
+    private static void mergeRuntimeAsset(TreeMap<String, byte[]> entries, Path source, String target, String label) {
+        if (!Files.isRegularFile(source)) return;
+        try {
+            entries.put(target, Files.readAllBytes(source));
+        } catch (IOException exception) {
+            throw new JavaPackCompileException("Unable to read editable " + label + " asset " + source, exception);
         }
     }
 
