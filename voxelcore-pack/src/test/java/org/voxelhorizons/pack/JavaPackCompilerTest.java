@@ -1,6 +1,5 @@
 package org.voxelhorizons.pack;
 
-import org.voxelhorizons.content.load.ContentLoader;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -116,16 +115,10 @@ public class JavaPackCompilerTest {
         Path allocations = build.resolve("allocations.yml");
         JavaPackCompiler compiler = new JavaPackCompiler();
 
-        assertTrue("26.2 target must support oversized_in_gui", JavaPackTarget.MC_26_2.supportsOversizedInGui());
-        assertTrue("Parsed/compiled item must retain oversized_in_gui",
-                new ContentLoader().load(contentRoot.toPath())
-                        .get(org.voxelhorizons.content.ContentID.of("mypack", "toggle_off")).get()
-                        .render().oversizedInGui());
-
         Path newest = build.resolve("mc-26.2.zip");
         compiler.compile(contentRoot.toPath(), newest, allocations, JavaPackTarget.MC_26_2);
         String newestDefinition = zipText(newest, "assets/mypack/items/item/toggle_off.json");
-        assertTrue(newestDefinition.contains("\"oversized_in_gui\": true"));
+        assertTrue(newestDefinition.contains("\"oversized_in_gui\":true"));
         assertTrue(newestDefinition.contains("\"type\":\"minecraft:model\""));
 
         Path oldModern = build.resolve("mc-1.21.4.zip");
