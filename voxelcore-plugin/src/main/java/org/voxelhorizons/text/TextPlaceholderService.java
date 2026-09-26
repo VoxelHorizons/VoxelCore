@@ -1,6 +1,5 @@
 package org.voxelhorizons.text;
 
-import org.voxelhorizons.pack.ContainerGuiLayout;
 import org.voxelhorizons.pack.UiGlyphRegistry;
 import org.voxelhorizons.pack.UiTextResolver;
 
@@ -9,11 +8,7 @@ public final class TextPlaceholderService {
     private volatile UiTextResolver resolver;
 
     public TextPlaceholderService(UiGlyphRegistry glyphs) {
-        this(glyphs, ContainerGuiLayout.defaults());
-    }
-
-    public TextPlaceholderService(UiGlyphRegistry glyphs, ContainerGuiLayout containerGuiLayout) {
-        update(glyphs, containerGuiLayout);
+        update(glyphs);
     }
 
     public String resolve(String input) {
@@ -25,10 +20,6 @@ public final class TextPlaceholderService {
     }
 
     public void update(UiGlyphRegistry glyphs) {
-        update(glyphs, ContainerGuiLayout.defaults());
-    }
-
-    public void update(UiGlyphRegistry glyphs, ContainerGuiLayout containerGuiLayout) {
-        resolver = new UiTextResolver(glyphs, containerGuiLayout);
+        resolver = new UiTextResolver(glyphs);
     }
 }
