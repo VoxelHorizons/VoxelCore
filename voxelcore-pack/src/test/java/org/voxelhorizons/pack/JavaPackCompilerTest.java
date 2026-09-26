@@ -128,6 +128,44 @@ public class JavaPackCompilerTest {
     }
 
     @Test
+    public void preservesAuthoredModernItemDefinitionInsteadOfGeneratingProvider() throws Exception {
+        File contentRoot = temporaryFolder.newFolder("authored-item-content");
+        File pack = new File(contentRoot, "voxel");
+        assertTrue(new File(pack, "content").mkdirs());
+        assertTrue(new File(pack, "assets/voxel/models/ui/profile").mkdirs());
+        assertTrue(new File(pack, "assets/voxel/items/ui/profile").mkdirs());
+
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
+        write(new File(pack, "content/profile.yml"),
+                "items:\n" +
+                "  portrait:\n" +
+                "    material: minecraft:player_head\n" +
+                "    render:\n" +
+                "      model: voxel:ui/profile/portrait\n" +
+                "      oversized_in_gui: true\n");
+
+        write(new File(pack, "assets/voxel/models/ui/profile/portrait.json"),
+                "{\"parent\":\"builtin/entity\"}\n");
+
+        String authored = "{\"oversized_in_gui\":true,\"model\":{\"type\":\"minecraft:composite\","
+                + "\"models\":[{\"type\":\"minecraft:model\",\"model\":\"voxel:ui/profile/portrait_bounds\"},"
+                + "{\"type\":\"minecraft:special\",\"base\":\"voxel:ui/profile/portrait\","
+                + "\"model\":{\"type\":\"minecraft:player_head\"}}]}}";
+        write(new File(pack, "assets/voxel/items/ui/profile/portrait.json"), authored);
+
+        Path build = temporaryFolder.newFolder("authored-item-build").toPath();
+        Path output = build.resolve("mc-26.2.zip");
+        new JavaPackCompiler().compile(contentRoot.toPath(), output,
+                build.resolve("allocations.yml"), JavaPackTarget.MC_26_2);
+
+        String compiled = zipText(output, "assets/voxel/items/ui/profile/portrait.json");
+        assertEquals(authored, compiled);
+        assertTrue(compiled.contains("\"minecraft:composite\""));
+        assertTrue(compiled.contains("\"minecraft:special\""));
+        assertTrue(compiled.contains("\"minecraft:player_head\""));
+    }
+
+    @Test
     public void writesModernRangeMetadataForMinecraft262() throws Exception {
         File contentRoot = temporaryFolder.newFolder("metadata-content");
         File pack = new File(contentRoot, "mypack");
