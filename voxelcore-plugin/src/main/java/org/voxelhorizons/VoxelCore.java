@@ -82,6 +82,7 @@ public final class VoxelCore extends JavaPlugin {
     private PackManager packManager;
     private TextPlaceholderService textPlaceholderService;
     private TooltipRenderer tooltipRenderer;
+    private InventoryTitlePlaceholderListener inventoryTitlePlaceholderListener;
     private ContentBrowser contentBrowser;
     private Path contentRoot;
 
@@ -187,14 +188,13 @@ public final class VoxelCore extends JavaPlugin {
         if (packManager.currentTarget().supportsUiFonts()) {
             getServer().getPluginManager().registerEvents(new ChatPlaceholderListener(textPlaceholderService), this);
             PaperChatPlaceholderBridge.registerIfAvailable(this, textPlaceholderService);
-            getServer().getPluginManager().registerEvents(
-                    new InventoryTitlePlaceholderListener(
-                            this,
-                            textPlaceholderService,
-                            config.getBoolean("ui.chest_prefixes.enabled", false),
-                            config.getString("ui.chest_prefixes.single", ""),
-                            config.getString("ui.chest_prefixes.double", "")),
-                    this);
+            inventoryTitlePlaceholderListener = new InventoryTitlePlaceholderListener(
+                    this,
+                    textPlaceholderService,
+                    config.getBoolean("ui.chest_prefixes.enabled", false),
+                    config.getString("ui.chest_prefixes.single", ""),
+                    config.getString("ui.chest_prefixes.double", ""));
+            getServer().getPluginManager().registerEvents(inventoryTitlePlaceholderListener, this);
             new PlayerListPlaceholderSynchronizer(this, textPlaceholderService).start();
             PlaceholderApiIntegration.registerIfAvailable(this, textPlaceholderService);
         }
@@ -239,6 +239,7 @@ public final class VoxelCore extends JavaPlugin {
         if (contentReloader == null || contentRuntime == null || packManager == null) {
             throw new IllegalStateException("VoxelCore content runtime is not initialized");
         }
+        reloadRuntimeConfiguration();
         try {
             packManager.uiGlyphs(false);
         } catch (RuntimeException exception) {
@@ -257,6 +258,17 @@ public final class VoxelCore extends JavaPlugin {
             logger.warning("Content reload failed; revision " + result.activeRevision() + " remains active. " + result.message());
         }
         return result;
+    }
+
+    private void reloadRuntimeConfiguration() {
+        reloadConfig();
+        config = getConfig();
+        if (inventoryTitlePlaceholderListener != null) {
+            inventoryTitlePlaceholderListener.updateChestPrefixes(
+                    config.getBoolean("ui.chest_prefixes.enabled", false),
+                    config.getString("ui.chest_prefixes.single", ""),
+                    config.getString("ui.chest_prefixes.double", ""));
+        }
     }
 
     public VersionAdapter getVersionAdapter() { return versionAdapter; }
