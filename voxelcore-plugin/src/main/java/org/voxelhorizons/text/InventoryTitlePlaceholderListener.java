@@ -1,5 +1,6 @@
 package org.voxelhorizons.text;
 
+import org.bukkit.ChatColor;
 import org.bukkit.block.Chest;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.event.EventHandler;
@@ -74,7 +75,7 @@ public final class InventoryTitlePlaceholderListener implements Listener {
         final String originalTitle = event.getView().getTitle();
         final String configuredChestTitle = chestTitle(openedTop);
         final String titleInput = configuredChestTitle == null ? originalTitle : configuredChestTitle;
-        final String resolvedTitle = placeholders.resolve(titleInput);
+        final String resolvedTitle = resolveTitle(titleInput);
 
         if (resolvedTitle == null || resolvedTitle.equals(originalTitle)) return;
 
@@ -99,7 +100,7 @@ public final class InventoryTitlePlaceholderListener implements Listener {
                 // title too rather than blindly restoring the event-time value.
                 String currentTitle = currentView.getTitle();
                 String configured = chestTitle(openedTop);
-                String titleToApply = placeholders.resolve(configured == null ? currentTitle : configured);
+                String titleToApply = resolveTitle(configured == null ? currentTitle : configured);
                 if (titleToApply == null || titleToApply.equals(currentTitle)) return;
 
                 try {
@@ -109,6 +110,13 @@ public final class InventoryTitlePlaceholderListener implements Listener {
                 }
             }
         });
+    }
+
+    private String resolveTitle(String input) {
+        if (input == null) return null;
+        String colored = ChatColor.translateAlternateColorCodes('&', input);
+        String resolved = placeholders.resolve(colored);
+        return resolved == null ? null : ChatColor.translateAlternateColorCodes('&', resolved);
     }
 
     private String chestTitle(Inventory inventory) {
