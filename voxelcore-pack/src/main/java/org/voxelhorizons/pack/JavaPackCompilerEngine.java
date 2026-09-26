@@ -48,6 +48,13 @@ final class JavaPackCompilerEngine {
 
     JavaPackBuildResult compile(Path contentRoot, Path outputZip, Path allocationManifestPath,
                                 JavaPackTarget target, boolean writeOutput) {
+        return compile(contentRoot, outputZip, allocationManifestPath, target, writeOutput,
+                ContainerGuiLayout.defaults());
+    }
+
+    JavaPackBuildResult compile(Path contentRoot, Path outputZip, Path allocationManifestPath,
+                                JavaPackTarget target, boolean writeOutput,
+                                ContainerGuiLayout containerGuiLayout) {
         if (contentRoot == null || allocationManifestPath == null || target == null) {
             throw new IllegalArgumentException("Compiler arguments cannot be null");
         }
@@ -80,7 +87,7 @@ final class JavaPackCompilerEngine {
         if (target.supportsUiFonts()) {
             writeTooltipResources(entries);
             writeContainerGuiResources(entries);
-            writeUiFont(entries, glyphs);
+            writeUiFont(entries, glyphs, containerGuiLayout);
         }
 
         List<ItemDefinition> items = new ArrayList<ItemDefinition>(registry.entries().values());
@@ -480,7 +487,8 @@ final class JavaPackCompilerEngine {
         putEntry(entries, atlasPath, utf8(atlas.toString()));
     }
 
-    private static void writeUiFont(Map<String, byte[]> entries, UiGlyphRegistry glyphs) {
+    private static void writeUiFont(Map<String, byte[]> entries, UiGlyphRegistry glyphs,
+                                    ContainerGuiLayout containerGuiLayout) {
         StringBuilder out = new StringBuilder("{\n  \"providers\": [\n");
         out.append("    {\"type\":\"space\",\"advances\":{");
         boolean firstAdvance = true;
@@ -506,7 +514,7 @@ final class JavaPackCompilerEngine {
         }
         String tooltipProviders = TooltipPackResources.defaultProviders();
         if (!tooltipProviders.isEmpty()) out.append(",\n    ").append(tooltipProviders);
-        String containerProviders = ContainerGuiPackResources.defaultProviders();
+        String containerProviders = ContainerGuiPackResources.defaultProviders(containerGuiLayout);
         if (!containerProviders.isEmpty()) out.append(",\n    ").append(containerProviders);
         out.append("\n  ]\n}\n");
         String path = AuthoredFontSupport.DEFAULT_FONT_PATH;
