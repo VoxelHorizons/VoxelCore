@@ -84,6 +84,16 @@ plugins/VoxelCore/assets/tooltip/
 
 These files are the default tooltip border templates bundled with the plugin. Edit the pixels in place and the next `pack validate` / `pack build` uses those files instead of the embedded fallback artwork. The three templates must remain exactly `2x38` pixels so their font advances remain stable. Existing files are never overwritten during startup, so plugin updates preserve local artwork changes. An optional `right_offset.png` may also be supplied at `4x38`; otherwise VoxelCore keeps its built-in offset variant.
 
+Physical chest titles can optionally be prefixed with any normal VoxelCore UI/offset placeholders. This does not add or bundle chest artwork: define the image through the ordinary `ui:` content system, then reference its placeholder from `config.yml`. Virtual/plugin-created chest GUIs are not modified.
+
+```yaml
+ui:
+  chest_prefixes:
+    enabled: true
+    single: ':offset_-8::generic_27_top::offset_8:'
+    double: ':offset_-8::generic_54_top::offset_8:'
+```
+
 When PlaceholderAPI is installed, VoxelCore registers an optional persistent `voxelcore` expansion. `%voxelcore_font_staff%` resolves exactly like `:staff:`, including GUI spacing behavior, while `%voxelcore_font_voxel/staff%` selects the explicit `voxel:staff` ContentID when aliases are ambiguous. Font names may contain underscores. Unknown or ambiguous names remain unresolved, and VoxelCore continues to work without PlaceholderAPI installed.
 
 When ShopGUI+ is installed, VoxelCore registers an optional custom-item provider during ShopGUI+'s supported post-enable lifecycle. A shop entry can reference any concrete VoxelCore item by ContentID:
