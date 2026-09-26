@@ -9,16 +9,10 @@ public final class UiTextResolver {
     private static final Pattern OFFSET = Pattern.compile(":offset_(-?\\d+):");
 
     private final UiGlyphRegistry glyphs;
-    private final ContainerGuiLayout containerGuiLayout;
 
     public UiTextResolver(UiGlyphRegistry glyphs) {
-        this(glyphs, ContainerGuiLayout.defaults());
-    }
-
-    public UiTextResolver(UiGlyphRegistry glyphs, ContainerGuiLayout containerGuiLayout) {
         if (glyphs == null) throw new IllegalArgumentException("glyphs cannot be null");
         this.glyphs = glyphs;
-        this.containerGuiLayout = containerGuiLayout == null ? ContainerGuiLayout.defaults() : containerGuiLayout;
     }
 
     /**
@@ -35,8 +29,7 @@ public final class UiTextResolver {
      */
     public String resolve(String input, boolean allowInline, boolean allowGui) {
         if (input == null || input.indexOf(':') < 0) return input;
-        String resolved = allowGui ? ContainerGuiGlyphs.resolveAliases(input, true, containerGuiLayout) : input;
-        resolved = glyphs.resolveAliases(resolved, true, allowInline, allowGui);
+        String resolved = glyphs.resolveAliases(input, true, allowInline, allowGui);
         if (!allowGui) return resolved;
         Matcher matcher = OFFSET.matcher(resolved);
         StringBuffer output = new StringBuffer();
