@@ -1,10 +1,12 @@
 package org.voxelhorizons.text;
 
+import org.bukkit.block.Chest;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.inventory.DoubleChest;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.plugin.Plugin;
@@ -24,14 +26,23 @@ public final class InventoryTitlePlaceholderListener implements Listener {
     private final Plugin plugin;
     private final TextPlaceholderService placeholders;
     private final Method setTitleMethod;
+    private final boolean chestPrefixesEnabled;
+    private final String singleChestPrefix;
+    private final String doubleChestPrefix;
     private boolean warnedUnavailable;
     private boolean warnedFailure;
 
-    public InventoryTitlePlaceholderListener(Plugin plugin, TextPlaceholderService placeholders) {
+    public InventoryTitlePlaceholderListener(Plugin plugin, TextPlaceholderService placeholders,
+                                             boolean chestPrefixesEnabled,
+                                             String singleChestPrefix,
+                                             String doubleChestPrefix) {
         if (plugin == null) throw new IllegalArgumentException("plugin cannot be null");
         if (placeholders == null) throw new IllegalArgumentException("placeholders cannot be null");
         this.plugin = plugin;
         this.placeholders = placeholders;
+        this.chestPrefixesEnabled = chestPrefixesEnabled;
+        this.singleChestPrefix = singleChestPrefix == null ? "" : singleChestPrefix;
+        this.doubleChestPrefix = doubleChestPrefix == null ? "" : doubleChestPrefix;
         this.setTitleMethod = findSetTitleMethod();
     }
 
@@ -49,7 +60,9 @@ public final class InventoryTitlePlaceholderListener implements Listener {
         final HumanEntity player = event.getPlayer();
         final Inventory openedTop = event.getInventory();
         final String originalTitle = event.getView().getTitle();
-        final String resolvedTitle = placeholders.resolve(originalTitle);
+        final String eventPrefix = chestPrefix(openedTop);
+        final String eventInput = eventPrefix + originalTitle;
+        final String resolvedTitle = placeholders.resolve(eventInput);
 
         if (resolvedTitle == null || resolvedTitle.equals(originalTitle)) return;
 
@@ -62,7 +75,7 @@ public final class InventoryTitlePlaceholderListener implements Listener {
                 // Another plugin may have changed the title after the open event. Resolve that newer
                 // title too rather than blindly restoring the event-time value.
                 String currentTitle = currentView.getTitle();
-                String titleToApply = placeholders.resolve(currentTitle);
+                String titleToApply = placeholders.resolve(chestPrefix(openedTop) + currentTitle);
                 if (titleToApply == null || titleToApply.equals(currentTitle)) return;
 
                 try {
@@ -72,6 +85,15 @@ public final class InventoryTitlePlaceholderListener implements Listener {
                 }
             }
         });
+    }
+
+    private String chestPrefix(Inventory inventory) {
+        if (!chestPrefixesEnabled || inventory == null) return "";
+        Object holder = inventory.getHolder();
+        if (!(holder instanceof Chest) && !(holder instanceof DoubleChest)) return "";
+        if (inventory.getSize() == 27) return singleChestPrefix;
+        if (inventory.getSize() == 54) return doubleChestPrefix;
+        return "";
     }
 
     private static boolean sameInventory(Inventory current, Inventory opened) {
