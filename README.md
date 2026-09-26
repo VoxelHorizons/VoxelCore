@@ -84,6 +84,30 @@ plugins/VoxelCore/assets/tooltip/
 
 These files are the default tooltip border templates bundled with the plugin. Edit the pixels in place and the next `pack validate` / `pack build` uses those files instead of the embedded fallback artwork. The three templates must remain exactly `2x38` pixels so their font advances remain stable. Existing files are never overwritten during startup, so plugin updates preserve local artwork changes. An optional `right_offset.png` may also be supplied at `4x38`; otherwise VoxelCore keeps its built-in offset variant.
 
+VoxelCore also provides two compiler-owned container restoration glyphs, `:generic_27_top:` and `:generic_54_top:`. They are intended for packs that replace the vanilla `generic_54` container texture to build custom menu chrome: physical single and double chests can overlay the original-looking chest top without affecting plugin-created virtual chest GUIs.
+
+The default configuration is:
+
+```yaml
+ui:
+  chest_prefixes:
+    enabled: true
+    single: ':offset_-8::generic_27_top::offset_8:'
+    double: ':offset_-8::generic_54_top::offset_8:'
+```
+
+Only inventories backed by a real Bukkit `Chest` or `DoubleChest` holder receive these prefixes. The surrounding `-8/+8` offsets align the 176-pixel artwork with the vanilla container origin while returning the text cursor to its original position, so the normal chest title still renders correctly.
+
+On first startup, editable copies are extracted to:
+
+```text
+plugins/VoxelCore/assets/container/gui/
+├── generic_27_top.png
+└── generic_54_top.png
+```
+
+The single-chest template must remain `176x85` and the double-chest template `176x139`. Existing files are never overwritten. The next resource-pack validation/build uses the edited copies in place of the embedded defaults.
+
 When PlaceholderAPI is installed, VoxelCore registers an optional persistent `voxelcore` expansion. `%voxelcore_font_staff%` resolves exactly like `:staff:`, including GUI spacing behavior, while `%voxelcore_font_voxel/staff%` selects the explicit `voxel:staff` ContentID when aliases are ambiguous. Font names may contain underscores. Unknown or ambiguous names remain unresolved, and VoxelCore continues to work without PlaceholderAPI installed.
 
 When ShopGUI+ is installed, VoxelCore registers an optional custom-item provider during ShopGUI+'s supported post-enable lifecycle. A shop entry can reference any concrete VoxelCore item by ContentID:
