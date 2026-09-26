@@ -78,7 +78,7 @@ public class UiGlyphCompilerTest {
         String chest54 = resolver.resolve(":offset_-8::generic_54_top::offset_8:Chest");
         assertEquals(UiSpacingGlyphs.charactersForOffset(-8)
                         + "\u00A7f" + new String(Character.toChars(ContainerGuiGlyphs.GENERIC_54_TOP))
-                        + UiSpacingGlyphs.charactersForOffset(-ContainerGuiGlyphs.ADVANCE)
+                        + UiSpacingGlyphs.charactersForOffset(-ContainerGuiLayout.defaults().doubleAdvance())
                         + UiSpacingGlyphs.charactersForOffset(8) + "Chest",
                 chest54);
         assertEquals(":generic_54_top:", resolver.resolve(":generic_54_top:", true, false));
@@ -136,7 +136,7 @@ public class UiGlyphCompilerTest {
     }
 
     @Test
-    public void editableContainerGuiAssetsOverrideCompilerDefaults() throws Exception {
+    public void editableContainerGuiAssetsSupportCustomSizeScaleAndPosition() throws Exception {
         File contentRoot = temporaryFolder.newFolder("container-content");
         File pack = new File(contentRoot, "voxel");
         assertTrue(new File(pack, "content").mkdirs());
@@ -146,19 +146,35 @@ public class UiGlyphCompilerTest {
         File editable = temporaryFolder.newFolder("container-gui-assets");
         File single = new File(editable, "generic_27_top.png");
         File doubleChest = new File(editable, "generic_54_top.png");
-        writePng(single, 176, 85);
-        writePng(doubleChest, 176, 139);
+        writePng(single, 200, 96);
+        writePng(doubleChest, 240, 160);
+
+        ContainerGuiSettings settings = new ContainerGuiSettings(96, 20, 160, 28);
+        ContainerGuiLayout layout = ContainerGuiLayout.load(editable.toPath(), settings);
+        assertEquals(201, layout.singleAdvance());
+        assertEquals(241, layout.doubleAdvance());
 
         Path build = temporaryFolder.newFolder("container-build").toPath();
         Path output = build.resolve("pack.zip");
         new JavaPackCompiler().compile(contentRoot.toPath(), output,
                 build.resolve("render-allocations.yml"), JavaPackTarget.MC_1_14_4,
-                tooltipAssets.toPath(), editable.toPath());
+                tooltipAssets.toPath(), editable.toPath(), settings);
 
         assertPngPixelsEqual(single.toPath(),
                 zipBytes(output, "assets/voxelcore/textures/container/gui/generic_27_top.png"));
         assertPngPixelsEqual(doubleChest.toPath(),
                 zipBytes(output, "assets/voxelcore/textures/container/gui/generic_54_top.png"));
+
+        String font = zipText(output, "assets/minecraft/font/default.json");
+        assertTrue(font.contains("\"file\":\"voxelcore:container/gui/generic_27_top.png\",\"ascent\":20,\"height\":96"));
+        assertTrue(font.contains("\"file\":\"voxelcore:container/gui/generic_54_top.png\",\"ascent\":28,\"height\":160"));
+
+        UiGlyphRegistry registry = new JavaPackCompiler().loadUiGlyphs(contentRoot.toPath(),
+                build.resolve("glyph-allocations.yml"), false);
+        UiTextResolver resolver = new UiTextResolver(registry, layout);
+        String rendered = resolver.resolve(":generic_54_top:");
+        assertEquals("\u00A7f" + new String(Character.toChars(ContainerGuiGlyphs.GENERIC_54_TOP))
+                + UiSpacingGlyphs.charactersForOffset(-241), rendered);
     }
 
     @Test
