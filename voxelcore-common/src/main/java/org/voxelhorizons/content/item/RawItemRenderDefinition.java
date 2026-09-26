@@ -10,10 +10,11 @@ public final class RawItemRenderDefinition {
     private final Integer durability;
     private final Map<String, Boolean> attributes;
     private final CustomModelDataDefinition customModelData;
+    private final Boolean oversizedInGui;
     private final Map<String, Object> rule;
 
     public RawItemRenderDefinition(String model, CustomModelDataDefinition customModelData) {
-        this(model, null, null, null, customModelData, null);
+        this(model, null, null, null, customModelData, null, null);
     }
 
     public RawItemRenderDefinition(String model,
@@ -21,7 +22,7 @@ public final class RawItemRenderDefinition {
                                    Integer durability,
                                    Map<String, Boolean> attributes,
                                    CustomModelDataDefinition customModelData) {
-        this(model, unbreakable, durability, attributes, customModelData, null);
+        this(model, unbreakable, durability, attributes, customModelData, null, null);
     }
 
     public RawItemRenderDefinition(String model,
@@ -30,11 +31,22 @@ public final class RawItemRenderDefinition {
                                    Map<String, Boolean> attributes,
                                    CustomModelDataDefinition customModelData,
                                    Map<String, Object> rule) {
+        this(model, unbreakable, durability, attributes, customModelData, null, rule);
+    }
+
+    public RawItemRenderDefinition(String model,
+                                   Boolean unbreakable,
+                                   Integer durability,
+                                   Map<String, Boolean> attributes,
+                                   CustomModelDataDefinition customModelData,
+                                   Boolean oversizedInGui,
+                                   Map<String, Object> rule) {
         this.model = model;
         this.unbreakable = unbreakable;
         this.durability = durability;
         this.attributes = attributes == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, Boolean>(attributes));
         this.customModelData = customModelData;
+        this.oversizedInGui = oversizedInGui;
         this.rule = rule == null ? null : Collections.unmodifiableMap(new LinkedHashMap<String, Object>(rule));
     }
 
@@ -43,5 +55,6 @@ public final class RawItemRenderDefinition {
     public Integer durability() { return durability; }
     public Map<String, Boolean> attributes() { return attributes; }
     public CustomModelDataDefinition customModelData() { return customModelData; }
+    public Boolean oversizedInGui() { return oversizedInGui; }
     public Map<String, Object> rule() { return rule; }
 }

@@ -1,5 +1,6 @@
 package org.voxelhorizons.pack;
 
+
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -91,6 +92,39 @@ public class JavaPackCompilerTest {
         Path secondNumeric = build.resolve("numeric-second.zip");
         compiler.compile(contentRoot.toPath(), secondNumeric, allocations, JavaPackTarget.numericCmd("1.14-test", 4));
         assertEquals(java.util.Arrays.toString(Files.readAllBytes(numeric)), java.util.Arrays.toString(Files.readAllBytes(secondNumeric)));
+    }
+
+    @Test
+    public void generatesOversizedInGuiForSupportedModernTargets() throws Exception {
+        File contentRoot = temporaryFolder.newFolder("oversized-content");
+        File pack = new File(contentRoot, "mypack");
+        assertTrue(new File(pack, "content").mkdirs());
+        assertTrue(new File(pack, "assets/mypack/models/item").mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: mypack\n");
+        write(new File(pack, "content/ui.yml"),
+                "items:\n" +
+                "  toggle_off:\n" +
+                "    material: minecraft:paper\n" +
+                "    render:\n" +
+                "      model: mypack:item/toggle_off\n" +
+                "      oversized_in_gui: true\n");
+        write(new File(pack, "assets/mypack/models/item/toggle_off.json"),
+                "{\"parent\":\"minecraft:item/generated\"}\n");
+
+        Path build = temporaryFolder.newFolder("oversized-build").toPath();
+        Path allocations = build.resolve("allocations.yml");
+        JavaPackCompiler compiler = new JavaPackCompiler();
+
+        Path newest = build.resolve("mc-26.2.zip");
+        compiler.compile(contentRoot.toPath(), newest, allocations, JavaPackTarget.MC_26_2);
+        String newestDefinition = zipText(newest, "assets/mypack/items/item/toggle_off.json");
+        assertTrue(newestDefinition.contains("\"oversized_in_gui\":true"));
+        assertTrue(newestDefinition.contains("\"type\":\"minecraft:model\""));
+
+        Path oldModern = build.resolve("mc-1.21.4.zip");
+        compiler.compile(contentRoot.toPath(), oldModern, allocations, JavaPackTarget.MC_1_21_4);
+        String oldDefinition = zipText(oldModern, "assets/mypack/items/item/toggle_off.json");
+        assertTrue(!oldDefinition.contains("oversized_in_gui"));
     }
 
     @Test

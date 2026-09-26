@@ -27,7 +27,7 @@ public final class ItemDefinitionParser {
             "extends", "type", "material", "display_name", "lore", "bound", "abstract", "render", "properties", "events"
     ));
     private static final Set<String> RENDER_KEYS = new HashSet<String>(Arrays.asList(
-            "model", "unbreakable", "durability", "attributes", "custom_model_data", "rule"
+            "model", "unbreakable", "durability", "attributes", "custom_model_data", "oversized_in_gui", "rule"
     ));
     private final ActionDefinitionParser actions = new ActionDefinitionParser();
 
@@ -107,6 +107,7 @@ public final class ItemDefinitionParser {
             Integer durability = nonNegativeInteger(renderMap, "durability", id, file);
             Map<String, Boolean> attributes = booleanMap(renderMap, "attributes", id, file);
             CustomModelDataDefinition customModelData = parseCustomModelData(renderMap, id, file);
+            Boolean oversizedInGui = booleanValue(renderMap, "oversized_in_gui", id, file);
             Map<String, Object> rule = null;
             if (renderMap.containsKey("rule")) {
                 Object rawRule = renderMap.get("rule");
@@ -114,7 +115,8 @@ public final class ItemDefinitionParser {
                 rule = normalizeRuleMap((Map<?, ?>) rawRule, file);
                 if (rule.isEmpty()) throw new ContentLoadException("render.rule cannot be empty for " + id + " in " + file);
             }
-            render = new RawItemRenderDefinition(model, unbreakable, durability, attributes, customModelData, rule);
+            render = new RawItemRenderDefinition(model, unbreakable, durability, attributes, customModelData,
+                    oversizedInGui, rule);
         }
 
         Map<String, Object> properties = null;
