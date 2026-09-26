@@ -101,11 +101,13 @@ public final class AdvancementsMenuOverride implements Listener {
         if (!enabled || !ADVANCEMENT_PACKET.equals(packetName)) return false;
         if (!"OPENED_TAB".equalsIgnoreCase(action)) return false;
 
+        boolean blankSent = packets.blankClientAdvancements(player);
         boolean closeSent = packets.closeClientScreen(player);
 
         if (debug) {
             plugin.getLogger().info("[PacketDebug] Intercepting Advancements OPENED_TAB for "
                     + player.getName()
+                    + "; blankAdvancementsSent=" + blankSent
                     + "; closeScreenSent=" + closeSent
                     + "; scheduling /" + command);
         }
@@ -132,6 +134,15 @@ public final class AdvancementsMenuOverride implements Listener {
                         + " consumedByListener=" + consumedByListener
                         + " dispatched=" + dispatched);
             }
+
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (!player.isOnline()) return;
+                boolean restored = packets.restoreClientAdvancements(player);
+                if (debug) {
+                    plugin.getLogger().info("[PacketDebug] Restored advancement cache for "
+                            + player.getName() + " result=" + restored);
+                }
+            }, 2L);
         });
 
         // Consume only this packet. Every unrelated inbound packet is forwarded by the Netty handler.

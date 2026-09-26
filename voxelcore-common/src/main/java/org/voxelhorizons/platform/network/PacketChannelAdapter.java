@@ -13,6 +13,16 @@ public interface PacketChannelAdapter {
      */
     default boolean closeClientScreen(Player player) { return false; }
 
+    /**
+     * Temporarily clears the client's advancement cache without changing server-side progress.
+     */
+    default boolean blankClientAdvancements(Player player) { return false; }
+
+    /**
+     * Restores the client's advancement cache from the server's current in-memory advancement state.
+     */
+    default boolean restoreClientAdvancements(Player player) { return false; }
+
     interface PacketInterceptor {
         /**
          * @return true to consume/cancel the inbound packet, false to pass it through.

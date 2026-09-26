@@ -9,7 +9,13 @@ import org.voxelhorizons.platform.network.PacketChannelAdapter;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -97,6 +103,115 @@ public final class v26_2_PacketChannelAdapter implements PacketChannelAdapter {
     }
 
     @Override
+    public boolean blankClientAdvancements(Player player) {
+        if (player == null) return false;
+
+        try {
+            Channel channel = channels.get(player.getUniqueId());
+            if (channel == null) channel = resolveChannel(player);
+            if (channel == null) return false;
+
+            ClassLoader loader = player.getClass().getClassLoader();
+            Class<?> updateClass = Class.forName(
+                    "net.minecraft.network.protocol.game.ClientboundUpdateAdvancementsPacket",
+                    true,
+                    loader);
+            Object resetPacket = updateClass
+                    .getConstructor(boolean.class, Collection.class, Set.class, Map.class, boolean.class)
+                    .newInstance(
+                            true,
+                            Collections.emptyList(),
+                            Collections.emptySet(),
+                            Collections.emptyMap(),
+                            false);
+
+            Class<?> selectClass = Class.forName(
+                    "net.minecraft.network.protocol.game.ClientboundSelectAdvancementsTabPacket",
+                    true,
+                    loader);
+            Class<?> identifierClass = Class.forName(
+                    "net.minecraft.resources.Identifier",
+                    true,
+                    loader);
+            Object clearSelection = selectClass.getConstructor(identifierClass).newInstance(new Object[]{null});
+
+            final Channel target = channel;
+            target.eventLoop().execute(() -> {
+                target.write(resetPacket);
+                target.writeAndFlush(clearSelection);
+            });
+            return true;
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    @Override
+    public boolean restoreClientAdvancements(Player player) {
+        if (player == null) return false;
+
+        try {
+            Channel channel = channels.get(player.getUniqueId());
+            if (channel == null) channel = resolveChannel(player);
+            if (channel == null) return false;
+
+            Object serverPlayer = player.getClass().getMethod("getHandle").invoke(player);
+            if (serverPlayer == null) return false;
+
+            Method getAdvancements = serverPlayer.getClass().getMethod("getAdvancements");
+            Object advancements = getAdvancements.invoke(serverPlayer);
+            if (advancements == null) return false;
+
+            Field visibleField = findDeclaredField(advancements.getClass(), "visible");
+            Field progressField = findDeclaredField(advancements.getClass(), "progress");
+            if (visibleField == null || progressField == null) return false;
+
+            visibleField.setAccessible(true);
+            progressField.setAccessible(true);
+
+            Object visibleRaw = visibleField.get(advancements);
+            Object progressRaw = progressField.get(advancements);
+            if (!(visibleRaw instanceof Set) || !(progressRaw instanceof Map)) return false;
+
+            @SuppressWarnings("unchecked")
+            Set<Object> visible = (Set<Object>) visibleRaw;
+            @SuppressWarnings("unchecked")
+            Map<Object, Object> serverProgress = (Map<Object, Object>) progressRaw;
+
+            List<Object> added = new ArrayList<>(visible);
+            Map<Object, Object> progress = new LinkedHashMap<>();
+
+            for (Object holder : visible) {
+                Object advancementProgress = serverProgress.get(holder);
+                if (advancementProgress == null) continue;
+                Method idMethod = holder.getClass().getMethod("id");
+                Object identifier = idMethod.invoke(holder);
+                if (identifier != null) progress.put(identifier, advancementProgress);
+            }
+
+            ClassLoader loader = player.getClass().getClassLoader();
+            Class<?> updateClass = Class.forName(
+                    "net.minecraft.network.protocol.game.ClientboundUpdateAdvancementsPacket",
+                    true,
+                    loader);
+            Object restorePacket = updateClass
+                    .getConstructor(boolean.class, Collection.class, Set.class, Map.class, boolean.class)
+                    .newInstance(
+                            true,
+                            added,
+                            Collections.emptySet(),
+                            progress,
+                            false);
+
+            final Channel target = channel;
+            target.eventLoop().execute(() -> target.writeAndFlush(restorePacket));
+            return true;
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    @Override
     public void uninject(Player player) {
         if (player == null) return;
 
@@ -159,6 +274,18 @@ public final class v26_2_PacketChannelAdapter implements PacketChannelAdapter {
                 }
             }
             type = type.getSuperclass();
+        }
+        return null;
+    }
+
+    private static Field findDeclaredField(Class<?> type, String name) {
+        Class<?> current = type;
+        while (current != null) {
+            try {
+                return current.getDeclaredField(name);
+            } catch (NoSuchFieldException ignored) {
+                current = current.getSuperclass();
+            }
         }
         return null;
     }
