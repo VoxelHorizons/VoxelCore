@@ -92,8 +92,14 @@ The default configuration is:
 ui:
   chest_prefixes:
     enabled: true
-    single: ':offset_-8::generic_27_top::offset_8:'
-    double: ':offset_-8::generic_54_top::offset_8:'
+    single:
+      prefix: ':offset_-8::generic_27_top::offset_8:'
+      scale_ratio: 85
+      y_position: 13
+    double:
+      prefix: ':offset_-8::generic_54_top::offset_8:'
+      scale_ratio: 139
+      y_position: 13
 ```
 
 Only inventories backed by a real Bukkit `Chest` or `DoubleChest` holder receive these prefixes. The surrounding `-8/+8` offsets align the 176-pixel artwork with the vanilla container origin while returning the text cursor to its original position, so the normal chest title still renders correctly.
@@ -106,7 +112,7 @@ plugins/VoxelCore/assets/container/gui/
 └── generic_54_top.png
 ```
 
-The single-chest template must remain `176x85` and the double-chest template `176x139`. Existing files are never overwritten. The next resource-pack validation/build uses the edited copies in place of the embedded defaults.
+Existing files are never overwritten. The next resource-pack validation/build uses the edited copies in place of the embedded defaults. The PNGs may also be resized: `scale_ratio` controls the bitmap provider's rendered height and `y_position` controls its ascent/vertical placement. VoxelCore reads the current PNG dimensions and recalculates the glyph advance automatically, so the built-in placeholder still rewinds by the correct scaled width after an asset is resized.
 
 When PlaceholderAPI is installed, VoxelCore registers an optional persistent `voxelcore` expansion. `%voxelcore_font_staff%` resolves exactly like `:staff:`, including GUI spacing behavior, while `%voxelcore_font_voxel/staff%` selects the explicit `voxel:staff` ContentID when aliases are ambiguous. Font names may contain underscores. Unknown or ambiguous names remain unresolved, and VoxelCore continues to work without PlaceholderAPI installed.
 
