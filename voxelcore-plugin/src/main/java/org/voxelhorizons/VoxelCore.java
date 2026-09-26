@@ -264,10 +264,10 @@ public final class VoxelCore extends JavaPlugin {
         reloadConfig();
         config = getConfig();
         if (inventoryTitlePlaceholderListener != null) {
-            inventoryTitlePlaceholderListener.updateChestPrefixes(
-                    config.getBoolean("ui.chest_prefixes.enabled", false),
-                    config.getString("ui.chest_prefixes.single", ""),
-                    config.getString("ui.chest_prefixes.double", ""));
+            inventoryTitlePlaceholderListener.updateChestTitles(
+                    config.getBoolean("ui.chest_titles.enabled", false),
+                    config.getString("ui.chest_titles.single", ""),
+                    config.getString("ui.chest_titles.double", ""));
         }
     }
 
