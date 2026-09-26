@@ -73,6 +73,30 @@ public final class v26_2_PacketChannelAdapter implements PacketChannelAdapter {
     }
 
     @Override
+    public boolean closeClientScreen(Player player) {
+        if (player == null) return false;
+
+        try {
+            Channel channel = channels.get(player.getUniqueId());
+            if (channel == null) channel = resolveChannel(player);
+            if (channel == null) return false;
+
+            ClassLoader loader = player.getClass().getClassLoader();
+            Class<?> packetClass = Class.forName(
+                    "net.minecraft.network.protocol.game.ClientboundContainerClosePacket",
+                    true,
+                    loader);
+            Object packet = packetClass.getConstructor(int.class).newInstance(0);
+
+            final Channel target = channel;
+            target.eventLoop().execute(() -> target.writeAndFlush(packet));
+            return true;
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    @Override
     public void uninject(Player player) {
         if (player == null) return;
 
