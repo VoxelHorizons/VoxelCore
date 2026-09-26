@@ -6,5 +6,11 @@ ui:
   chest_prefixes:
     enabled: true
     # These are applied only to physical chest inventories, not plugin-created virtual chest GUIs.
-    single: ':offset_-8::generic_27_top::offset_8:'
-    double: ':offset_-8::generic_54_top::offset_8:'
+    single:
+      prefix: ':offset_-8::generic_27_top::offset_8:'
+      scale_ratio: 85
+      y_position: 13
+    double:
+      prefix: ':offset_-8::generic_54_top::offset_8:'
+      scale_ratio: 139
+      y_position: 13
