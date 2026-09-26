@@ -1,10 +1,10 @@
-version: 2 # DO NOT CHANGE
+version: 3 # DO NOT CHANGE
 game:
   bedrock_support: false # Reserved for a future integration; currently has no runtime effect
 
 ui:
-  chest_prefixes:
+  chest_titles:
     enabled: false
-    # Applied only to real physical chests. These may contain normal VoxelCore UI/offset placeholders.
+    # Full titles used for real physical chests. Normal VoxelCore UI/offset placeholders are supported.
     single: ''
     double: ''
