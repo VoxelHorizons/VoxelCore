@@ -32,6 +32,7 @@ import org.voxelhorizons.content.runtime.ContentSnapshot;
 import org.voxelhorizons.content.runtime.ContentSnapshotValidator;
 import org.voxelhorizons.item.ItemManager;
 import org.voxelhorizons.item.DyeableItemListener;
+import org.voxelhorizons.network.AdvancementsMenuOverride;
 import org.voxelhorizons.integration.shopgui.ShopGuiPlusIntegration;
 import org.voxelhorizons.block.BlockManager;
 import org.voxelhorizons.block.BlockListener;
@@ -84,6 +85,7 @@ public final class VoxelCore extends JavaPlugin {
     private TooltipRenderer tooltipRenderer;
     private InventoryTitlePlaceholderListener inventoryTitlePlaceholderListener;
     private ContentBrowser contentBrowser;
+    private AdvancementsMenuOverride advancementsMenuOverride;
     private Path contentRoot;
 
     public static VoxelCore getInstance() { return instance; }
@@ -173,6 +175,8 @@ public final class VoxelCore extends JavaPlugin {
         blockManager = new BlockManager(contentRuntime, versionAdapter.version().atLeast(1, 13, 0));
         contentBrowser = new ContentBrowser(this);
         getServer().getPluginManager().registerEvents(contentBrowser, this);
+        advancementsMenuOverride = new AdvancementsMenuOverride(this, versionAdapter.packets());
+        advancementsMenuOverride.register();
         blockMiningSpeedController = new BlockMiningSpeedController(this, blockManager,
                 versionAdapter.version().atLeast(1, 20, 5));
         actionExecutor = new ActionExecutor(blockManager, itemManager);
@@ -229,6 +233,7 @@ public final class VoxelCore extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (advancementsMenuOverride != null) advancementsMenuOverride.shutdown();
         if (blockMiningSpeedController != null) blockMiningSpeedController.clearAll();
         if (config == null || configFile == null) return;
         try { config.save(configFile); }
@@ -263,6 +268,7 @@ public final class VoxelCore extends JavaPlugin {
     private void reloadRuntimeConfiguration() {
         reloadConfig();
         config = getConfig();
+        if (advancementsMenuOverride != null) advancementsMenuOverride.reload();
         if (inventoryTitlePlaceholderListener != null) {
             inventoryTitlePlaceholderListener.updateChestTitles(
                     config.getBoolean("ui.chest_titles.enabled", false),
