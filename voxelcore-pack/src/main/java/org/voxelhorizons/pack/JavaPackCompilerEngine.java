@@ -129,15 +129,34 @@ final class JavaPackCompilerEngine {
 
             if (target.mode() == JavaPackMode.ITEM_MODEL_1_21_4_PLUS) {
                 String itemInfoPath = "assets/" + model.namespace + "/items/" + model.path + ".json";
-                String node = render.rule().isEmpty()
-                        ? modelNode(model, null, allocation)
-                        : compileModernNode(render.rule(), item, itemPack, packsByNamespace, allocation);
-                StringBuilder itemInfo = new StringBuilder("{\n");
-                if (render.oversizedInGui() && target.supportsOversizedInGui()) {
-                    itemInfo.append("  \"oversized_in_gui\": true,\n");
+
+                // If the content pack explicitly authors the modern item provider, preserve it verbatim.
+                // This is required for advanced providers such as minecraft:composite /
+                // minecraft:special player_head renderers used by shader-driven portraits.
+                Path authoredItemInfo = itemPack.root().resolve("assets").resolve(model.namespace)
+                        .resolve("items").resolve(model.path + ".json");
+                if (Files.isRegularFile(authoredItemInfo)) {
+                    try {
+                        byte[] authoredBytes = Files.readAllBytes(authoredItemInfo);
+                        byte[] existing = entries.get(itemInfoPath);
+                        if (existing == null || !java.util.Arrays.equals(existing, authoredBytes)) {
+                            entries.put(itemInfoPath, authoredBytes);
+                        }
+                    } catch (IOException exception) {
+                        throw new JavaPackCompileException("Unable to read authored item definition "
+                                + authoredItemInfo, exception);
+                    }
+                } else {
+                    String node = render.rule().isEmpty()
+                            ? modelNode(model, null, allocation)
+                            : compileModernNode(render.rule(), item, itemPack, packsByNamespace, allocation);
+                    StringBuilder itemInfo = new StringBuilder("{\n");
+                    if (render.oversizedInGui() && target.supportsOversizedInGui()) {
+                        itemInfo.append("  \"oversized_in_gui\": true,\n");
+                    }
+                    itemInfo.append("  \"model\": ").append(node).append("\n}\n");
+                    putEntry(entries, itemInfoPath, utf8(itemInfo.toString()));
                 }
-                itemInfo.append("  \"model\": ").append(node).append("\n}\n");
-                putEntry(entries, itemInfoPath, utf8(itemInfo.toString()));
             } else {
                 Integer predicateValue = target.mode() == JavaPackMode.LEGACY_DAMAGE_UNBREAKABLE
                         ? legacyPredicateValue(item, render, model, blocks, allocation)
