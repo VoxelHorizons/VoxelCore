@@ -39,6 +39,7 @@ import org.voxelhorizons.block.BlockPickListener;
 import org.voxelhorizons.block.BlockMiningSpeedController;
 import org.voxelhorizons.action.ActionExecutor;
 import org.voxelhorizons.action.ItemActionListener;
+import org.voxelhorizons.pack.ContainerGuiSettings;
 import org.voxelhorizons.pack.PackManager;
 import org.voxelhorizons.platform.VersionAdapter;
 import org.voxelhorizons.platform.VersionAdapterFactory;
@@ -151,8 +152,19 @@ public final class VoxelCore extends JavaPlugin {
                             VoxelCore.this.validateBlocks(blocks, allocations, contentLoader.load(contentRoot));
                         }
                     }, blockAllocationStore, modernBlockStates);
-            packManager = new PackManager(getDataFolder().toPath(), contentRoot, versionAdapter.version());
-            textPlaceholderService = new TextPlaceholderService(packManager.uiGlyphs(true));
+            ContainerGuiSettings containerGuiSettings = new ContainerGuiSettings(
+                    config.getInt("ui.chest_prefixes.single.scale_ratio",
+                            ContainerGuiSettings.DEFAULT_SINGLE_SCALE_RATIO),
+                    config.getInt("ui.chest_prefixes.single.y_position",
+                            ContainerGuiSettings.DEFAULT_SINGLE_Y_POSITION),
+                    config.getInt("ui.chest_prefixes.double.scale_ratio",
+                            ContainerGuiSettings.DEFAULT_DOUBLE_SCALE_RATIO),
+                    config.getInt("ui.chest_prefixes.double.y_position",
+                            ContainerGuiSettings.DEFAULT_DOUBLE_Y_POSITION));
+            packManager = new PackManager(getDataFolder().toPath(), contentRoot, versionAdapter.version(),
+                    containerGuiSettings);
+            textPlaceholderService = new TextPlaceholderService(
+                    packManager.uiGlyphs(true), packManager.containerGuiLayout());
             tooltipRenderer = new TooltipRenderer(textPlaceholderService);
         } catch (IOException exception) {
             logger.log(Level.SEVERE, "Unable to create VoxelCore content directory " + contentRoot, exception);
@@ -192,8 +204,8 @@ public final class VoxelCore extends JavaPlugin {
                             this,
                             textPlaceholderService,
                             config.getBoolean("ui.chest_prefixes.enabled", true),
-                            config.getString("ui.chest_prefixes.single", ":offset_-8::generic_27_top::offset_8:"),
-                            config.getString("ui.chest_prefixes.double", ":offset_-8::generic_54_top::offset_8:")),
+                            config.getString("ui.chest_prefixes.single.prefix", ":offset_-8::generic_27_top::offset_8:"),
+                            config.getString("ui.chest_prefixes.double.prefix", ":offset_-8::generic_54_top::offset_8:")),
                     this);
             new PlayerListPlaceholderSynchronizer(this, textPlaceholderService).start();
             PlaceholderApiIntegration.registerIfAvailable(this, textPlaceholderService);
@@ -250,7 +262,7 @@ public final class VoxelCore extends JavaPlugin {
         ContentReloadResult result = contentReloader.reload();
         if (result.success()) {
             blockMiningSpeedController.clearAll();
-            textPlaceholderService.update(packManager.uiGlyphs(true));
+            textPlaceholderService.update(packManager.uiGlyphs(true), packManager.containerGuiLayout());
             logger.info("Published content revision " + result.activeRevision() + " (" + result.itemCount()
                     + " items, " + result.blockCount() + " blocks)");
         } else {
