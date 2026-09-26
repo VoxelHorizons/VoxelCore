@@ -20,15 +20,20 @@ final class ContainerGuiPackResources {
         return entries;
     }
 
-    static String defaultProviders() {
-        return bitmap("voxelcore:container/gui/generic_27_top.png", ContainerGuiGlyphs.GENERIC_27_TOP, 85)
+    static String defaultProviders(ContainerGuiLayout layout) {
+        ContainerGuiSettings settings = layout == null
+                ? ContainerGuiSettings.defaults()
+                : layout.settings();
+        return bitmap("voxelcore:container/gui/generic_27_top.png", ContainerGuiGlyphs.GENERIC_27_TOP,
+                        settings.singleYPosition(), settings.singleScaleRatio())
                 + ",\n    "
-                + bitmap("voxelcore:container/gui/generic_54_top.png", ContainerGuiGlyphs.GENERIC_54_TOP, 139);
+                + bitmap("voxelcore:container/gui/generic_54_top.png", ContainerGuiGlyphs.GENERIC_54_TOP,
+                        settings.doubleYPosition(), settings.doubleScaleRatio());
     }
 
-    private static String bitmap(String file, int codePoint, int height) {
+    private static String bitmap(String file, int codePoint, int ascent, int height) {
         return "{\"type\":\"bitmap\",\"file\":\"" + file + "\",\"ascent\":"
-                + ContainerGuiGlyphs.ASCENT + ",\"height\":" + height
+                + ascent + ",\"height\":" + height
                 + ",\"chars\":[\"" + new String(Character.toChars(codePoint)) + "\"]}";
     }
 
