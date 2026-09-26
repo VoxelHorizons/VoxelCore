@@ -155,9 +155,9 @@ public class UiGlyphCompilerTest {
                 build.resolve("render-allocations.yml"), JavaPackTarget.MC_1_14_4,
                 tooltipAssets.toPath(), editable.toPath());
 
-        assertArrayEquals(Files.readAllBytes(single.toPath()),
+        assertPngPixelsEqual(single.toPath(),
                 zipBytes(output, "assets/voxelcore/textures/container/gui/generic_27_top.png"));
-        assertArrayEquals(Files.readAllBytes(doubleChest.toPath()),
+        assertPngPixelsEqual(doubleChest.toPath(),
                 zipBytes(output, "assets/voxelcore/textures/container/gui/generic_54_top.png"));
     }
 
@@ -243,6 +243,18 @@ public class UiGlyphCompilerTest {
             for (int x = 0; x < width; x++) image.setRGB(x, y, 0xFFFFFFFF);
         }
         assertTrue(ImageIO.write(image, "png", file));
+    }
+
+    private static void assertPngPixelsEqual(Path expected, byte[] actualBytes) throws Exception {
+        BufferedImage expectedImage = ImageIO.read(expected.toFile());
+        BufferedImage actualImage = ImageIO.read(new java.io.ByteArrayInputStream(actualBytes));
+        assertEquals(expectedImage.getWidth(), actualImage.getWidth());
+        assertEquals(expectedImage.getHeight(), actualImage.getHeight());
+        for (int y = 0; y < expectedImage.getHeight(); y++) {
+            for (int x = 0; x < expectedImage.getWidth(); x++) {
+                assertEquals(expectedImage.getRGB(x, y), actualImage.getRGB(x, y));
+            }
+        }
     }
 
     private static byte[] zipBytes(Path zip, String name) throws Exception {
