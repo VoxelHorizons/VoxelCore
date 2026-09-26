@@ -132,7 +132,12 @@ final class JavaPackCompilerEngine {
                 String node = render.rule().isEmpty()
                         ? modelNode(model, null, allocation)
                         : compileModernNode(render.rule(), item, itemPack, packsByNamespace, allocation);
-                putEntry(entries, itemInfoPath, utf8("{\n  \"model\": " + node + "\n}\n"));
+                StringBuilder itemInfo = new StringBuilder("{\n");
+                if (render.oversizedInGui() && target.supportsOversizedInGui()) {
+                    itemInfo.append("  \"oversized_in_gui\": true,\n");
+                }
+                itemInfo.append("  \"model\": ").append(node).append("\n}\n");
+                putEntry(entries, itemInfoPath, utf8(itemInfo.toString()));
             } else {
                 Integer predicateValue = target.mode() == JavaPackMode.LEGACY_DAMAGE_UNBREAKABLE
                         ? legacyPredicateValue(item, render, model, blocks, allocation)
