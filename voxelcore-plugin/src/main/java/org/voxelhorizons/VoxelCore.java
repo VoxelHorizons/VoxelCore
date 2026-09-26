@@ -191,9 +191,9 @@ public final class VoxelCore extends JavaPlugin {
             inventoryTitlePlaceholderListener = new InventoryTitlePlaceholderListener(
                     this,
                     textPlaceholderService,
-                    config.getBoolean("ui.chest_prefixes.enabled", false),
-                    config.getString("ui.chest_prefixes.single", ""),
-                    config.getString("ui.chest_prefixes.double", ""));
+                    config.getBoolean("ui.chest_titles.enabled", false),
+                    config.getString("ui.chest_titles.single", ""),
+                    config.getString("ui.chest_titles.double", ""));
             getServer().getPluginManager().registerEvents(inventoryTitlePlaceholderListener, this);
             new PlayerListPlaceholderSynchronizer(this, textPlaceholderService).start();
             PlaceholderApiIntegration.registerIfAvailable(this, textPlaceholderService);
