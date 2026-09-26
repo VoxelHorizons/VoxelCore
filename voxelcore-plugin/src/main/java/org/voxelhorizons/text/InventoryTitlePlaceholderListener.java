@@ -26,9 +26,9 @@ public final class InventoryTitlePlaceholderListener implements Listener {
     private final Plugin plugin;
     private final TextPlaceholderService placeholders;
     private final Method setTitleMethod;
-    private final boolean chestPrefixesEnabled;
-    private final String singleChestPrefix;
-    private final String doubleChestPrefix;
+    private volatile boolean chestPrefixesEnabled;
+    private volatile String singleChestPrefix;
+    private volatile String doubleChestPrefix;
     private boolean warnedUnavailable;
     private boolean warnedFailure;
 
@@ -44,10 +44,14 @@ public final class InventoryTitlePlaceholderListener implements Listener {
         if (placeholders == null) throw new IllegalArgumentException("placeholders cannot be null");
         this.plugin = plugin;
         this.placeholders = placeholders;
-        this.chestPrefixesEnabled = chestPrefixesEnabled;
-        this.singleChestPrefix = singleChestPrefix == null ? "" : singleChestPrefix;
-        this.doubleChestPrefix = doubleChestPrefix == null ? "" : doubleChestPrefix;
+        updateChestPrefixes(chestPrefixesEnabled, singleChestPrefix, doubleChestPrefix);
         this.setTitleMethod = findSetTitleMethod();
+    }
+
+    public void updateChestPrefixes(boolean enabled, String singlePrefix, String doublePrefix) {
+        this.chestPrefixesEnabled = enabled;
+        this.singleChestPrefix = singlePrefix == null ? "" : singlePrefix;
+        this.doubleChestPrefix = doublePrefix == null ? "" : doublePrefix;
     }
 
     public boolean supported() {
