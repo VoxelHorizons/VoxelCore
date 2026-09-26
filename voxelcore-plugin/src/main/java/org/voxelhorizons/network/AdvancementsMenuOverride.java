@@ -101,9 +101,13 @@ public final class AdvancementsMenuOverride implements Listener {
         if (!enabled || !ADVANCEMENT_PACKET.equals(packetName)) return false;
         if (!"OPENED_TAB".equalsIgnoreCase(action)) return false;
 
+        boolean closeSent = packets.closeClientScreen(player);
+
         if (debug) {
             plugin.getLogger().info("[PacketDebug] Intercepting Advancements OPENED_TAB for "
-                    + player.getName() + "; scheduling /" + command);
+                    + player.getName()
+                    + "; closeScreenSent=" + closeSent
+                    + "; scheduling /" + command);
         }
 
         Bukkit.getScheduler().runTask(plugin, () -> {
