@@ -32,6 +32,10 @@ public final class InventoryTitlePlaceholderListener implements Listener {
     private boolean warnedUnavailable;
     private boolean warnedFailure;
 
+    public InventoryTitlePlaceholderListener(Plugin plugin, TextPlaceholderService placeholders) {
+        this(plugin, placeholders, false, "", "");
+    }
+
     public InventoryTitlePlaceholderListener(Plugin plugin, TextPlaceholderService placeholders,
                                              boolean chestPrefixesEnabled,
                                              String singleChestPrefix,
