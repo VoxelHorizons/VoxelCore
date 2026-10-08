@@ -81,7 +81,13 @@ public final class TooltipRenderer {
                 ? config.getInt(path + ".x_offset", config.getInt(defaults + "x_offset", 55))
                 : overrideOffset.intValue();
 
-        TooltipLayout layout = new TooltipLayout(glyphs, left, center, right, overlap, padding, xOffset);
+        String anchor = config.getString(path + ".anchor", config.getString(defaults + "anchor", "crosshair"));
+        if (!"crosshair".equalsIgnoreCase(anchor) && !"center".equalsIgnoreCase(anchor)) {
+            throw new IllegalArgumentException("Invalid tooltip anchor '" + anchor
+                    + "' for variant '" + id + "' (expected crosshair or center)");
+        }
+        TooltipLayout layout = new TooltipLayout(glyphs, left, center, right, overlap, padding,
+                xOffset, "crosshair".equalsIgnoreCase(anchor));
         String subtitle = layout.compose(prepare(line1), prepare(line2), prepare(line3));
         player.sendTitle("", subtitle, 0, ticks, 0);
     }
