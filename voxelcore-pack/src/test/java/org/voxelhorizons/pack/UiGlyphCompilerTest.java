@@ -93,7 +93,7 @@ public class UiGlyphCompilerTest {
         File contentRoot = temporaryFolder.newFolder("tooltip-content");
         File pack = new File(contentRoot, "voxel");
         assertTrue(new File(pack, "content").mkdirs());
-        write(new File(pack, "pack.yml"), "schema: 1\\nnamespace: voxel\\n");
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
         Path build = temporaryFolder.newFolder("tooltip-build").toPath();
         Path output = build.resolve("pack.zip");
         new JavaPackCompiler().compile(contentRoot.toPath(), output,
