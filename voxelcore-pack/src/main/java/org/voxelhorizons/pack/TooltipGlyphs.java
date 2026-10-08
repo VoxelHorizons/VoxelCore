@@ -53,8 +53,8 @@ public final class TooltipGlyphs {
     public static int lineAscent(int line) {
         switch (line) {
             case 1: return 4;
-            case 2: return -1;
-            case 3: return -6;
+            case 2: return 0;
+            case 3: return -4;
             default: throw new IllegalArgumentException("Tooltip line must be 1, 2 or 3");
         }
     }
