@@ -129,7 +129,7 @@ public final class JavaPackCompiler {
             removeAdditionalNamespaces(contentRoot, stagedRoot, packs);
 
             JavaPackBuildResult result = engine.compile(stagedRoot, outputZip, allocationManifestPath, target, writeOutput);
-            if (writeOutput) mergeAdditionalAssets(outputZip, additionalAssets);
+            if (writeOutput) mergeAdditionalAssets(outputZip, additionalAssets, target);
             return new JavaPackBuildResult(result.output(), result.allocationManifest(), result.renderedItems(),
                     result.copiedAssets() + additionalAssets.size(), result.renderedBlocks());
         } catch (IOException exception) {
@@ -262,7 +262,7 @@ public final class JavaPackCompiler {
         }
     }
 
-    private static void mergeAdditionalAssets(Path outputZip, List<AuthoredAsset> authoredAssets) {
+    private static void mergeAdditionalAssets(Path outputZip, List<AuthoredAsset> authoredAssets, JavaPackTarget target) {
         TreeMap<String, byte[]> entries = readZip(outputZip);
         for (AuthoredAsset asset : authoredAssets) {
             byte[] bytes;
@@ -274,10 +274,13 @@ public final class JavaPackCompiler {
             byte[] previous = entries.put(asset.path, bytes);
             if (previous != null && asset.path.equals(AuthoredFontSupport.DEFAULT_FONT_PATH)) {
                 entries.put(asset.path, AuthoredFontSupport.mergeDefault(bytes, previous));
+            } else if (previous != null && AtlasCompatibility.isAtlas(asset.path)) {
+                entries.put(asset.path, AtlasCompatibility.merge(previous, bytes, asset.path));
             } else if (previous != null && !Arrays.equals(previous, bytes)) {
                 throw new JavaPackCompileException("Resource pack path collision: " + asset.path);
             }
         }
+        if (target.packFormat() >= 88) AtlasCompatibility.repair(entries);
         writeDeterministicZip(outputZip, entries);
     }
 
