@@ -1,4 +1,4 @@
-version: 4 # DO NOT CHANGE
+version: 6 # DO NOT CHANGE
 game:
   bedrock_support: false # Reserved for a future integration; currently has no runtime effect
 
@@ -12,6 +12,25 @@ menu_overrides:
     debug: false
 
 ui:
+  tooltips:
+    # Named popup styles. Each name can use different UI glyphs and positioning.
+    # Omitted keys in a variant inherit the values from 'default'.
+    default:
+      left: 'voxel:tooltip_left'
+      center: 'voxel:tooltip_center'
+      right: 'voxel:tooltip_right'
+      # Bitmap glyphs add one spacing pixel; overlapping by 1 closes each tile seam.
+      tile_overlap: 1
+      horizontal_padding: 4
+      x_offset: 55
+    # Example style: enable it and provide your own optional glyphs in your content pack.
+    # warning:
+    #   left: 'voxel:tooltip_warning_left'
+    #   center: 'voxel:tooltip_warning_center'
+    #   right: 'voxel:tooltip_warning_right'
+    #   tile_overlap: 1
+    #   horizontal_padding: 6
+    #   x_offset: 55
   chest_titles:
     enabled: false
     # Full titles used for real physical chests. Normal VoxelCore UI/offset placeholders are supported.

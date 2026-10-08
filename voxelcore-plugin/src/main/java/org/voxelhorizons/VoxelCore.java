@@ -101,7 +101,6 @@ public final class VoxelCore extends JavaPlugin {
 
         try {
             if (!getDataFolder().exists()) getDataFolder().mkdirs();
-            ensureDefaultAssetTemplates();
             configFile = new File(getDataFolder(), "config.yml");
             if (!configFile.exists()) {
                 logger.info("No Configuration File Found. Generating A New One...");
@@ -156,7 +155,8 @@ public final class VoxelCore extends JavaPlugin {
                     }, blockAllocationStore, modernBlockStates);
             packManager = new PackManager(getDataFolder().toPath(), contentRoot, versionAdapter.version());
             textPlaceholderService = new TextPlaceholderService(packManager.uiGlyphs(true));
-            tooltipRenderer = new TooltipRenderer(textPlaceholderService);
+            tooltipRenderer = new TooltipRenderer(textPlaceholderService,
+                    packManager.uiGlyphs(false), () -> getConfig());
         } catch (IOException exception) {
             logger.log(Level.SEVERE, "Unable to create VoxelCore content directory " + contentRoot, exception);
             getServer().getPluginManager().disablePlugin(this);
@@ -256,7 +256,9 @@ public final class VoxelCore extends JavaPlugin {
         ContentReloadResult result = contentReloader.reload();
         if (result.success()) {
             blockMiningSpeedController.clearAll();
-            textPlaceholderService.update(packManager.uiGlyphs(true));
+            org.voxelhorizons.pack.UiGlyphRegistry currentGlyphs = packManager.uiGlyphs(true);
+            textPlaceholderService.update(currentGlyphs);
+            tooltipRenderer.updateGlyphs(currentGlyphs);
             logger.info("Published content revision " + result.activeRevision() + " (" + result.itemCount()
                     + " items, " + result.blockCount() + " blocks)");
         } else {
@@ -332,22 +334,6 @@ public final class VoxelCore extends JavaPlugin {
                 }
             }
         }
-    }
-
-    private void ensureDefaultAssetTemplates() {
-        saveResourceIfMissing("assets/tooltip/left.png");
-        saveResourceIfMissing("assets/tooltip/center.png");
-        saveResourceIfMissing("assets/tooltip/right.png");
-    }
-
-    private void saveResourceIfMissing(String resourcePath) {
-        File target = new File(getDataFolder(), resourcePath.replace('/', File.separatorChar));
-        if (target.isFile()) return;
-        File parent = target.getParentFile();
-        if (parent != null && !parent.exists() && !parent.mkdirs() && !parent.isDirectory()) {
-            throw new IllegalStateException("Unable to create asset template directory " + parent);
-        }
-        saveResource(resourcePath, false);
     }
 
     private void migrateConfig(int defaultVersion) {
