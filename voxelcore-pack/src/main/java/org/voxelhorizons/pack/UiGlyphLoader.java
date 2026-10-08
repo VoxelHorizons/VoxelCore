@@ -36,12 +36,6 @@ public final class UiGlyphLoader {
                         + " collides with a VoxelCore spacing glyph");
             }
         }
-        for (Integer tooltip : TooltipGlyphs.reservedCodePoints()) {
-            if (authoredSymbols.contains(tooltip)) {
-                throw new ContentLoadException("Authored font symbol " + codePoint(tooltip.intValue())
-                        + " collides with a VoxelCore tooltip glyph");
-            }
-        }
         Map<ContentID, RawGlyph> raw = new LinkedHashMap<ContentID, RawGlyph>();
         for (ContentPack pack : packs) {
             Path root = pack.root().resolve("content");
