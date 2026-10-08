@@ -36,14 +36,16 @@ ui:
       right: 'voxel:tooltip_right'
       tile_overlap: 1
       horizontal_padding: 4
-      x_offset: 55
+      anchor: crosshair
+      x_offset: 8
     warning:
       left: 'voxel:warning_left'
       center: 'voxel:warning_center'
       right: 'voxel:warning_right'
       # Values not listed here inherit from default.
       horizontal_padding: 6
-      x_offset: 55
+      anchor: crosshair
+      x_offset: 8
     quest:
       left: 'voxel:quest_left'
       center: 'voxel:quest_center'
@@ -59,6 +61,10 @@ Use the **full** `namespace:id` for each configured glyph. A missing ID produces
 ## How spacing is calculated
 
 Bitmap glyphs advance by their scaled pixel width **plus one Minecraft spacing pixel**. A 2x38 texture authored with `scale_ratio: 19` paints a 1px-wide section, but advances 2px. VoxelCore now inserts `:offset_-1:` between each tile (`tile_overlap: 1`), so adjacent tiles touch without the black stripes previously visible.
+
+The `anchor` setting can be `crosshair` (default for newly generated config files) or `center` (the former behavior). For `crosshair`, `x_offset: 8` begins the left edge roughly eight font pixels to the right of the screen crosshair, independent of tooltip text width. For `center`, the offset moves the centered tooltip as before. On an existing server, edit `ui.tooltips.default.x_offset` from 55 to 8 and set `anchor: crosshair` explicitly; existing custom config values are not overwritten by migration. Each variant can override either setting.
+
+The three text rows now use ascents `4`, `0`, and `-4` instead of `4`, `-1`, and `-6` to reduce vertical line spacing. Rebuild and republish your resource pack to include the new generated font providers, then reload the client pack.
 
 The effective full background width is computed from each configured glyph's actual advance. The widest of the three text lines determines how many center tiles are needed, plus `horizontal_padding` on each side. Text is moved back with a negative offset over the background. `x_offset` shifts the finished popup horizontally.
 
