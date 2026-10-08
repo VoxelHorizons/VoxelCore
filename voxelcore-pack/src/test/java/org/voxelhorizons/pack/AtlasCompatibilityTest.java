@@ -12,6 +12,26 @@ public class AtlasCompatibilityTest {
         return new String(entries.get(key), StandardCharsets.UTF_8);
     }
 
+    @Test public void acceptsTabIndentedAuthoredModels() {
+        Map<String, byte[]> entries = new TreeMap<String, byte[]>();
+        String help = "assets/voxel/models/block/guide/help.json";
+        String watering = "assets/voxel/models/farming/tools/watering_can.json";
+        String helpJson = "{\n\t\"format_version\": \"1.21.11\",\n\t\"textures\": {\"particle\": \"minecraft:block/oak_planks\"}\n}";
+        String wateringJson = "{\n\t\"__comment\": \"Updated by Flopsi\",\n\t\"textures\": {\"layer0\": \"minecraft:item/stick\"}\n}";
+        entries.put(help, text(helpJson));
+        entries.put(watering, text(wateringJson));
+        AtlasCompatibility.repair(entries);
+        assertEquals(helpJson, read(entries, help));
+        assertEquals(wateringJson, read(entries, watering));
+    }
+
+    @Test public void acceptsTabIndentedAtlasSources() {
+        byte[] authored = text("{\n\t\"sources\": [{\"type\": \"minecraft:directory\", \"source\": \"ui\", \"prefix\": \"ui/\"}]\n}");
+        String merged = new String(AtlasCompatibility.merge(authored, authored,
+                "assets/minecraft/atlases/items.json"), StandardCharsets.UTF_8);
+        assertTrue(merged.contains("\"source\":\"ui\""));
+    }
+
     @Test public void preservesVanillaSourcesAlongsideGeneratedDirectories() {
         Map<String, byte[]> entries = new TreeMap<String, byte[]>();
         entries.put("assets/minecraft/atlases/items.json",
