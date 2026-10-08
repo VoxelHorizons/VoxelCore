@@ -24,10 +24,10 @@ ui:
     y_position: 7
 ```
 
-In VoxelCore's \`config.yml\`, define as many named variants as you need:
+In VoxelCore's `config.yml`, define as many named variants as you need:
 
 
-\`\`\`yaml
+```yaml
 ui:
   tooltips:
     default:
@@ -49,9 +49,9 @@ ui:
       center: 'voxel:quest_center'
       right: 'voxel:quest_right'
 
-\`\`\`
+```
 
-The names \`default\`, \`warning\`, and \`quest\` are examples. Add any lowercase, alphanumeric, underscore or hyphen IDs. Other than \`default\`, variants can omit a value to inherit it from the default configuration. Existing \`ui.tooltip\` values from the single-tooltip implementation are migrated into \`ui.tooltips.default\` on the v6 configuration upgrade without overwriting existing variant values.
+The names `default`, `warning`, and `quest` are examples. Add any lowercase, alphanumeric, underscore or hyphen IDs. Other than `default`, variants can omit a value to inherit it from the default configuration. Existing `ui.tooltip` values from the single-tooltip implementation are migrated into `ui.tooltips.default` on the v6 configuration upgrade without overwriting existing variant values.
 
 
 Use the **full** `namespace:id` for each configured glyph. A missing ID produces a clear error when the tooltip is tested, rather than inserting unseen hardcoded assets. Rebuild and publish your resource pack after changing glyph images, then reload VoxelCore to update the glyph registry.
@@ -64,20 +64,20 @@ The effective full background width is computed from each configured glyph's act
 
 ## Testing variants
 
-Use \`/vc admin ui tooltip <variant> <seconds> <line1> | <line2> | <line3>\`:
+Use `/vc admin ui tooltip <variant> <seconds> <line1> | <line2> | <line3>`:
 
 
-\`\`\`text
+```text
 /vc admin ui tooltip default 5 This is a test | Second Test | Third
 /vc admin ui tooltip warning 5 &cDanger ahead! | Please be careful | &eKeep out
 /vc admin ui tooltip quest 5 New Quest | Discover the portal | &aFollow the path
 
-\`\`\`
+```
 
-The command tab-completes configured tooltip variant names. Running it without enough arguments lists the available names. The previous command syntax \`/vc admin ui tooltip 5 This is a test | Second Test | Third\` remains supported, as do existing Java calls to \`show(player, line1, line2, line3, ticks)\`, both rendering the \`default\` variant.
+The command tab-completes configured tooltip variant names. Running it without enough arguments lists the available names. The previous command syntax `/vc admin ui tooltip 5 This is a test | Second Test | Third` remains supported, as do existing Java calls to `show(player, line1, line2, line3, ticks)`, both rendering the `default` variant.
 
-New Java call sites can choose a style via \`show(player, "warning", line1, line2, line3, ticks)\`. A missing variant or glyph is reported as a descriptive error instead of showing a broken popup.
+New Java call sites can choose a style via `show(player, "warning", line1, line2, line3, ticks)`. A missing variant or glyph is reported as a descriptive error instead of showing a broken popup.
 
-\`tile_overlap\` should normally be 1. Increase it only if your artwork visibly overlaps and you need a different joining style. Custom UI textures can have different widths, as long as their scaled dimensions match how you intend them to join.
+`tile_overlap` should normally be 1. Increase it only if your artwork visibly overlaps and you need a different joining style. Custom UI textures can have different widths, as long as their scaled dimensions match how you intend them to join.
 
 The three text-row ASCII providers remain generated because they are **font character mappings, not image assets**. The background textures are entirely content-defined.
