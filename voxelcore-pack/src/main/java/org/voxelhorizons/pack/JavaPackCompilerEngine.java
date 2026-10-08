@@ -189,6 +189,7 @@ final class JavaPackCompilerEngine {
                 blocks, blockAllocationStore.load(), modernBlockStates);
         validateBlockTextures(blocks, packsByNamespace);
         int renderedBlocks = BlockPackCompiler.write(entries, blocks, blockAllocations, modernBlockStates);
+        if (target.packFormat() >= 88) AtlasCompatibility.repair(entries);
 
         if (writeOutput) {
             try {
