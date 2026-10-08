@@ -1,4 +1,4 @@
-version: 4 # DO NOT CHANGE
+version: 5 # DO NOT CHANGE
 game:
   bedrock_support: false # Reserved for a future integration; currently has no runtime effect
 
@@ -12,6 +12,16 @@ menu_overrides:
     debug: false
 
 ui:
+  tooltip:
+    # UI glyph IDs from your content packs (content/*.yml under ui:).
+    # The matching PNG textures are authored like any other UI font image.
+    left: 'voxel:tooltip_left'
+    center: 'voxel:tooltip_center'
+    right: 'voxel:tooltip_right'
+    # Bitmap advances include a 1-pixel Minecraft gap. Overlap removes seams between tiles.
+    tile_overlap: 1
+    horizontal_padding: 4
+    x_offset: 55
   chest_titles:
     enabled: false
     # Full titles used for real physical chests. Normal VoxelCore UI/offset placeholders are supported.
