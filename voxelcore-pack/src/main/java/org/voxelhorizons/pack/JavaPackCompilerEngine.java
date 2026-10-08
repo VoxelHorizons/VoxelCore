@@ -78,7 +78,6 @@ final class JavaPackCompilerEngine {
         int copiedAssets = copyAuthoredAssets(packs, entries);
         writeCustomTextureAtlas(packs, target, entries);
         if (target.supportsUiFonts()) {
-            writeTooltipResources(entries);
             writeUiFont(entries, glyphs);
         }
 
@@ -528,7 +527,7 @@ final class JavaPackCompilerEngine {
                     .append(glyph.ascent()).append(",\"height\":").append(glyph.height())
                     .append(",\"chars\":[\"").append(glyph.character()).append("\"]}");
         }
-        String tooltipProviders = TooltipPackResources.defaultProviders();
+        String tooltipProviders = TooltipTextProviders.defaultProviders();
         if (!tooltipProviders.isEmpty()) out.append(",\n    ").append(tooltipProviders);
         out.append("\n  ]\n}\n");
         String path = AuthoredFontSupport.DEFAULT_FONT_PATH;
@@ -538,12 +537,6 @@ final class JavaPackCompilerEngine {
         else entries.put(path, AuthoredFontSupport.mergeDefault(authored, generated));
     }
 
-
-    private static void writeTooltipResources(Map<String, byte[]> entries) {
-        for (Map.Entry<String, byte[]> resource : TooltipPackResources.entries().entrySet()) {
-            putEntry(entries, resource.getKey(), resource.getValue());
-        }
-    }
 
     private static int copyAuthoredAssets(List<ContentPack> packs, Map<String, byte[]> entries) {
         int count = 0;

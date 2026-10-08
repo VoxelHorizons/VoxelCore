@@ -137,10 +137,23 @@ public final class UiCommand implements SubCommand {
         @Override public String getPermission() { return "voxelcore.admin.ui.tooltip"; }
         @Override public boolean playerOnly() { return true; }
 
+        @Override public List<String> onTabComplete(CommandSender sender, String[] args) {
+            if (args.length != 1) return Collections.emptyList();
+            List<String> matches = new ArrayList<String>();
+            String prefix = args[0].toLowerCase(java.util.Locale.ROOT);
+            for (String variant : VoxelCore.getInstance().getTooltipRenderer().variants()) {
+                if (variant.toLowerCase(java.util.Locale.ROOT).startsWith(prefix)) matches.add(variant);
+            }
+            return matches;
+        }
+
         @Override public void execute(CommandSender sender, String[] args) {
             Player player = (Player) sender;
             if (args.length < 2) {
-                player.sendMessage("Usage: /voxelcore admin ui tooltip <seconds> <line1> | <line2> | <line3>");
+                player.sendMessage("Usage: /vc admin ui tooltip <variant> <seconds> <line1> | <line2> | <line3>");
+                player.sendMessage("Legacy: /vc admin ui tooltip <seconds> <line1> | <line2> | <line3> (uses default)");
+                player.sendMessage("Available tooltip variants: "
+                        + VoxelCore.getInstance().getTooltipRenderer().variants());
                 return;
             }
             if (!VoxelCore.getInstance().getPackManager().currentTarget().supportsUiFonts()) {
@@ -148,9 +161,19 @@ public final class UiCommand implements SubCommand {
                 return;
             }
 
+            // Keep the existing <seconds> syntax working for all existing commands/call sites.
+            final boolean legacy = isDuration(args[0]);
+            final String variant = legacy ? "default" : args[0];
+            final int secondsIndex = legacy ? 0 : 1;
+            final int textStart = secondsIndex + 1;
+            if (args.length <= textStart) {
+                player.sendMessage("Usage: /vc admin ui tooltip <variant> <seconds> <line1> | <line2> | <line3>");
+                return;
+            }
+
             final double seconds;
             try {
-                seconds = Double.parseDouble(args[0]);
+                seconds = Double.parseDouble(args[secondsIndex]);
             } catch (NumberFormatException exception) {
                 player.sendMessage("Tooltip duration must be a number of seconds.");
                 return;
@@ -161,7 +184,7 @@ public final class UiCommand implements SubCommand {
             }
 
             StringBuilder raw = new StringBuilder();
-            for (int index = 1; index < args.length; index++) {
+            for (int index = textStart; index < args.length; index++) {
                 if (raw.length() > 0) raw.append(' ');
                 raw.append(args[index]);
             }
@@ -172,10 +195,20 @@ public final class UiCommand implements SubCommand {
             }
             String[] lines = {"", "", ""};
             System.arraycopy(supplied, 0, lines, 0, supplied.length);
-
             int ticks = Math.max(1, (int) Math.round(seconds * 20.0D));
-            VoxelCore.getInstance().getTooltipRenderer().show(player, lines[0], lines[1], lines[2], ticks);
-            player.sendMessage("Showing popup tooltip for " + seconds + "s.");
+            try {
+                VoxelCore.getInstance().getTooltipRenderer().show(player, variant,
+                        lines[0], lines[1], lines[2], ticks);
+            } catch (IllegalArgumentException exception) {
+                player.sendMessage("Unable to show tooltip: " + exception.getMessage());
+                return;
+            }
+            player.sendMessage("Showing '" + variant + "' popup tooltip for " + seconds + "s.");
+        }
+
+        private static boolean isDuration(String value) {
+            try { Double.parseDouble(value); return true; }
+            catch (NumberFormatException ignored) { return false; }
         }
     }
 
