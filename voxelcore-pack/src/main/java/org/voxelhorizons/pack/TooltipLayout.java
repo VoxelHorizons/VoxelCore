@@ -13,9 +13,15 @@ public final class TooltipLayout {
     private final int overlap;
     private final int padding;
     private final int xOffset;
+    private final boolean anchorToCrosshair;
 
     public TooltipLayout(UiGlyphRegistry registry, String leftId, String centerId, String rightId,
                          int overlap, int padding, int xOffset) {
+        this(registry, leftId, centerId, rightId, overlap, padding, xOffset, false);
+    }
+
+    public TooltipLayout(UiGlyphRegistry registry, String leftId, String centerId, String rightId,
+                         int overlap, int padding, int xOffset, boolean anchorToCrosshair) {
         if (registry == null) throw new IllegalArgumentException("Missing UI glyph registry");
         this.left = required(registry, leftId);
         this.center = required(registry, centerId);
@@ -28,6 +34,7 @@ public final class TooltipLayout {
         this.overlap = overlap;
         this.padding = padding;
         this.xOffset = xOffset;
+        this.anchorToCrosshair = anchorToCrosshair;
     }
 
     private static UiGlyphDefinition required(UiGlyphRegistry registry, String id) {
@@ -50,8 +57,12 @@ public final class TooltipLayout {
         int count = Math.max(0, (requestedWidth - boxWidth + step - 1) / step);
         boxWidth += count * step;
 
+        // Subtitle text is centered by Minecraft. For crosshair anchoring, offset
+        // the box by half its final width so its left edge stays beside the crosshair
+        // regardless of how many center tiles are used.
+        int effectiveOffset = xOffset + (anchorToCrosshair ? (boxWidth + 1) / 2 : 0);
         StringBuilder output = new StringBuilder();
-        output.append(UiSpacingGlyphs.charactersForOffset(xOffset)).append("\u00A7f");
+        output.append(UiSpacingGlyphs.charactersForOffset(effectiveOffset)).append("\u00A7f");
         output.append(left.character());
         for (int i = 0; i < count; i++) {
             output.append(UiSpacingGlyphs.charactersForOffset(-overlap)).append(center.character());
@@ -62,7 +73,7 @@ public final class TooltipLayout {
             output.append(TooltipGlyphs.translateLine(lines[line - 1], line));
             output.append(UiSpacingGlyphs.charactersForOffset(-TooltipGlyphs.width(lines[line - 1])));
         }
-        output.append(UiSpacingGlyphs.charactersForOffset(boxWidth - xOffset - padding));
+        output.append(UiSpacingGlyphs.charactersForOffset(boxWidth - effectiveOffset - padding));
         return output.toString();
     }
 }
