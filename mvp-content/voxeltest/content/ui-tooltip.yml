@@ -1,0 +1,16 @@
+# Example UI tooltip content for the voxeltest content pack.
+# Move the three textures into your own pack's assets/<namespace>/textures/ui/tooltip/.
+# Set ui.tooltip.left/center/right in VoxelCore config.yml to your own namespace IDs.
+ui:
+  tooltip_left:
+    path: ui/tooltip/left.png
+    scale_ratio: 19
+    y_position: 7
+  tooltip_center:
+    path: ui/tooltip/center.png
+    scale_ratio: 19
+    y_position: 7
+  tooltip_right:
+    path: ui/tooltip/right.png
+    scale_ratio: 19
+    y_position: 7
