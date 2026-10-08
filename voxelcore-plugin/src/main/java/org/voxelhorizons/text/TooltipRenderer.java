@@ -2,7 +2,6 @@ package org.voxelhorizons.text;
 
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
-import org.voxelhorizons.pack.TooltipGlyphs;
 import org.voxelhorizons.pack.TooltipLayout;
 import org.voxelhorizons.pack.UiGlyphRegistry;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -11,10 +10,10 @@ import java.util.function.Supplier;
 /** Runtime renderer for compiler-owned three-line resource-pack popup tooltips. */
 public final class TooltipRenderer {
     private final TextPlaceholderService placeholders;
-    private final Supplier<UiGlyphRegistry> glyphs;
+    private volatile UiGlyphRegistry glyphs;
     private final Supplier<FileConfiguration> settings;
 
-    public TooltipRenderer(TextPlaceholderService placeholders, Supplier<UiGlyphRegistry> glyphs,
+    public TooltipRenderer(TextPlaceholderService placeholders, UiGlyphRegistry glyphs,
                            Supplier<FileConfiguration> settings) {
         if (placeholders == null || glyphs == null || settings == null) {
             throw new IllegalArgumentException("Tooltip dependencies cannot be null");
@@ -37,7 +36,7 @@ public final class TooltipRenderer {
         String third = prepare(line3);
         FileConfiguration config = settings.get();
         String prefix = "ui.tooltip.";
-        TooltipLayout layout = new TooltipLayout(glyphs.get(),
+        TooltipLayout layout = new TooltipLayout(glyphs,
                 config.getString(prefix + "left", "voxel:tooltip_left"),
                 config.getString(prefix + "center", "voxel:tooltip_center"),
                 config.getString(prefix + "right", "voxel:tooltip_right"),
@@ -45,6 +44,11 @@ public final class TooltipRenderer {
                 config.getInt(prefix + "horizontal_padding", 4), xOffset);
         String subtitle = layout.compose(first, second, third);
         player.sendTitle("", subtitle, 0, ticks, 0);
+    }
+
+    public void updateGlyphs(UiGlyphRegistry updated) {
+        if (updated == null) throw new IllegalArgumentException("UI glyph registry cannot be null");
+        glyphs = updated;
     }
 
     public void clear(Player player) {
