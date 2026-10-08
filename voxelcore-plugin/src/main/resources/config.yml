@@ -22,7 +22,10 @@ ui:
       # Bitmap glyphs add one spacing pixel; overlapping by 1 closes each tile seam.
       tile_overlap: 1
       horizontal_padding: 4
-      x_offset: 55
+      # crosshair: left edge begins just right of the crosshair; center: old centered positioning.
+      anchor: crosshair
+      # Pixel gap from the crosshair when anchor is crosshair.
+      x_offset: 8
     # Example style: enable it and provide your own optional glyphs in your content pack.
     # warning:
     #   left: 'voxel:tooltip_warning_left'
@@ -30,7 +33,7 @@ ui:
     #   right: 'voxel:tooltip_warning_right'
     #   tile_overlap: 1
     #   horizontal_padding: 6
-    #   x_offset: 55
+    #   x_offset: 8
   chest_titles:
     enabled: false
     # Full titles used for real physical chests. Normal VoxelCore UI/offset placeholders are supported.
