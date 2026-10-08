@@ -17,13 +17,6 @@ public final class TooltipGlyphs {
     public static final int LINE_2_BASE = 0xF500;
     public static final int LINE_3_BASE = 0xF600;
 
-    public static final int BACKGROUND_LEFT = 0xF700;
-    public static final int BACKGROUND_CENTER = 0xF701;
-    public static final int BACKGROUND_RIGHT = 0xF702;
-    public static final int BACKGROUND_RIGHT_OFFSET = 0xF703;
-
-    public static final int DEFAULT_X_OFFSET = 55;
-    public static final int HORIZONTAL_PADDING = 4;
 
     private static final int[] ASCII_ADVANCES = {
             4,2,3,4,4,4,4,2,3,3,3,4,2,4,2,4,
@@ -41,10 +34,6 @@ public final class TooltipGlyphs {
         for (int cp = LINE_1_BASE; cp <= LINE_3_BASE + 0xFF; cp++) {
             reserved.add(Integer.valueOf(cp));
         }
-        reserved.add(Integer.valueOf(BACKGROUND_LEFT));
-        reserved.add(Integer.valueOf(BACKGROUND_CENTER));
-        reserved.add(Integer.valueOf(BACKGROUND_RIGHT));
-        reserved.add(Integer.valueOf(BACKGROUND_RIGHT_OFFSET));
         RESERVED = Collections.unmodifiableSet(reserved);
     }
 
@@ -139,55 +128,5 @@ public final class TooltipGlyphs {
         return width;
     }
 
-    public static String backgroundForWidth(int requestedWidth) {
-        int width = Math.max(4, requestedWidth);
-        boolean odd = (width & 1) != 0;
-        int rightAdvance = odd ? 3 : 2;
-        int centers = Math.max(0, (width - 2 - rightAdvance) / 2);
-        StringBuilder output = new StringBuilder(centers + 2);
-        output.append((char) BACKGROUND_LEFT);
-        for (int i = 0; i < centers; i++) output.append((char) BACKGROUND_CENTER);
-        output.append((char) (odd ? BACKGROUND_RIGHT_OFFSET : BACKGROUND_RIGHT));
-        return output.toString();
-    }
-
-    public static int backgroundWidth(String background) {
-        if (background == null || background.isEmpty()) return 0;
-        int width = 0;
-        for (int i = 0; i < background.length(); i++) {
-            char glyph = background.charAt(i);
-            if (glyph == BACKGROUND_LEFT || glyph == BACKGROUND_CENTER || glyph == BACKGROUND_RIGHT) width += 2;
-            else if (glyph == BACKGROUND_RIGHT_OFFSET) width += 3;
-        }
-        return width;
-    }
-
-    /**
-     * Creates one subtitle string whose background and three vertically offset
-     * text rows overlap while retaining a stable final advance for centering.
-     */
-    public static String compose(String line1, String line2, String line3, int xOffset) {
-        String[] lines = {line1 == null ? "" : line1, line2 == null ? "" : line2, line3 == null ? "" : line3};
-        int maxWidth = Math.max(width(lines[0]), Math.max(width(lines[1]), width(lines[2])));
-        int requested = maxWidth + (HORIZONTAL_PADDING * 2);
-        String background = backgroundForWidth(requested);
-        int boxWidth = backgroundWidth(background);
-
-        StringBuilder output = new StringBuilder();
-        output.append(UiSpacingGlyphs.charactersForOffset(xOffset));
-        output.append('\u00A7').append('f').append(background);
-        output.append(UiSpacingGlyphs.charactersForOffset(-boxWidth));
-        output.append(UiSpacingGlyphs.charactersForOffset(HORIZONTAL_PADDING));
-
-        for (int line = 1; line <= 3; line++) {
-            String value = lines[line - 1];
-            output.append(translateLine(value, line));
-            output.append(UiSpacingGlyphs.charactersForOffset(-width(value)));
-        }
-
-        // Net subtitle advance remains exactly boxWidth, so Minecraft centers the
-        // box predictably while xOffset moves the rendered pixels to the right.
-        output.append(UiSpacingGlyphs.charactersForOffset(boxWidth - xOffset - HORIZONTAL_PADDING));
-        return output.toString();
-    }
 }
+
