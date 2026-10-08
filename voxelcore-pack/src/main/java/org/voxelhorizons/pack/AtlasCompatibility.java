@@ -1,7 +1,7 @@
 package org.voxelhorizons.pack;
 
-import org.voxelhorizons.content.pack.ContentPackDiscovery;
-import java.io.ByteArrayInputStream;
+import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -10,6 +10,7 @@ import java.util.*;
  * in generated ZIP entries without rewriting the original resource pack source files.
  */
 final class AtlasCompatibility {
+    private static final Gson GSON = new Gson();
     private static final String ITEMS = "assets/minecraft/atlases/items.json";
     private static final String BLOCKS = "assets/minecraft/atlases/blocks.json";
 
@@ -184,11 +185,11 @@ final class AtlasCompatibility {
 
     private static Map<String, Object> parse(byte[] text, String path) {
         try {
-            Object parsed = ContentPackDiscovery.yaml().load(new ByteArrayInputStream(text));
+            Object parsed = GSON.fromJson(new String(text, StandardCharsets.UTF_8), Object.class);
             if (!(parsed instanceof Map))
                 throw new JavaPackCompileException("Invalid JSON object: " + path);
             return map(parsed);
-        } catch (RuntimeException err) {
+        } catch (JsonSyntaxException err) {
             throw new JavaPackCompileException("Invalid JSON at " + path + ": " + err.getMessage(), err);
         }
     }
