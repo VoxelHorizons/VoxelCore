@@ -43,7 +43,9 @@ final class AtlasCompatibility {
             int modelsAt = file.indexOf("/models/");
             if (modelsAt < 0 || !file.startsWith("assets/") || !file.endsWith(".json")) continue;
             int endNamespace = file.indexOf('/', 7);
-            if (endNamespace < 0 || endNamespace >= modelsAt) continue;
+            // Valid model assets are assets/<namespace>/models/<path>.json:
+            // /models/ starts at the namespace-ending slash itself.
+            if (endNamespace < 0 || endNamespace != modelsAt) continue;
             String name = file.substring(7, endNamespace) + ":" + file.substring(modelsAt + 8, file.length() - 5);
             models.put(name, new Model(file, parse(entry.getValue(), file)));
         }
