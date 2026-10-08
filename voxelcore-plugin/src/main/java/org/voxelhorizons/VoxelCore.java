@@ -156,7 +156,7 @@ public final class VoxelCore extends JavaPlugin {
             packManager = new PackManager(getDataFolder().toPath(), contentRoot, versionAdapter.version());
             textPlaceholderService = new TextPlaceholderService(packManager.uiGlyphs(true));
             tooltipRenderer = new TooltipRenderer(textPlaceholderService,
-                    () -> packManager.uiGlyphs(false), () -> getConfig());
+                    packManager.uiGlyphs(false), () -> getConfig());
         } catch (IOException exception) {
             logger.log(Level.SEVERE, "Unable to create VoxelCore content directory " + contentRoot, exception);
             getServer().getPluginManager().disablePlugin(this);
@@ -256,7 +256,9 @@ public final class VoxelCore extends JavaPlugin {
         ContentReloadResult result = contentReloader.reload();
         if (result.success()) {
             blockMiningSpeedController.clearAll();
-            textPlaceholderService.update(packManager.uiGlyphs(true));
+            org.voxelhorizons.pack.UiGlyphRegistry currentGlyphs = packManager.uiGlyphs(true);
+            textPlaceholderService.update(currentGlyphs);
+            tooltipRenderer.updateGlyphs(currentGlyphs);
             logger.info("Published content revision " + result.activeRevision() + " (" + result.itemCount()
                     + " items, " + result.blockCount() + " blocks)");
         } else {
