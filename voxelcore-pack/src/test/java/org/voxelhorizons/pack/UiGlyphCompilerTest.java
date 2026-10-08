@@ -82,11 +82,6 @@ public class UiGlyphCompilerTest {
         assertTrue(font.contains("\"height\":18"));
         assertTrue(font.contains("\"ascent\":8"));
         assertTrue(font.contains(glyph.character()));
-        assertTrue(font.contains("voxelcore:ui/tooltip/left.png"));
-        assertTrue(font.contains(String.valueOf((char) TooltipGlyphs.BACKGROUND_LEFT)));
-        assertTrue(zipText(output, "assets/voxelcore/font/tooltip_line1.json").contains("\"ascent\":4"));
-        assertTrue(zipText(output, "assets/voxelcore/font/tooltip_line2.json").contains("\"ascent\":-1"));
-        assertTrue(zipText(output, "assets/voxelcore/font/tooltip_line3.json").contains("\"ascent\":-6"));
 
         String firstManifest = new String(Files.readAllBytes(build.resolve("glyph-allocations.yml")), StandardCharsets.UTF_8);
         compiler.compile(contentRoot.toPath(), build.resolve("second.zip"), renderAllocations, JavaPackTarget.MC_1_14_4);
@@ -94,31 +89,20 @@ public class UiGlyphCompilerTest {
     }
 
     @Test
-    public void editableTooltipAssetsOverrideCompilerDefaults() throws Exception {
+    public void noLongerEmbedsTooltipBackgroundTextures() throws Exception {
         File contentRoot = temporaryFolder.newFolder("tooltip-content");
         File pack = new File(contentRoot, "voxel");
         assertTrue(new File(pack, "content").mkdirs());
-        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
-
-        File editable = temporaryFolder.newFolder("tooltip-assets");
-        File left = new File(editable, "left.png");
-        File center = new File(editable, "center.png");
-        File right = new File(editable, "right.png");
-        writePng(left, 2, 38);
-        writePng(center, 2, 38);
-        writePng(right, 2, 38);
-
+        write(new File(pack, "pack.yml"), "schema: 1\\nnamespace: voxel\\n");
         Path build = temporaryFolder.newFolder("tooltip-build").toPath();
         Path output = build.resolve("pack.zip");
         new JavaPackCompiler().compile(contentRoot.toPath(), output,
-                build.resolve("render-allocations.yml"), JavaPackTarget.MC_1_14_4, editable.toPath());
-
-        assertArrayEquals(Files.readAllBytes(left.toPath()),
-                zipBytes(output, "assets/voxelcore/textures/ui/tooltip/left.png"));
-        assertArrayEquals(Files.readAllBytes(center.toPath()),
-                zipBytes(output, "assets/voxelcore/textures/ui/tooltip/center.png"));
-        assertArrayEquals(Files.readAllBytes(right.toPath()),
-                zipBytes(output, "assets/voxelcore/textures/ui/tooltip/right.png"));
+                build.resolve("render-allocations.yml"), JavaPackTarget.MC_1_14_4);
+        try (ZipFile zip = new ZipFile(output.toFile())) {
+            assertTrue(zip.getEntry("assets/voxelcore/textures/ui/tooltip/left.png") == null);
+            assertTrue(zip.getEntry("assets/voxelcore/textures/ui/tooltip/center.png") == null);
+            assertTrue(zip.getEntry("assets/voxelcore/textures/ui/tooltip/right.png") == null);
+        }
     }
 
     @Test
