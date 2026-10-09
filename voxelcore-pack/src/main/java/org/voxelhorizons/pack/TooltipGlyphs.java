@@ -53,8 +53,8 @@ public final class TooltipGlyphs {
     public static int lineAscent(int line) {
         switch (line) {
             case 1: return 4;
-            case 2: return 0;
-            case 3: return -4;
+            case 2: return -1;
+            case 3: return -6;
             default: throw new IllegalArgumentException("Tooltip line must be 1, 2 or 3");
         }
     }
@@ -81,11 +81,20 @@ public final class TooltipGlyphs {
         return rows;
     }
 
-    /** Maps printable ASCII onto the requested vertically-positioned tooltip row. */
+    /**
+     * Translate text into vertically positioned tooltip glyphs, optionally tightening
+     * horizontal spacing. Color codes are preserved, and custom icons retain their
+     * original advance. Letter spacing only applies inside uninterrupted ASCII words.
+     */
     public static String translateLine(String input, int line) {
+        return translateLine(input, line, 0, 0);
+    }
+
+    public static String translateLine(String input, int line, int letterSpacing, int wordSpacing) {
         if (input == null || input.isEmpty()) return "";
         int base = lineBase(line);
         StringBuilder output = new StringBuilder(input.length());
+        boolean previousAscii = false;
         for (int index = 0; index < input.length();) {
             char current = input.charAt(index);
             if (current == '\u00A7' && index + 1 < input.length()) {
@@ -96,11 +105,17 @@ public final class TooltipGlyphs {
             int codePoint = input.codePointAt(index);
             index += Character.charCount(codePoint);
             if (codePoint >= 33 && codePoint <= 126) {
+                if (previousAscii) output.append(UiSpacingGlyphs.charactersForOffset(letterSpacing));
                 output.append((char) (base + codePoint));
+                previousAscii = true;
+            } else if (codePoint == 32) {
+                output.append(' ');
+                output.append(UiSpacingGlyphs.charactersForOffset(wordSpacing));
+                previousAscii = false;
             } else {
-                // Spaces remain ordinary spaces so they retain the vanilla 4 px advance.
-                // Non-ASCII glyphs are preserved for authored icon/font providers.
+                // Non-ASCII characters (including authored icons) are not kerned.
                 output.appendCodePoint(codePoint);
+                previousAscii = false;
             }
         }
         return output.toString();
@@ -108,8 +123,14 @@ public final class TooltipGlyphs {
 
     /** Width in resource-pack font pixels, ignoring legacy formatting codes. */
     public static int width(String input) {
+        return width(input, 0, 0);
+    }
+
+    /** Measure the exact same added offsets that translateLine emits. */
+    public static int width(String input, int letterSpacing, int wordSpacing) {
         if (input == null || input.isEmpty()) return 0;
         int width = 0;
+        boolean previousAscii = false;
         for (int index = 0; index < input.length();) {
             char current = input.charAt(index);
             if (current == '\u00A7' && index + 1 < input.length()) {
@@ -118,15 +139,17 @@ public final class TooltipGlyphs {
             }
             int codePoint = input.codePointAt(index);
             index += Character.charCount(codePoint);
-            if (codePoint >= 32 && codePoint <= 126) {
-                width += ASCII_ADVANCES[codePoint - 32];
+            if (codePoint >= 33 && codePoint <= 126) {
+                width += ASCII_ADVANCES[codePoint - 32] + (previousAscii ? letterSpacing : 0);
+                previousAscii = true;
+            } else if (codePoint == 32) {
+                width += ASCII_ADVANCES[0] + wordSpacing;
+                previousAscii = false;
             } else {
-                // Conservative fallback for authored/non-ASCII glyphs.
-                width += 4;
+                width += 4; // Conservative non-ASCII fallback, matching existing behavior.
+                previousAscii = false;
             }
         }
         return width;
     }
-
 }
-
