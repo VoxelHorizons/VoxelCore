@@ -35,9 +35,6 @@ public final class TooltipLayout {
         this.overlap = overlap;
         this.padding = padding;
         this.xOffset = xOffset;
-        if (letterSpacing < -2 || letterSpacing > 4 || wordSpacing < -3 || wordSpacing > 8) {
-            throw new IllegalArgumentException("Tooltip letter_spacing must be -2..4 and word_spacing -3..8");
-        }
         this.letterSpacing = letterSpacing;
         this.wordSpacing = wordSpacing;
     }
