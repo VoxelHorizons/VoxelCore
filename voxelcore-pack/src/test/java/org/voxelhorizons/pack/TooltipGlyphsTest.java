@@ -73,6 +73,24 @@ public class TooltipGlyphsTest {
                 TooltipGlyphs.width(input, -1, -1)); // Only B-to-C.
     }
 
+    @Test public void acceptsArbitraryNegativeLetterAndWordSpacing() {
+        Map<ContentID, UiGlyphDefinition> definitions = new LinkedHashMap<ContentID, UiGlyphDefinition>();
+        for (String name : new String[]{"left", "center", "right"}) {
+            ContentID id = ContentID.of("voxel", "tooltip_" + name);
+            definitions.put(id, new UiGlyphDefinition(id, "voxel:ui/tooltip/" + name,
+                    19, 7, 2, false, 0xE100 + definitions.size()));
+        }
+        UiGlyphRegistry glyphs = new UiGlyphRegistry(definitions);
+        TooltipLayout compact = new TooltipLayout(glyphs,
+                "voxel:tooltip_left", "voxel:tooltip_center", "voxel:tooltip_right",
+                1, 4, 30, -6, -20);
+        String output = compact.compose("Text with wide spaces", "Second line", "Third");
+        assertTrue(output.contains(UiSpacingGlyphs.charactersForOffset(-6)));
+        assertTrue(output.contains(UiSpacingGlyphs.charactersForOffset(-20)));
+        assertEquals(TooltipGlyphs.width("A B") - 20, TooltipGlyphs.width("A B", 0, -20));
+        assertEquals(TooltipGlyphs.width("AB") - 6, TooltipGlyphs.width("AB", -6, 0));
+    }
+
     @Test public void layoutAppliesHorizontalSpacingToBackgroundSizing() {
         Map<ContentID, UiGlyphDefinition> definitions = new LinkedHashMap<ContentID, UiGlyphDefinition>();
         for (String name : new String[]{"left", "center", "right"}) {
