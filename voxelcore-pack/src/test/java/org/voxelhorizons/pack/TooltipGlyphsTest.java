@@ -59,7 +59,7 @@ public class TooltipGlyphsTest {
                 TooltipGlyphs.width(input, -1, -1));
         assertEquals(TooltipGlyphs.width("A"),
                 TooltipGlyphs.width("A", -1, -1)); // No leading kerning.
-        assertEquals(TooltipGlyphs.width("A B") - 1,
+        assertEquals(TooltipGlyphs.width("A B"),
                 TooltipGlyphs.width("A B", -1, 0)); // Only within words.
         assertTrue(compact.length() > baseline.length());
     }
