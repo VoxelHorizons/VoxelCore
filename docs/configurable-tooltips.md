@@ -36,16 +36,18 @@ ui:
       right: 'voxel:tooltip_right'
       tile_overlap: 1
       horizontal_padding: 4
-      anchor: crosshair
-      x_offset: 8
+      letter_spacing: -1
+      word_spacing: -1
+      x_offset: 30
     warning:
       left: 'voxel:warning_left'
       center: 'voxel:warning_center'
       right: 'voxel:warning_right'
       # Values not listed here inherit from default.
       horizontal_padding: 6
-      anchor: crosshair
-      x_offset: 8
+      letter_spacing: -1
+      word_spacing: -1
+      x_offset: 30
     quest:
       left: 'voxel:quest_left'
       center: 'voxel:quest_center'
@@ -62,9 +64,11 @@ Use the **full** `namespace:id` for each configured glyph. A missing ID produces
 
 Bitmap glyphs advance by their scaled pixel width **plus one Minecraft spacing pixel**. A 2x38 texture authored with `scale_ratio: 19` paints a 1px-wide section, but advances 2px. VoxelCore now inserts `:offset_-1:` between each tile (`tile_overlap: 1`), so adjacent tiles touch without the black stripes previously visible.
 
-The `anchor` setting can be `crosshair` (default for newly generated config files) or `center` (the former behavior). For `crosshair`, `x_offset: 8` begins the left edge roughly eight font pixels to the right of the screen crosshair, independent of tooltip text width. For `center`, the offset moves the centered tooltip as before. On an existing server, edit `ui.tooltips.default.x_offset` from 55 to 8 and set `anchor: crosshair` explicitly; existing custom config values are not overwritten by migration. Each variant can override either setting.
+Horizontal text spacing can be adjusted independently for each tooltip variant. `letter_spacing: -1` removes one font pixel between adjacent printable ASCII glyphs within a word. `word_spacing: -1` removes one pixel from each ordinary space, while keeping words distinct. Legacy colour codes are ignored for spacing; custom Unicode icons retain their existing width. Both settings are included in the tooltip width calculation, so backgrounds fit the compacted text. Omit either value in a variant to inherit it from `default`.
 
-The three text rows now use ascents `4`, `0`, and `-4` instead of `4`, `-1`, and `-6` to reduce vertical line spacing. Rebuild and republish your resource pack to include the new generated font providers, then reload the client pack.
+The original horizontal position mode is unchanged: `x_offset: 30` shifts the centred popup horizontally. The experimental `anchor` feature was removed because a fixed offset already gives the desired position. Old `anchor` entries can be deleted; they are ignored.
+
+Line ascent values remain the original `4`, `-1`, and `-6`. The spacing changes in this patch are **horizontal** and do not affect vertical row placement. To use the updated tooltip text rendering, install the new JAR. Existing UI glyph fonts and background textures remain unchanged.
 
 The effective full background width is computed from each configured glyph's actual advance. The widest of the three text lines determines how many center tiles are needed, plus `horizontal_padding` on each side. Text is moved back with a negative offset over the background. `x_offset` shifts the finished popup horizontally.
 
