@@ -229,7 +229,7 @@ public final class VoxelCore extends JavaPlugin {
 
         try {
             currencyBridge = VoxelCurrencyBridge.start(this);
-        } catch (RuntimeException exception) {
+        } catch (RuntimeException | LinkageError exception) {
             logger.log(Level.SEVERE, "VaultUnlocked currency integration failed; currencies unavailable", exception);
         }
 
