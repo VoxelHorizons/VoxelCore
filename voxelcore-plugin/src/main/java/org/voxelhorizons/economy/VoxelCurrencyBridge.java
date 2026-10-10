@@ -192,7 +192,10 @@ public final class VoxelCurrencyBridge implements InvocationHandler {
             names.put(id, (String)args[1]);
             return true;
         }
-        if (name.equals("hasAccount")) return true;
+        if (name.equals("hasAccount")) {
+            UUID id = (UUID)args[0];
+            return coins.hasAccount(Bukkit.getOfflinePlayer(id)) || balances.contains("balances." + id);
+        }
         if (name.equals("renameAccount")) {
             UUID id = (UUID)args[args.length - 2];
             names.put(id, (String)args[args.length - 1]);
