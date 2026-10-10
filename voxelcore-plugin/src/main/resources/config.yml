@@ -39,3 +39,11 @@ ui:
     # Full titles used for real physical chests. Normal VoxelCore UI/offset placeholders are supported.
     single: ''
     double: ''
+
+# Optional independent VaultUnlocked (Vault2) currencies.
+# Essentials remains the legacy Coins provider; VoxelCore does not touch it.
+economy:
+  enabled: false
+  currencies:
+    tokens:
+      decimals: 0
