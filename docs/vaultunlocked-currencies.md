@@ -1,36 +1,41 @@
-# VaultUnlocked currencies (experimental)
+# VaultUnlocked currencies
 
-This is an opt-in implementation of a VaultUnlocked **Vault2 economy provider** for the server.
-
-## Configuration
-
-In `plugins/VoxelCore/config.yml`:
+VoxelCore offers an **independent** Vault2 economy provider. It does not wrap Essentials Coins or migrate any Essentials balances. Enable the provider in `plugins/VoxelCore/config.yml`:
 
 ```yaml
 economy:
   enabled: true
-  default-currency: coins
   currencies:
-    cosmetics:
-      decimals: 0
-    gems:
+    tokens:
       decimals: 0
 ```
 
-Install VaultUnlocked and keep EssentialsX's existing Vault-compatible economy provider installed. Restart the server after enabling the integration. Coins continue to use the existing Essentials balance; VoxelCore stores `cosmetics` and `gems` balances in `plugins/VoxelCore/currency-balances.yml`.
+All balances are stored in `plugins/VoxelCore/currency-balances.yml`. Currency balances are UUID-keyed and use decimal strings internally. Tokens only accept whole-number transactions.
 
-## Usage from other plugins
+## Commands
 
-Consumers must use the VaultUnlocked Vault2 economy API and provide the currency ID, e.g. `cosmetics`, not the original legacy Vault API. Check balances with the provider's `balance(pluginName, playerUuid, world, currency)`; credit and debit via `deposit` and `withdraw` with the same currency ID.
+Legacy Essentials commands continue to work without currency suffixes. To select VoxelCore Tokens explicitly:
 
-VaultUnlocked's PlaceholderAPI expansion supports `%vaultunlocked_balance_currency_cosmetics%` when a Vault2 economy is registered and the PlaceholderAPI expansion is available.
+- `/money balance tokens`, `/bal tokens`, `/balance tokens`
+- `/money pay <player> <amount> tokens`, `/pay <player> <amount> tokens`
+- `/money top tokens`, `/baltop tokens`
 
-## Important limitations
+These currency-qualified commands are intercepted only for configured VoxelCore currency IDs. The legacy commands remain handled by Essentials.
 
-- **Opt-in by default.** Do not enable on a production server until validated.
-- VoxelCore refuses to override any existing Vault2 economy provider: it is not a universal multi-provider aggregator.
-- `coins` uses the existing legacy Vault provider. All other currencies are persisted by VoxelCore. Do not delete `currency-balances.yml`.
-- Shared accounts, inter-account transfers and asynchronous economy operations are **not yet supported**. Consumers should use balance/deposit/withdraw.
-- Only integer or configured-decimal positive amounts are accepted; insufficient funds fail a withdrawal.
-- This is an early integration. Validate service registration, balance persistence and transaction failure behavior on a staging Paper server before deployment.
-- Currency storage and the legacy economy may have different durability/transaction semantics. No cross-currency atomic transfers are offered.
+## PlaceholderAPI
+
+When the VaultUnlocked PAPI expansion sees an active modern Vault2 provider:
+
+```
+%vaultunlocked_balance_currency_tokens%
+```
+
+It reads the Vault2 balance. If the expansion returns Essentials Coins, confirm the VoxelCore service registered on startup; a missing modern provider makes VaultUnlocked fall back to its legacy provider. Check logs for "Registered VaultUnlocked currencies: [tokens]" or warnings about an existing Vault2 provider.
+
+## Rollout cautions
+
+- Opt-in, disabled by default in packaged config.
+- Registration is refused when another Vault2 provider exists; do not override it.
+- Tokens are independent from Essentials; no exchange or migration.
+- On-disk saving occurs on balance mutations. Back up the balance file.
+- Test on a staging Paper server first. This implementation does not provide atomic two-account transfers, shared accounts or async APIs.
