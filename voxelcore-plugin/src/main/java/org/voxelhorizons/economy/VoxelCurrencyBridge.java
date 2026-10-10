@@ -28,13 +28,12 @@ import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
- * Optional VaultUnlocked (Vault2) provider. The default currency is delegated to the
- * existing legacy Vault economy (Essentials); other currencies are owned by VoxelCore.
- * No legacy Economy service is registered or replaced.
+ * Optional VaultUnlocked (Vault2) provider. All currencies are independently owned
+ * by VoxelCore, and Essentials remains the legacy Vault Coins provider.
  */
 public final class VoxelCurrencyBridge implements InvocationHandler {
     private final JavaPlugin plugin;
-    private final net.milkbowl.vault.economy.Economy coins;
+
     private final Map<String, Integer> currencies = new LinkedHashMap<String, Integer>();
     private final Map<UUID, String> names = new HashMap<UUID, String>();
     private final File balancesFile;
@@ -42,10 +41,9 @@ public final class VoxelCurrencyBridge implements InvocationHandler {
     private final String defaultCurrency;
     private Economy service;
 
-    private VoxelCurrencyBridge(JavaPlugin plugin, net.milkbowl.vault.economy.Economy coins,
-                                File balancesFile, String defaultCurrency) {
+    private VoxelCurrencyBridge(JavaPlugin plugin, File balancesFile, String defaultCurrency) {
         this.plugin = plugin;
-        this.coins = coins;
+
         this.balancesFile = balancesFile;
         this.balances = YamlConfiguration.loadConfiguration(balancesFile);
         this.defaultCurrency = defaultCurrency;
@@ -64,16 +62,9 @@ public final class VoxelCurrencyBridge implements InvocationHandler {
             plugin.getLogger().warning("Another Vault2 economy is registered. VoxelCore will not override it.");
             return null;
         }
-        RegisteredServiceProvider<net.milkbowl.vault.economy.Economy> legacy =
-                Bukkit.getServicesManager().getRegistration(net.milkbowl.vault.economy.Economy.class);
-        if (legacy == null || legacy.getProvider() == null) {
-            plugin.getLogger().warning("Essentials/legacy Vault Coins provider missing; Voxel currencies disabled.");
-            return null;
-        }
-        String main = section.getString("default-currency", "coins").toLowerCase(Locale.ROOT);
-        VoxelCurrencyBridge bridge = new VoxelCurrencyBridge(plugin, legacy.getProvider(),
+        String main = section.getString("default-currency", "tokens").toLowerCase(Locale.ROOT);
+        VoxelCurrencyBridge bridge = new VoxelCurrencyBridge(plugin,
                 new File(plugin.getDataFolder(), "currency-balances.yml"), main);
-        bridge.currencies.put(main, Math.max(0, legacy.getProvider().fractionalDigits()));
         ConfigurationSection configured = section.getConfigurationSection("currencies");
         if (configured == null || configured.getKeys(false).isEmpty()) {
             plugin.getLogger().warning("No additional currencies configured.");
@@ -81,7 +72,7 @@ public final class VoxelCurrencyBridge implements InvocationHandler {
         }
         for (String raw : configured.getKeys(false)) {
             String currency = raw.toLowerCase(Locale.ROOT);
-            if (!currency.matches("[a-z0-9_-]{1,32}") || currency.equals(main)) {
+            if (!currency.matches("[a-z0-9_-]{1,32}")) {
                 plugin.getLogger().warning("Ignoring invalid or reserved currency: " + raw);
                 continue;
             }
@@ -92,7 +83,10 @@ public final class VoxelCurrencyBridge implements InvocationHandler {
             }
             bridge.currencies.put(currency, decimals);
         }
-        if (bridge.currencies.size() == 1) return null;
+        if (!bridge.currencies.containsKey(main)) {
+            plugin.getLogger().warning("The default currency must appear in economy.currencies: " + main);
+            return null;
+        }
         bridge.service = (Economy) Proxy.newProxyInstance(Economy.class.getClassLoader(),
                 new Class<?>[]{Economy.class}, bridge);
         Bukkit.getServicesManager().register(Economy.class, bridge.service, plugin, ServicePriority.Normal);
@@ -115,9 +109,6 @@ public final class VoxelCurrencyBridge implements InvocationHandler {
     }
 
     private BigDecimal read(UUID id, String currency) {
-        if (currency.equals(defaultCurrency)) {
-            return BigDecimal.valueOf(coins.getBalance(Bukkit.getOfflinePlayer(id)));
-        }
         return new BigDecimal(balances.getString("balances." + id + "." + currency, "0"));
     }
 
@@ -141,17 +132,6 @@ public final class VoxelCurrencyBridge implements InvocationHandler {
         BigDecimal next = operation.equals("deposit") ? current.add(amount) : current.subtract(amount);
         if (next.signum() < 0) return response(BigDecimal.ZERO, current,
                 net.milkbowl.vault2.economy.EconomyResponse.ResponseType.FAILURE, "Insufficient funds");
-        if (currency.equals(defaultCurrency)) {
-            EconomyResponse legacy = operation.equals("deposit")
-                    ? coins.depositPlayer(Bukkit.getOfflinePlayer(id), amount.doubleValue())
-                    : coins.withdrawPlayer(Bukkit.getOfflinePlayer(id), amount.doubleValue());
-            return response(legacy.transactionSuccess() ? amount : BigDecimal.ZERO,
-                    BigDecimal.valueOf(legacy.balance),
-                    legacy.transactionSuccess()
-                            ? net.milkbowl.vault2.economy.EconomyResponse.ResponseType.SUCCESS
-                            : net.milkbowl.vault2.economy.EconomyResponse.ResponseType.FAILURE,
-                    legacy.errorMessage == null ? "" : legacy.errorMessage);
-        }
         balances.set("balances." + id + "." + currency, next.toPlainString());
         try {
             balances.save(balancesFile);
@@ -194,7 +174,7 @@ public final class VoxelCurrencyBridge implements InvocationHandler {
         }
         if (name.equals("hasAccount")) {
             UUID id = (UUID)args[0];
-            return coins.hasAccount(Bukkit.getOfflinePlayer(id)) || balances.contains("balances." + id);
+            return balances.contains("balances." + id);
         }
         if (name.equals("renameAccount")) {
             UUID id = (UUID)args[args.length - 2];
