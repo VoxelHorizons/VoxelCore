@@ -45,11 +45,11 @@ It reads the Vault2 balance. If the expansion returns Essentials Coins, confirm 
 Requires `voxelcore.admin.eco` and the specific `voxelcore.admin.eco.<action>` permission (defaults: op). Available from console and in-game:
 
 ```text
-/vc admin eco balance <player> [currency]
-/vc admin eco give <player> <amount> [currency]
-/vc admin eco take <player> <amount> [currency]
-/vc admin eco set <player> <amount> [currency]
-/vc admin eco reset <player> [currency]
+/vc admin eco balance <player> <currency>
+/vc admin eco give <player> <amount> <currency>
+/vc admin eco take <player> <amount> <currency>
+/vc admin eco set <player> <amount> <currency>
+/vc admin eco reset <player> <currency>
 ```
 
-The omitted currency defaults to `tokens`. These commands modify VoxelCore-managed balances only, never Essentials Coins. Tokens enforce whole numbers. Taking more than the current balance clamps the account to zero; negative deposits or amounts are rejected. Actions log their before/after balances for auditing.
+A currency argument is required for every admin operation; there is no implicit Tokens default. These commands modify VoxelCore-managed balances only, never Essentials Coins. Tokens enforce whole numbers. Taking more than the current balance clamps the account to zero; negative deposits or amounts are rejected. Actions log their before/after balances for auditing.
