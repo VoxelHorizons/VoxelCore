@@ -56,11 +56,15 @@ public final class VoxelCurrencyBridge implements InvocationHandler {
             plugin.getLogger().warning("Voxel currencies require VaultUnlocked; integration not started.");
             return null;
         }
-        // Avoid replacing an existing Vault2 provider. VaultUnlocked publishes one
-        // economy service at a time; multiple providers cannot be safely combined.
-        if (Bukkit.getServicesManager().getRegistration(Economy.class) != null) {
-            plugin.getLogger().warning("Another Vault2 economy is registered. VoxelCore will not override it.");
-            return null;
+        // EssentialsX Unlocked may register its own Vault2 provider. Keep that
+        // registration intact, but select VoxelCore for modern currency lookups.
+        // Bukkit ServicesManager chooses one provider by priority; it does not merge them.
+        RegisteredServiceProvider<Economy> existing =
+                Bukkit.getServicesManager().getRegistration(Economy.class);
+        if (existing != null) {
+            plugin.getLogger().info("Existing Vault2 provider: " + existing.getProvider().getName()
+                    + "; registering VoxelCore Tokens at higher priority. "
+                    + "Legacy Essentials Coins remain unchanged.");
         }
         String main = section.getString("default-currency", "tokens").toLowerCase(Locale.ROOT);
         VoxelCurrencyBridge bridge = new VoxelCurrencyBridge(plugin,
@@ -89,7 +93,13 @@ public final class VoxelCurrencyBridge implements InvocationHandler {
         }
         bridge.service = (Economy) Proxy.newProxyInstance(Economy.class.getClassLoader(),
                 new Class<?>[]{Economy.class}, bridge);
-        Bukkit.getServicesManager().register(Economy.class, bridge.service, plugin, ServicePriority.Normal);
+        Bukkit.getServicesManager().register(Economy.class, bridge.service, plugin, ServicePriority.Highest);
+        RegisteredServiceProvider<Economy> selected = Bukkit.getServicesManager().getRegistration(Economy.class);
+        if (selected == null || selected.getProvider() != bridge.service) {
+            Bukkit.getServicesManager().unregister(Economy.class, bridge.service);
+            plugin.getLogger().severe("VoxelCore did not become the selected Vault2 provider; Tokens integration disabled.");
+            return null;
+        }
         plugin.getLogger().info("Registered VaultUnlocked currencies: " + bridge.currencies.keySet());
         return bridge;
     }
