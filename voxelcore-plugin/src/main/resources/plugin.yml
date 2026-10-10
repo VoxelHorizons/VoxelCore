@@ -5,12 +5,19 @@ api-version: '${voxelcore.api.version}'
 softdepend: [PlaceholderAPI, ShopGUIPlus]
 
 commands:
+  vceconomy:
+    description: Manage and inspect VoxelCore currency wallets
+    aliases: [vcecon]
+    usage: /vceconomy currencies
+    permission: voxelcore.admin.economy
   voxelcore:
     description: VoxelCore administrative and debug command
     aliases: [vc]
     permission: voxelcore.use
 
 permissions:
+  voxelcore.admin.economy:
+    default: op
   voxelcore.use:
     default: op
   voxelcore.admin:
