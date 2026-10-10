@@ -39,3 +39,15 @@ ui:
     # Full titles used for real physical chests. Normal VoxelCore UI/offset placeholders are supported.
     single: ''
     double: ''
+
+# Optional currencies exposed through VaultUnlocked (Vault2).
+# Existing Coins are always delegated to the Essentials/legacy Vault provider.
+# Enable only when VaultUnlocked and an Essentials economy are present.
+economy:
+  enabled: false
+  default-currency: coins
+  currencies:
+    cosmetics:
+      decimals: 0
+    gems:
+      decimals: 0
