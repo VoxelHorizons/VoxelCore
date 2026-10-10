@@ -24,6 +24,23 @@ Restart to initialize. Wallets start with 0. The database is `plugins/VoxelCore/
 
 SQLite writes use WAL, FULL synchronous durability, a transaction audit trail and exact signed 64-bit minor-unit balances. Invalid precision and negative balances are rejected. No floating-point amount storage is used.
 
+## Administrator test commands
+
+Once the economy is enabled and the server restarted, operators with
+`voxelcore.admin.economy` may run:
+
+```text
+/vceconomy currencies
+/vceconomy balance FlopsiNZ voxel:coins
+/vceconomy credit FlopsiNZ voxel:coins 100.00
+/vceconomy debit FlopsiNZ voxel:coins 10.00
+/vceconomy transfer FlopsiNZ OtherOnlinePlayer voxel:coins 5.00
+```
+
+Player names must be online. For offline accounts, use the full UUID. Each successful
+operation creates a random transaction ID and is recorded in the SQLite audit journal.
+These commands are intentionally admin-only and **are not player-accessible payment commands**.
+
 ## Java integration
 
 Depend on the matching `voxelcore-common` API and obtain the running service:
@@ -68,6 +85,6 @@ Do not simply debit a wallet and then give items without recovery logic, or cred
 
 The service currently uses one serialized JDBC connection with durable synchronous commits; it is a **correctness-first ledger**, not yet a nonblocking bulk transaction executor. Never call it at high frequency on the server tick thread without performance validation. A future VoxelShop trade coordinator should run database steps in a bounded worker pool and switch back to the main thread for Bukkit inventory operations, with explicit state transitions. This is not yet included here.
 
-All server-side plugins using Bukkit's service registry are trusted; the API does not authenticate external Java callers. Player-exposed credit/debit or administrative operations must have their own permission and authorization checks. A Vault compatibility adapter and admin money commands are intentionally not enabled at this stage.
+All server-side plugins using Bukkit's service registry are trusted; the API does not authenticate external Java callers. Player-exposed credit/debit or administrative operations must have their own permission and authorization checks. A Vault compatibility adapter and player money commands are intentionally not enabled at this stage. Privileged balance/credit/debit/transfer test commands are available to administrators.
 
 See [VoxelShop PR #1](https://github.com/VoxelHorizons/VoxelShop/pull/1) for the market simulation prototype and [issue #65](https://github.com/VoxelHorizons/VoxelCore/issues/65) for the remaining currency and recovery milestones.
