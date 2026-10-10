@@ -30,6 +30,9 @@ import org.voxelhorizons.content.runtime.ContentRuntime;
 import org.voxelhorizons.content.runtime.ContentRuntimeReloader;
 import org.voxelhorizons.content.runtime.ContentSnapshot;
 import org.voxelhorizons.content.runtime.ContentSnapshotValidator;
+import org.voxelhorizons.economy.EconomyBootstrap;
+import org.voxelhorizons.economy.SqliteEconomyService;
+import org.voxelhorizons.economy.api.EconomyService;
 import org.voxelhorizons.item.ItemManager;
 import org.voxelhorizons.item.DyeableItemListener;
 import org.voxelhorizons.network.AdvancementsMenuOverride;
@@ -68,6 +71,7 @@ public final class VoxelCore extends JavaPlugin {
     public static VoxelCore instance;
     public Logger logger;
 
+    private SqliteEconomyService economyService;
     private File configFile;
     public FileConfiguration config;
 
@@ -171,6 +175,16 @@ public final class VoxelCore extends JavaPlugin {
             return;
         }
 
+        // Fail closed: if the opted-in ledger cannot open, never start a server
+        // with an unavailable or partially initialized economy service.
+        try {
+            economyService = EconomyBootstrap.start(this);
+        } catch (Exception exception) {
+            logger.log(Level.SEVERE, "VoxelCore economy initialization failed; refusing to start", exception);
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+
         itemManager = new ItemManager(contentRuntime, versionAdapter);
         blockManager = new BlockManager(contentRuntime, versionAdapter.version().atLeast(1, 13, 0));
         contentBrowser = new ContentBrowser(this);
@@ -233,6 +247,12 @@ public final class VoxelCore extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (economyService != null) {
+            getServer().getServicesManager().unregister(EconomyService.class, economyService);
+            try { economyService.close(); }
+            catch (java.sql.SQLException e) { getLogger().log(Level.SEVERE, "Economy ledger close failed", e); }
+            economyService = null;
+        }
         if (advancementsMenuOverride != null) advancementsMenuOverride.shutdown();
         if (blockMiningSpeedController != null) blockMiningSpeedController.clearAll();
         if (config == null || configFile == null) return;
@@ -279,6 +299,7 @@ public final class VoxelCore extends JavaPlugin {
         }
     }
 
+    public EconomyService getEconomyService() { return economyService; }
     public VersionAdapter getVersionAdapter() { return versionAdapter; }
     public ServerPlatformCapabilities getServerPlatformCapabilities() { return serverPlatformCapabilities; }
     public ContentRuntime getContentRuntime() { return contentRuntime; }
