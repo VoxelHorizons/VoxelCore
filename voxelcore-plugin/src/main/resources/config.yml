@@ -40,14 +40,10 @@ ui:
     single: ''
     double: ''
 
-# Optional currencies exposed through VaultUnlocked (Vault2).
-# Existing Coins are always delegated to the Essentials/legacy Vault provider.
-# Enable only when VaultUnlocked and an Essentials economy are present.
+# Optional independent VaultUnlocked (Vault2) currencies.
+# Essentials remains the legacy Coins provider; VoxelCore does not touch it.
 economy:
   enabled: false
-  default-currency: coins
   currencies:
-    cosmetics:
-      decimals: 0
-    gems:
+    tokens:
       decimals: 0
