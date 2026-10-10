@@ -35,6 +35,7 @@ import org.voxelhorizons.item.DyeableItemListener;
 import org.voxelhorizons.network.AdvancementsMenuOverride;
 import org.voxelhorizons.integration.shopgui.ShopGuiPlusIntegration;
 import org.voxelhorizons.economy.VoxelCurrencyBridge;
+import org.voxelhorizons.economy.CurrencyCommands;
 import org.voxelhorizons.block.BlockManager;
 import org.voxelhorizons.block.BlockListener;
 import org.voxelhorizons.block.BlockPickListener;
@@ -229,6 +230,7 @@ public final class VoxelCore extends JavaPlugin {
 
         try {
             currencyBridge = VoxelCurrencyBridge.start(this);
+            if (currencyBridge != null) getServer().getPluginManager().registerEvents(new CurrencyCommands(currencyBridge), this);
         } catch (RuntimeException | LinkageError exception) {
             logger.log(Level.SEVERE, "VaultUnlocked currency integration failed; currencies unavailable", exception);
         }
