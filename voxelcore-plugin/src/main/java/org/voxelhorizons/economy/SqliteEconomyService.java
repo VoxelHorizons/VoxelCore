@@ -94,7 +94,33 @@ public final class SqliteEconomyService implements EconomyService, AutoCloseable
                     + "delta_minor INTEGER NOT NULL, balance_after_minor INTEGER NOT NULL,"
                     + "PRIMARY KEY(transaction_id, entry_index),"
                     + "FOREIGN KEY(transaction_id) REFERENCES economy_transactions(id))");
+            statement.execute("CREATE TABLE IF NOT EXISTS economy_currency_schema ("
+                    + "currency_id TEXT PRIMARY KEY, precision INTEGER NOT NULL, maximum_minor INTEGER NOT NULL)");
             if (version == 0) statement.execute("PRAGMA user_version=1");
+        }
+        // Currency precision and maximum are part of the persisted ledger schema.
+        // Silently changing either would reinterpret player balances or strand funds.
+        try (Statement statement = database.createStatement();
+             ResultSet rows = statement.executeQuery(
+                     "SELECT currency_id, precision, maximum_minor FROM economy_currency_schema")) {
+            while (rows.next()) {
+                CurrencyDefinition current = currencies.get(rows.getString(1));
+                if (current == null || current.precision() != rows.getInt(2)
+                        || current.maximumMinor() != rows.getLong(3)) {
+                    throw new SQLException("Currency removed or precision/maximum changed: " + rows.getString(1)
+                            + ". Use an explicit migration, not a config edit.");
+                }
+            }
+        }
+        for (CurrencyDefinition currency : currencies.values()) {
+            try (PreparedStatement insert = database.prepareStatement(
+                    "INSERT OR IGNORE INTO economy_currency_schema(currency_id,precision,maximum_minor)"
+                            + " VALUES (?,?,?)")) {
+                insert.setString(1, currency.id());
+                insert.setInt(2, currency.precision());
+                insert.setLong(3, currency.maximumMinor());
+                insert.executeUpdate();
+            }
         }
     }
 
