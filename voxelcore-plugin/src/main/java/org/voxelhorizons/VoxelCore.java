@@ -30,6 +30,7 @@ import org.voxelhorizons.content.runtime.ContentRuntime;
 import org.voxelhorizons.content.runtime.ContentRuntimeReloader;
 import org.voxelhorizons.content.runtime.ContentSnapshot;
 import org.voxelhorizons.content.runtime.ContentSnapshotValidator;
+import org.voxelhorizons.economy.EconomyAdminCommand;
 import org.voxelhorizons.economy.EconomyBootstrap;
 import org.voxelhorizons.economy.SqliteEconomyService;
 import org.voxelhorizons.economy.api.EconomyService;
@@ -233,6 +234,11 @@ public final class VoxelCore extends JavaPlugin {
             bukkitCommand.setExecutor(commandFactory);
             bukkitCommand.setTabCompleter(commandFactory);
             CommandRegistry.register(commandFactory);
+            PluginCommand economyCommand = getCommand("vceconomy");
+            if (economyCommand == null) throw new IllegalStateException("Missing vceconomy declaration");
+            EconomyAdminCommand economyAdmin = new EconomyAdminCommand(economyService);
+            economyCommand.setExecutor(economyAdmin);
+            economyCommand.setTabCompleter(economyAdmin);
         } catch (Exception exception) {
             logger.log(Level.SEVERE, "Unable to register VoxelCore commands", exception);
             getServer().getPluginManager().disablePlugin(this);
