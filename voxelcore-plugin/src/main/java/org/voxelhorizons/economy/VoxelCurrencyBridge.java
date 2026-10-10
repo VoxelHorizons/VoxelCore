@@ -54,7 +54,7 @@ public final class VoxelCurrencyBridge implements InvocationHandler {
     public static VoxelCurrencyBridge start(JavaPlugin plugin) {
         ConfigurationSection section = plugin.getConfig().getConfigurationSection("economy");
         if (section == null || !section.getBoolean("enabled", false)) return null;
-        if (!Bukkit.getPluginManager().isPluginEnabled("VaultUnlocked")) {
+        if (!Bukkit.getPluginManager().isPluginEnabled("Vault")) {
             plugin.getLogger().warning("Voxel currencies require VaultUnlocked; integration not started.");
             return null;
         }
