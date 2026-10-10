@@ -94,6 +94,21 @@ public final class VoxelCurrencyBridge implements InvocationHandler {
         return bridge;
     }
 
+    public boolean supports(String currency) { return currencies.containsKey(currency.toLowerCase(Locale.ROOT)); }
+    public Collection<String> currencies() { return Collections.unmodifiableCollection(currencies.keySet()); }
+    public synchronized BigDecimal balance(UUID id, String currency) { return read(id, currency.toLowerCase(Locale.ROOT)); }
+    public synchronized net.milkbowl.vault2.economy.EconomyResponse transaction(String operation, UUID id, String currency, BigDecimal amount) {
+        return modify(operation, id, currency.toLowerCase(Locale.ROOT), amount);
+    }
+    public synchronized Map<UUID, BigDecimal> top(String currency) {
+        Map<UUID, BigDecimal> result = new HashMap<UUID, BigDecimal>();
+        ConfigurationSection section = balances.getConfigurationSection("balances");
+        if (section != null) for (String key : section.getKeys(false)) {
+            try { UUID id = UUID.fromString(key); result.put(id, read(id, currency)); }
+            catch (IllegalArgumentException ignored) { }
+        }
+        return result;
+    }
     public void shutdown() {
         if (service != null) Bukkit.getServicesManager().unregister(Economy.class, service);
     }
@@ -159,7 +174,7 @@ public final class VoxelCurrencyBridge implements InvocationHandler {
         if (name.equals("getDefaultCurrency")) return defaultCurrency;
         if (name.equals("defaultCurrencyNameSingular")) return defaultCurrency;
         if (name.equals("defaultCurrencyNamePlural")) return defaultCurrency;
-        if (name.equals("fractionalDigits")) return args.length > 1 ? currencies.getOrDefault(String.valueOf(args[1]), -1) : currencies.get(defaultCurrency);
+        if (name.equals("fractionalDigits")) return args.length > 1 ? currencies.getOrDefault(String.valueOf(args[1]).toLowerCase(Locale.ROOT), -1) : currencies.get(defaultCurrency);
         if (name.equals("format")) {
             BigDecimal value = null;
             for (Object arg : args) if (arg instanceof BigDecimal) value = (BigDecimal)arg;
