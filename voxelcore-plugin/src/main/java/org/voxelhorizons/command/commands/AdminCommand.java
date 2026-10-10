@@ -20,6 +20,7 @@ public class AdminCommand implements SubCommand {
         register(new BlockCommand());
         register(new PackCommand());
         register(new UiCommand());
+        register(new EconomyCommand());
     }
 
     private void register(SubCommand command) {
@@ -46,6 +47,6 @@ public class AdminCommand implements SubCommand {
 
     @Override
     public void execute(CommandSender sender, String[] args) {
-        sender.sendMessage("Usage: /voxelcore admin <reload|content|item|block|pack|ui>");
+        sender.sendMessage("Usage: /voxelcore admin <reload|content|item|block|pack|ui|eco>");
     }
 }
