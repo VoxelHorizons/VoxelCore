@@ -39,3 +39,17 @@ It reads the Vault2 balance. If the expansion returns Essentials Coins, confirm 
 - Tokens are independent from Essentials; no exchange or migration.
 - On-disk saving occurs on balance mutations. Back up the balance file.
 - Test on a staging Paper server first. This implementation does not provide atomic two-account transfers, shared accounts or async APIs.
+
+## Admin currency commands
+
+Requires `voxelcore.admin.eco` and the specific `voxelcore.admin.eco.<action>` permission (defaults: op). Available from console and in-game:
+
+```text
+/vc admin eco balance <player> [currency]
+/vc admin eco give <player> <amount> [currency]
+/vc admin eco take <player> <amount> [currency]
+/vc admin eco set <player> <amount> [currency]
+/vc admin eco reset <player> [currency]
+```
+
+The omitted currency defaults to `tokens`. These commands modify VoxelCore-managed balances only, never Essentials Coins. Tokens enforce whole numbers. Taking more than the current balance clamps the account to zero; negative deposits or amounts are rejected. Actions log their before/after balances for auditing.
