@@ -35,7 +35,7 @@ public final class EconomyCommand implements SubCommand {
     @Override public boolean playerOnly() { return false; }
     @Override public Map<String, SubCommand> getChildren() { return children; }
     @Override public void execute(CommandSender sender, String[] args) {
-        sender.sendMessage("Usage: /vc admin eco <balance|give|take|set|reset> <player> [amount] [currency]");
+        sender.sendMessage("Usage: /vc admin eco <balance|give|take|set|reset> <player> [amount] <currency>");
     }
 
     private static VoxelCurrencyBridge provider(CommandSender sender) {
@@ -74,10 +74,9 @@ public final class EconomyCommand implements SubCommand {
             VoxelCurrencyBridge bridge = provider(sender);
             if (bridge == null) return;
             boolean amountRequired = !operation.equals("balance") && !operation.equals("reset");
-            if (args.length < 1 || args.length > (amountRequired ? 3 : 2)
-                    || (amountRequired && args.length < 2)) {
+            if (args.length != (amountRequired ? 3 : 2)) {
                 sender.sendMessage("§cUsage: /vc admin eco " + operation
-                        + (amountRequired ? " <player> <amount> [currency]" : " <player> [currency]"));
+                        + (amountRequired ? " <player> <amount> <currency>" : " <player> <currency>"));
                 return;
             }
             OfflinePlayer target = Bukkit.getOfflinePlayer(args[0]);
@@ -85,8 +84,7 @@ public final class EconomyCommand implements SubCommand {
                 sender.sendMessage("§cThat player has never joined this server.");
                 return;
             }
-            String currency = args.length == (amountRequired ? 3 : 2)
-                    ? args[args.length - 1].toLowerCase(Locale.ROOT) : "tokens";
+            String currency = args[args.length - 1].toLowerCase(Locale.ROOT);
             if (!bridge.supports(currency)) {
                 sender.sendMessage("§cUnknown VoxelCore currency: " + currency
                         + ". Available: " + bridge.currencies());
