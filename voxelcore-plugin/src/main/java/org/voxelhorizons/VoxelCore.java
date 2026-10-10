@@ -92,6 +92,7 @@ public final class VoxelCore extends JavaPlugin {
     private Path contentRoot;
 
     public static VoxelCore getInstance() { return instance; }
+    public VoxelCurrencyBridge getCurrencyBridge() { return currencyBridge; }
 
     public VoxelCore() {
         if (instance != null) throw new IllegalStateException(getName() + " already initialized!");
