@@ -39,3 +39,17 @@ ui:
     # Full titles used for real physical chests. Normal VoxelCore UI/offset placeholders are supported.
     single: ''
     double: ''
+
+# Optional multi-currency VoxelCore economy. Disabled until admin explicitly enables it.
+# Changes to currency precision or maximum after first initialization need a migration.
+economy:
+  enabled: false
+  currencies:
+    'voxel:coins':
+      name: Coins
+      precision: 2
+      maximum-balance: '1000000000000'
+    'voxel:cosmetics':
+      name: Cosmetic Tokens
+      precision: 0
+      maximum-balance: '1000000000'
