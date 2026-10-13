@@ -46,4 +46,27 @@ public class ConfigMigrationSupportTest {
         assertEquals("voxel:danger_left", current.getString("ui.tooltips.danger.left"));
         assertTrue(!current.contains("ui.tooltip"));
     }
+    @Test
+    public void addsBrowserTitleDefaultsWhilePreservingExistingUiSettings() throws Exception {
+        YamlConfiguration current = new YamlConfiguration();
+        current.loadFromString("version: 6\nui:\n  chest_titles:\n    single: '&eExisting title'\n"
+                + "  browser:\n    titles:\n      items: '&f:my_custom_items:'\n");
+        YamlConfiguration defaults = new YamlConfiguration();
+        defaults.loadFromString("version: 7\nui:\n  browser:\n    titles:\n"
+                + "      items: 'VC Items {page}/{pages}'\n"
+                + "      blocks: 'VC Blocks {page}/{pages}'\n"
+                + "    page_titles:\n      items: {}\n      blocks: {}\n");
+
+        ConfigMigrationSupport.merge(current, defaults, 7);
+
+        assertEquals(7, current.getInt("version"));
+        assertEquals("&eExisting title", current.getString("ui.chest_titles.single"));
+        assertEquals("&f:my_custom_items:", current.getString("ui.browser.titles.items"));
+        assertEquals("VC Blocks {page}/{pages}", current.getString("ui.browser.titles.blocks"));
+        YamlConfiguration persisted = new YamlConfiguration();
+        persisted.loadFromString(current.saveToString());
+        assertEquals("&f:my_custom_items:", persisted.getString("ui.browser.titles.items"));
+        assertEquals("VC Blocks {page}/{pages}", persisted.getString("ui.browser.titles.blocks"));
+    }
+
 }

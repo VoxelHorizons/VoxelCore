@@ -607,6 +607,41 @@ move preview/control items into their inventory.
 Browser contents are rebuilt from the active runtime snapshot whenever a page opens. If a content reload publishes a
 new revision while a browser is already open, the next click refreshes that browser before performing an action.
 
+### Configurable item/block browser titles
+
+Both browser title templates live in `plugins/VoxelCore/config.yml` under `ui.browser`.
+The defaults retain the familiar "VC Items 1/3" and "VC Blocks 1/3" titles,
+but can be replaced with custom resource-pack font glyphs and offsets:
+
+```yaml
+ui:
+  browser:
+    titles:
+      items: '&f:offset_-8::vc_items_page_{page}:'
+      blocks: '&f:offset_-8::vc_blocks_page_{page}:'
+    page_titles:
+      items:
+        '1': '&f:offset_-8::vc_items_first_page:'
+      blocks: {}
+```
+
+- `{page}` is the **1-based** current page number.
+- `{pages}` is the total page count; `{total}` is the number of available entries.
+- `{type}` expands to `Items` or `Blocks`.
+- `page_titles.items.<number>` / `page_titles.blocks.<number>` (1-based) can
+  replace a specific page's title without changing other pages; other pages
+  fall back to the per-type `titles` template.
+- Tokens expand **before** VoxelCore's `:glyph:` and `:offset_<pixels>:`
+  resolution, allowing a glyph named `vc_items_page_2` to be selected from a
+  template containing `:vc_items_page_{page}:`. Traditional `&` chat colors
+  are supported. Titles are read from the current configuration each time a
+  page opens, so a VoxelCore admin reload picks up edits without rebuilding a
+  resource pack unless the glyph artwork itself has changed.
+
+The six-row inventory size and pagination buttons remain unchanged.
+For older existing installations, the v7 config migration preserves authored
+settings and adds the browser title defaults.
+
 ## Safe reloads
 
 Reload builds the candidate revision in isolation:
