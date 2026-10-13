@@ -141,4 +141,82 @@ public class AtlasCompatibilityTest {
         assertTrue(read(entries, "assets/minecraft/atlases/blocks.json")
                 .contains("\"resource\":\"minecraft:item/stick\""));
     }
+    @Test public void stitchesIllusionerEntitySkinIntoBlocksForScarecrowModel() {
+        Map<String, byte[]> entries = new TreeMap<String, byte[]>();
+        String path = "assets/voxel/models/furniture/farming/deco/scarecrow.json";
+        // Reproduces the operator's original Blockbench scarecrow: its arms/body
+        // reference entity/illager/illusioner, with vanilla hay/pumpkin blocks.
+        String original = "{\"format_version\":\"1.21.11\",\"textures\":{"
+                + "\"1\":\"entity/illager/illusioner\","
+                + "\"2\":\"block/carved_pumpkin\","
+                + "\"5\":\"block/hay_block_side\","
+                + "\"particle\":\"block/pumpkin_top\"},"
+                + "\"elements\":[{\"from\":[4,3,6],\"to\":[12,13,12],"
+                + "\"faces\":{\"north\":{\"uv\":[1,11,3,15],"
+                + "\"texture\":\"#1\",\"tintindex\":0}}}]}";
+        entries.put(path, text(original));
+        // The uploaded resource pack also contains scarecrow_hat using the
+        // very same mob skin: both should resolve to one shared atlas sprite.
+        String hat = "assets/voxel/models/furniture/farming/deco/scarecrow_hat.json";
+        entries.put(hat, text("{\"textures\":{\"1\":\"entity/illager/illusioner\","
+                + "\"5\":\"block/hay_block_side\"}}"));
+        entries.put("assets/voxel/items/furniture/farming/deco/scarecrow.json",
+                text("{\"model\":{\"type\":\"minecraft:model\","
+                        + "\"model\":\"voxel:furniture/farming/deco/scarecrow\"}}"));
+
+        AtlasCompatibility.repair(entries);
+        String model = read(entries, path);
+        assertTrue(model.contains("\"1\":\"voxelcore:atlas_compat/blocks/minecraft/entity/illager/illusioner\""));
+        assertTrue(model.contains("\"2\":\"block/carved_pumpkin\""));
+        assertTrue(model.contains("\"5\":\"block/hay_block_side\""));
+        assertTrue(model.contains("\"particle\":\"block/pumpkin_top\""));
+        assertTrue(read(entries, hat).contains(
+                "\"1\":\"voxelcore:atlas_compat/blocks/minecraft/entity/illager/illusioner\""));
+        assertTrue(model.contains("\"tintindex\":0"));
+        // Gson represents JSON numeric values as doubles when rewriting.
+        assertTrue(model.contains("\"uv\":[1.0,11.0,3.0,15.0]"));
+        String blockAtlas = read(entries, "assets/minecraft/atlases/blocks.json");
+        assertTrue(blockAtlas.contains("\"resource\":\"minecraft:entity/illager/illusioner\""));
+        assertTrue(blockAtlas.contains("\"sprite\":\"voxelcore:atlas_compat/blocks/minecraft/entity/illager/illusioner\""));
+        // The item atlas should not gain a second, conflicting copy of this texture.
+        String itemAtlas = entries.containsKey("assets/minecraft/atlases/items.json")
+                ? read(entries, "assets/minecraft/atlases/items.json") : "";
+        assertFalse(itemAtlas.contains("minecraft:entity/illager/illusioner"));
+        AtlasCompatibility.repair(entries);
+        assertEquals(1, read(entries, "assets/minecraft/atlases/blocks.json")
+                .split("voxelcore:atlas_compat/blocks/minecraft/entity/illager/illusioner", -1).length-1);
+    }
+
+    @Test public void registersEntityOnlyItemModelInItemsAtlas() {
+        Map<String, byte[]> entries = new TreeMap<String, byte[]>();
+        String model = "assets/voxel/models/item/illusioner_mask.json";
+        entries.put(model, text("{\"textures\":{\"layer0\":\"minecraft:entity/illager/illusioner\"}}"));
+        AtlasCompatibility.repair(entries);
+        assertTrue(read(entries, model).contains(
+                "voxelcore:atlas_compat/items/minecraft/entity/illager/illusioner"));
+        assertTrue(read(entries, "assets/minecraft/atlases/items.json").contains(
+                "\"resource\":\"minecraft:entity/illager/illusioner\""));
+        assertFalse(entries.containsKey("assets/minecraft/atlases/blocks.json"));
+    }
+
+    @Test public void mixedBlockItemAndEntityTexturesUseOneAtlas() {
+        Map<String, byte[]> entries = new TreeMap<String, byte[]>();
+        String model = "assets/voxel/models/furniture/illusioner_staff.json";
+        entries.put(model, text("{\"textures\":{"
+                + "\"block\":\"minecraft:block/oak_planks\","
+                + "\"item\":\"minecraft:item/stick\","
+                + "\"entity\":\"minecraft:entity/illager/illusioner\"}}"));
+        entries.put("assets/voxel/items/furniture/illusioner_staff.json",
+                text("{\"model\":{\"type\":\"minecraft:model\","
+                        + "\"model\":\"voxel:furniture/illusioner_staff\"}}"));
+        AtlasCompatibility.repair(entries);
+        String output = read(entries, model);
+        assertTrue(output.contains("voxelcore:atlas_compat/items/minecraft/block/oak_planks"));
+        assertTrue(output.contains("voxelcore:atlas_compat/items/minecraft/entity/illager/illusioner"));
+        assertTrue(output.contains("\"item\":\"minecraft:item/stick\""));
+        String items = read(entries, "assets/minecraft/atlases/items.json");
+        assertTrue(items.contains("\"resource\":\"minecraft:block/oak_planks\""));
+        assertTrue(items.contains("\"resource\":\"minecraft:entity/illager/illusioner\""));
+    }
+
 }
