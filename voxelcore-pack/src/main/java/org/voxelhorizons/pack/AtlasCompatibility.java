@@ -51,10 +51,13 @@ final class AtlasCompatibility {
             models.put(name, new Model(file, parse(entry.getValue(), file)));
         }
 
+        // Generated and authored modern item definitions identify models which must use
+        // the items atlas even when their model path is not under item/ (e.g. vehicles/).
+        Set<String> itemModels = itemModelReferences(entries);
         Map<String, String> blockAliases = new TreeMap<String, String>();
         Map<String, String> itemAliases = new TreeMap<String, String>();
         for (String id : models.keySet())
-            resolve(id, models, entries, new HashSet<String>(), blockAliases, itemAliases);
+            resolve(id, models, entries, new HashSet<String>(), blockAliases, itemAliases, itemModels);
 
         if (!blockAliases.isEmpty()) {
             byte[] current = entries.get(BLOCKS);
@@ -69,7 +72,8 @@ final class AtlasCompatibility {
 
     private static Map<String, String> resolve(String id, Map<String, Model> models,
              Map<String, byte[]> entries, Set<String> stack,
-             Map<String, String> blockAliases, Map<String, String> itemAliases) {
+             Map<String, String> blockAliases, Map<String, String> itemAliases,
+             Set<String> itemModels) {
         Model model = models.get(id);
         if (model == null) return Collections.emptyMap();
         if (model.resolved != null) return model.resolved;
@@ -78,7 +82,7 @@ final class AtlasCompatibility {
         Map<String, String> textures = new LinkedHashMap<String, String>();
         Object parent = model.root.get("parent");
         if (parent instanceof String)
-            textures.putAll(resolve(qualify((String) parent), models, entries, stack, blockAliases, itemAliases));
+            textures.putAll(resolve(qualify((String) parent), models, entries, stack, blockAliases, itemAliases, itemModels));
         Map<String, Object> own = map(model.root.get("textures"));
         for (Map.Entry<String, Object> row : own.entrySet())
             if (row.getValue() instanceof String) textures.put(row.getKey(), (String) row.getValue());
@@ -90,7 +94,7 @@ final class AtlasCompatibility {
             items |= atlas == 2;
         }
         if (blocks && items) {
-            boolean preferItem = id.contains(":item/") || own.containsKey("layer0");
+            boolean preferItem = itemModels.contains(id) || id.contains(":item/") || own.containsKey("layer0");
             Map<String, String> aliasMap = preferItem ? itemAliases : blockAliases;
             int foreign = preferItem ? 1 : 2;
             for (Map.Entry<String, String> row : new ArrayList<Map.Entry<String, String>>(textures.entrySet())) {
@@ -111,6 +115,30 @@ final class AtlasCompatibility {
         return textures;
     }
 
+    /** Item providers may reference cuboid models in any authored model directory. */
+    private static Set<String> itemModelReferences(Map<String, byte[]> entries) {
+        Set<String> result = new HashSet<String>();
+        for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
+            String path = entry.getKey();
+            if (!path.startsWith("assets/") || !path.endsWith(".json")
+                    || path.indexOf("/items/") < 0 || path.indexOf("/models/") >= 0) continue;
+            collectItemModelReferences(parse(entry.getValue(), path), result);
+        }
+        return result;
+    }
+
+    private static void collectItemModelReferences(Object node, Set<String> models) {
+        if (node instanceof List) {
+            for (Object child : (List<?>) node) collectItemModelReferences(child, models);
+        } else if (node instanceof Map) {
+            Map<String, Object> map = map(node);
+            Object type = map.get("type"), model = map.get("model");
+            if (("minecraft:model".equals(type) || "model".equals(type)) && model instanceof String)
+                models.add(qualify((String) model));
+            for (Object child : map.values()) collectItemModelReferences(child, models);
+        }
+    }
+
     private static String follow(String value, Map<String, String> refs) {
         Set<String> visited = new HashSet<String>();
         while (value != null && value.startsWith("#")) {
@@ -125,6 +153,10 @@ final class AtlasCompatibility {
         if (sprite == null || sprite.startsWith("#")) return 0;
         String id = qualify(sprite), p = id.substring(id.indexOf(':') + 1);
         if (p.startsWith("block/") || p.startsWith("atlas_compat/blocks/")) return 1;
+        // Vanilla chest entity artwork is sampled from the blocks atlas by cuboid
+        // model baking. When a vehicle also has item-atlas textures, alias the chest
+        // sprite into items rather than modifying/copying the original PNG.
+        if (id.startsWith("minecraft:") && p.startsWith("entity/chest/")) return 1;
         if (p.startsWith("item/") || p.startsWith("atlas_compat/items/")) return 2;
         return !id.startsWith("minecraft:") && !p.startsWith("entity/") ? 2 : 0;
     }
