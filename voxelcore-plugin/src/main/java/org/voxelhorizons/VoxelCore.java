@@ -34,6 +34,8 @@ import org.voxelhorizons.item.ItemManager;
 import org.voxelhorizons.item.DyeableItemListener;
 import org.voxelhorizons.network.AdvancementsMenuOverride;
 import org.voxelhorizons.integration.shopgui.ShopGuiPlusIntegration;
+import org.voxelhorizons.economy.VoxelCurrencyBridge;
+import org.voxelhorizons.economy.CurrencyCommands;
 import org.voxelhorizons.block.BlockManager;
 import org.voxelhorizons.block.BlockListener;
 import org.voxelhorizons.block.BlockPickListener;
@@ -85,10 +87,12 @@ public final class VoxelCore extends JavaPlugin {
     private TooltipRenderer tooltipRenderer;
     private InventoryTitlePlaceholderListener inventoryTitlePlaceholderListener;
     private ContentBrowser contentBrowser;
+    private VoxelCurrencyBridge currencyBridge;
     private AdvancementsMenuOverride advancementsMenuOverride;
     private Path contentRoot;
 
     public static VoxelCore getInstance() { return instance; }
+    public VoxelCurrencyBridge getCurrencyBridge() { return currencyBridge; }
 
     public VoxelCore() {
         if (instance != null) throw new IllegalStateException(getName() + " already initialized!");
@@ -225,6 +229,13 @@ public final class VoxelCore extends JavaPlugin {
             return;
         }
 
+        try {
+            currencyBridge = VoxelCurrencyBridge.start(this);
+            if (currencyBridge != null) getServer().getPluginManager().registerEvents(new CurrencyCommands(currencyBridge), this);
+        } catch (RuntimeException | LinkageError exception) {
+            logger.log(Level.SEVERE, "VaultUnlocked currency integration failed; currencies unavailable", exception);
+        }
+
         logger.info("VOXELCORE_READY revision=" + contentRuntime.current().revision()
                 + " items=" + contentRuntime.current().items().size()
                 + " platform=" + versionAdapter.version()
@@ -233,6 +244,7 @@ public final class VoxelCore extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (currencyBridge != null) currencyBridge.shutdown();
         if (advancementsMenuOverride != null) advancementsMenuOverride.shutdown();
         if (blockMiningSpeedController != null) blockMiningSpeedController.clearAll();
         if (config == null || configFile == null) return;
