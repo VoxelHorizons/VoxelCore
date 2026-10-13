@@ -35,8 +35,8 @@ final class VoxelCoreItemProvider extends ItemProvider {
         try {
             ContentID id = parseReference(configuredId);
             // ShopGUI+ uses the same item provider for both real shop stock and
-            // presentation-only buttons. Allow abstract render variants ONLY in
-            // settings GUI button slots. Normal shop entries must remain concrete.
+            // presentation-only GUI icons. Allow abstract render variants ONLY in
+            // known display-only config paths. Tradeable shop stock stays concrete.
             return isGuiButtonItem(section.getCurrentPath())
                     ? items.createRender(id)
                     : items.create(id);
@@ -44,7 +44,7 @@ final class VoxelCoreItemProvider extends ItemProvider {
             String path = section.getCurrentPath();
             String message = "ShopGUI+ references invalid VoxelCore item '" + configuredId
                     + "' at " + path + ": " + exception.getMessage()
-                    + (isGuiButtonItem(path) ? " (GUI buttons require a renderable model and material)"
+                    + (isGuiButtonItem(path) ? " (GUI icons require a renderable model and material)"
                         : " (shop stock requires a non-abstract item definition)");
             logger.log(Level.SEVERE, message);
             // Returning null here allows ShopGUI+ to retain an incomplete GuiButton and crash later
@@ -54,16 +54,31 @@ final class VoxelCoreItemProvider extends ItemProvider {
     }
 
     /**
-     * ShopGUI+ global settings contain decorative buttons at e.g.
-     * buttons.goBack.item. These are displays, not buyable shop contents.
-     * Do NOT allow this path to match arbitrary shop entries by suffix:
-     * shops.<name>.items.<id>.item always uses createItem.
+     * ShopGUI+ calls ItemProvider for both tradeable products and decorative
+     * button/selector icons. Their config paths distinguish the two usages:
+     *
+     * buttons.goBack.item                                  (global navigation)
+     * amountSelectionGUI.buttons.set1.item                (quantity selector)
+     * amountSelectionGUIBulkBuy.buttons.buy1.item         (other GUI variants)
+     * shopMenuItems.1.item                                 (shop selector icon)
+     *
+     * The nested GUI root is deliberately matched by its "GUI" component,
+     * rather than an exhaustive hardcoded list of button names or menus. This
+     * covers ShopGUI+ GUI variants but NEVER arbitrary shops.* product paths.
      */
     static boolean isGuiButtonItem(String path) {
         if (path == null) return false;
         String[] parts = path.split("\\.", -1);
-        return parts.length == 3 && "buttons".equalsIgnoreCase(parts[0])
-                && !parts[1].isEmpty() && "item".equalsIgnoreCase(parts[2]);
+        if (parts.length == 3 && "item".equalsIgnoreCase(parts[2])) {
+            // Only well-known display-only selector/button sections.
+            return !parts[1].isEmpty() && ("buttons".equalsIgnoreCase(parts[0])
+                    || "shopMenuItems".equalsIgnoreCase(parts[0]));
+        }
+        return parts.length == 4
+                && parts[0].toLowerCase(java.util.Locale.ROOT).contains("gui")
+                && "buttons".equalsIgnoreCase(parts[1])
+                && !parts[2].isEmpty()
+                && "item".equalsIgnoreCase(parts[3]);
     }
 
     static ContentID parseReference(String configuredId) {
