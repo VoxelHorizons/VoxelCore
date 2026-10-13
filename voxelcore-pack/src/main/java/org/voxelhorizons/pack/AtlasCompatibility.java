@@ -87,28 +87,44 @@ final class AtlasCompatibility {
         for (Map.Entry<String, Object> row : own.entrySet())
             if (row.getValue() instanceof String) textures.put(row.getKey(), (String) row.getValue());
 
-        boolean blocks = false, items = false;
+        boolean blocks = false, items = false, externalEntity = false;
         for (String value : textures.values()) {
-            int atlas = atlas(follow(value, textures));
+            String sprite = follow(value, textures);
+            int atlas = atlas(sprite);
             blocks |= atlas == 1;
             items |= atlas == 2;
+            // Mob skins (e.g. minecraft:entity/illager/illusioner) are NOT
+            // in either default block/item atlas. The texture exists in the
+            // vanilla assets but is unusable by a cuboid model until an atlas
+            // source explicitly stitches it in.
+            externalEntity |= isEntityTexture(sprite);
         }
-        if (blocks && items) {
-            boolean preferItem = itemModels.contains(id) || id.contains(":item/") || own.containsKey("layer0");
+        if ((blocks && items) || externalEntity) {
+            // Keep existing block-only models on the block atlas, even when
+            // they are displayed as items. Likewise keep item-only models on
+            // items. A mixed model uses its item provider to pick a side.
+            boolean preferItem = blocks && !items ? false : items && !blocks ? true
+                    : itemModels.contains(id) || id.contains(":item/") || own.containsKey("layer0");
             Map<String, String> aliasMap = preferItem ? itemAliases : blockAliases;
             int foreign = preferItem ? 1 : 2;
+            boolean modified = false;
             for (Map.Entry<String, String> row : new ArrayList<Map.Entry<String, String>>(textures.entrySet())) {
                 String sprite = follow(row.getValue(), textures);
-                if (atlas(sprite) != foreign) continue;
+                // Always stitch vanilla/custom entity textures into the chosen
+                // atlas. Continue aliasing the opposite atlas for mixed models.
+                if (atlas(sprite) != foreign && !isEntityTexture(sprite)) continue;
                 String resource = qualify(sprite);
                 String alias = "voxelcore:atlas_compat/" + (preferItem ? "items/" : "blocks/") +
                         resource.replace(':', '/');
                 aliasMap.put(alias, resource);
                 own.put(row.getKey(), alias);
                 textures.put(row.getKey(), alias);
+                modified = true;
             }
-            model.root.put("textures", own);
-            entries.put(model.file, utf8(json(model.root)));
+            if (modified) {
+                model.root.put("textures", own);
+                entries.put(model.file, utf8(json(model.root)));
+            }
         }
         model.resolved = textures;
         stack.remove(id);
@@ -159,6 +175,14 @@ final class AtlasCompatibility {
         if (id.startsWith("minecraft:") && p.startsWith("entity/chest/")) return 1;
         if (p.startsWith("item/") || p.startsWith("atlas_compat/items/")) return 2;
         return !id.startsWith("minecraft:") && !p.startsWith("entity/") ? 2 : 0;
+    }
+
+    /** Entity textures are available in resource packs but are not normally atlas sprites. */
+    private static boolean isEntityTexture(String sprite) {
+        if (sprite == null || sprite.startsWith("#")) return false;
+        String id = qualify(sprite);
+        String path = id.substring(id.indexOf(':') + 1);
+        return path.startsWith("entity/");
     }
 
     private static String qualify(String id) {
