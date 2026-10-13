@@ -86,6 +86,43 @@ public class VoxelCoreItemProviderTest {
     }
 
     @Test
+    public void amountSelectionButtonsSupportAbstractRenderModelsWithoutCreatingShopStock() {
+        FakeResolver resolver = new FakeResolver();
+        resolver.abstractItem = ContentID.of("voxel", "ui-blank");
+        VoxelCoreItemProvider provider = new VoxelCoreItemProvider(resolver, Logger.getAnonymousLogger());
+        YamlConfiguration config = new YamlConfiguration();
+
+        // Exact startup exception: amountSelectionGUI.buttons.set1.item
+        ConfigurationSection setOne = config.createSection("amountSelectionGUI.buttons.set1.item");
+        setOne.set("voxelcore", "voxel:ui-blank");
+        ItemStack icon = provider.loadItem(setOne);
+
+        assertTrue(provider.isValidItem(icon));
+        assertEquals(ContentID.of("voxel", "ui-blank"), resolver.renderCreated);
+        assertNull("Quantity buttons must not use the tradeable item factory", resolver.created);
+    }
+
+    @Test
+    public void bulkAmountGuiAndShopSelectorIconsAlsoUseRenderFactory() {
+        FakeResolver resolver = new FakeResolver();
+        resolver.abstractItem = ContentID.of("voxel", "ui-blank");
+        VoxelCoreItemProvider provider = new VoxelCoreItemProvider(resolver, Logger.getAnonymousLogger());
+        YamlConfiguration config = new YamlConfiguration();
+
+        ConfigurationSection bulk = config.createSection("amountSelectionGUIBulkBuy.buttons.buy1.item");
+        bulk.set("voxelcore", "voxel:ui-blank");
+        assertTrue(provider.isValidItem(provider.loadItem(bulk)));
+        assertNull(resolver.created);
+
+        resolver.renderCreated = null;
+        ConfigurationSection category = config.createSection("shopMenuItems.1.item");
+        category.set("voxelcore", "voxel:ui-blank");
+        assertTrue(provider.isValidItem(provider.loadItem(category)));
+        assertEquals(ContentID.of("voxel", "ui-blank"), resolver.renderCreated);
+        assertNull(resolver.created);
+    }
+
+    @Test
     public void abstractItemsRemainUntradeableEvenWhenUsedAsShopStock() {
         FakeResolver resolver = new FakeResolver();
         resolver.abstractItem = ContentID.of("voxel", "ui-blank");
@@ -124,16 +161,30 @@ public class VoxelCoreItemProviderTest {
     }
 
     @Test
-    public void onlyTopLevelGlobalButtonPathsHaveDisplayPrivileges() {
+    public void onlyKnownDisplayGuiPathsHaveAbstractRenderPrivileges() {
         assertTrue(VoxelCoreItemProvider.isGuiButtonItem("buttons.goBack.item"));
         assertTrue(VoxelCoreItemProvider.isGuiButtonItem("buttons.back.item"));
+        assertTrue(VoxelCoreItemProvider.isGuiButtonItem("amountSelectionGUI.buttons.set1.item"));
+        assertTrue(VoxelCoreItemProvider.isGuiButtonItem("amountSelectionGUI.buttons.confirm.item"));
+        assertTrue(VoxelCoreItemProvider.isGuiButtonItem("amountSelectionGUIBulkBuy.buttons.buy1.item"));
+        assertTrue(VoxelCoreItemProvider.isGuiButtonItem("amountSelectionGUIBulkSell.buttons.sell9.item"));
+        assertTrue(VoxelCoreItemProvider.isGuiButtonItem("buyGUI.buttons.confirm.item"));
+        assertTrue(VoxelCoreItemProvider.isGuiButtonItem("shopMenuItems.1.item"));
+
         assertFalse(VoxelCoreItemProvider.isGuiButtonItem(null));
         assertFalse(VoxelCoreItemProvider.isGuiButtonItem("buttons.goBack"));
         assertFalse(VoxelCoreItemProvider.isGuiButtonItem("buttons.goBack.item.other"));
+        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("amountSelectionGUI.buttons.set1"));
+        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("amountSelectionGUI.buttons..item"));
+        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("amountSelectionGUI.buttons.set1.price"));
         assertFalse(VoxelCoreItemProvider.isGuiButtonItem("shops.test.buttons.goBack.item"));
         assertFalse(VoxelCoreItemProvider.isGuiButtonItem("shops.test.items.1"));
+        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("shops.test.items.1.item"));
+        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("shopMenuItems.1"));
+        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("shops.amountSelectionGUI.buttons.set1.item"));
         assertFalse(VoxelCoreItemProvider.isGuiButtonItem("buttons.goBack.price"));
         assertFalse(VoxelCoreItemProvider.isGuiButtonItem("buttons..item"));
+        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("items.1.item"));
     }
 
     @Test
