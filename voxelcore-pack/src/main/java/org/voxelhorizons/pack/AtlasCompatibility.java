@@ -182,7 +182,9 @@ final class AtlasCompatibility {
         if (sprite == null || sprite.startsWith("#")) return false;
         String id = qualify(sprite);
         String path = id.substring(id.indexOf(':') + 1);
-        return path.startsWith("entity/");
+        // Chest artwork already has an explicit block-atlas classification;
+        // do not create a redundant alias or change the old chest behaviour.
+        return path.startsWith("entity/") && atlas(sprite) == 0;
     }
 
     private static String qualify(String id) {
