@@ -1,8 +1,26 @@
 # VoxelCore migration and optimization roadmap
 
-> **Implementation status (September 2026):** The foundation, item/content pipeline, and minimal Java resource-pack compiler (phases 0, 1, and 2a) are implemented on `main`, with exact real-server validation from Minecraft 1.12.2 through 26.2. Legacy HavenCore aliases from the original phase-1 acceptance criteria remain deferred migration work. Java UI font-content compilation (phase 2c) is implemented by this change. The next recommended implementation slice is phase 3a: Java item actions and interaction dispatch. The README remains the canonical feature and compatibility reference.
+> **Implementation checkpoint (13 October 2026):** VoxelCore's content/pack, Java actions and custom-block MVP are merged; VoxelFurniture has its placement, display, seating, storage and animation MVP; VoxelVehicles has modern land driving, persistence, storage and chest accessories. The September phase-3a recommendation is superseded. **Next: cross-plugin release hardening, persistent-state/restart validation, vehicle adapter/physics gaps and audited legacy imports**, followed by frontend expansion. See the evidence-linked checkpoint below. A merged PR is *not* proof of in-game acceptance for every server/client combination.
 
 Prepared for Voxel Horizons · 12 September 2026 · Living implementation plan
+
+## October 2026 cross-plugin implementation checkpoint
+
+**Scope and interpretation.** This is a new check against the current GitHub `main` branches and merged PR histories of [VoxelCore](https://github.com/VoxelHorizons/VoxelCore), [VoxelFurniture](https://github.com/VoxelHorizons/VoxelFurniture), [VoxelVehicles](https://github.com/VoxelHorizons/VoxelVehicles) and the closely coupled [VoxelFurnitureShop](https://github.com/VoxelHorizons/VoxelFurnitureShop), as of **13 October 2026**. The original 12 September static audit, architectural rationale and pinned source inventory in Sections 1–12 and the appendices are retained as *historical baseline*, not descriptions of the current implementations. Feature evidence below means source/merged PR evidence; CI passes are reported separately from human/client or production load testing. Do not infer Bedrock or full legacy vehicle support from VoxelCore's seven-version smoke matrix.
+
+| Area | Verified repository progress | Still missing or not sufficiently verified |
+| --- | --- | --- |
+| VoxelCore platform/content | Multi-version Maven distributions, immutable compiled item content/inheritance, atomic reload, PDC identity, stable render allocations, Paper capability selection and startup smoke tests. [Foundation PRs](https://github.com/VoxelHorizons/VoxelCore/pulls?q=is%3Apr+is%3Amerged) | Legacy HavenCore ID/data importer, comprehensive addon integration testing and explicit per-feature server/version claims |
+| VoxelCore packs/UI | Java glyphs/font and spacing, authored assets, generated blocks/models, resource-pack size optimization, custom-item/GUI browsing and configurable per-page titles, inventory/chest text, tooltip overlays, ShopGUIPlus hooks, render tint and modern rules; recent entity/chest atlas fixes ([#68](https://github.com/VoxelHorizons/VoxelCore/pull/68), [#70](https://github.com/VoxelHorizons/VoxelCore/pull/70), [#71](https://github.com/VoxelHorizons/VoxelCore/pull/71)) | General cross-plugin menu-session/action framework, complete authored-asset dependency auditing, Bedrock pack/conversion and Geyser mappings, measured atlas/client validation |
+| VoxelCore actions/blocks | Reusable item and placed-block actions, carrier-backed blocks, mine/tool/drop rules, hardness support on supported versions, creative pick-block ([#31](https://github.com/VoxelHorizons/VoxelCore/pull/31), [#43](https://github.com/VoxelHorizons/VoxelCore/pull/43), [#44](https://github.com/VoxelHorizons/VoxelCore/pull/44)) | Full HavenCore item behavior/binding/upgrade parity, full physics/protection matrix and non-immune blast-resistance simulation |
+| VoxelCore currency | Independently configured VaultUnlocked Tokens path and currency-aware commands merged in [#67](https://github.com/VoxelHorizons/VoxelCore/pull/67) | Do **not** claim the custom SQLite multi-currency ledger: [#66](https://github.com/VoxelHorizons/VoxelCore/pull/66) was closed **without merge**. Test compatibility/semantics with the currently selected economy provider and shop integrations |
+| VoxelFurniture | Version-aware display/armor-stand visual modes, placement/rotation/collision, seats, inventory, neighbour-aware chair/table models, dye, multipart render/text billboards, bob/spin, stateful and neighbour-triggered animations, child interaction commands, pick-block, reload/orphan repair and definition-cache optimization ([#27](https://github.com/VoxelHorizons/VoxelFurniture/pull/27), [#34](https://github.com/VoxelHorizons/VoxelFurniture/pull/34), [#37](https://github.com/VoxelHorizons/VoxelFurniture/pull/37), [#39](https://github.com/VoxelHorizons/VoxelFurniture/pull/39), [#42](https://github.com/VoxelHorizons/VoxelFurniture/pull/42), [#43](https://github.com/VoxelHorizons/VoxelFurniture/pull/43)) | Bulk/chunk lifecycle and crash-recovery benchmarks, ownership/permissions across all interaction paths, migration of real HavenFurniture data and client/version-specific visual acceptance |
+| VoxelVehicles | 26.2-focused land vehicle implementation with input/simulation, terrain/airborne motion, stable driver seat/render offsets, particles, persistent dyed item state, owner-aware pickup, UI inventory/cargo, installed chest accessories and model swaps, restored preview/metadata, optimized teleports and chunk indexes ([#8](https://github.com/VoxelHorizons/VoxelVehicles/pull/8), [#11](https://github.com/VoxelHorizons/VoxelVehicles/pull/11), [#12](https://github.com/VoxelHorizons/VoxelVehicles/pull/12), [#17](https://github.com/VoxelHorizons/VoxelVehicles/pull/17)) | **Cannot claim drivable 1.12–1.19.3**: legacy input/render adapters remain open in [issue #2](https://github.com/VoxelHorizons/VoxelVehicles/issues/2). HavenVehicles import, multi-seat/trailers ([#3](https://github.com/VoxelHorizons/VoxelVehicles/issues/3)), precise collision and workload benchmark ([#4](https://github.com/VoxelHorizons/VoxelVehicles/issues/4)). [#18](https://github.com/VoxelHorizons/VoxelVehicles/pull/18) was closed, superseded by merged #17 |
+| VoxelFurnitureShop (adjacent addon) | Dynamic regions/variants, shared door snapshots, rotation/requirements, animated persistent fixtures, protections/tooltips, full supported block-entity capture (decorated pots and skull profiles) and restart-safe editing recovery ([#10](https://github.com/VoxelHorizons/VoxelFurnitureShop/pull/10), [#11](https://github.com/VoxelHorizons/VoxelFurnitureShop/pull/11)) | Replay/backups and multi-version restore verification, unsupported native tile NBT, failure atomicity, larger showroom load benchmarks and original HavenFurnitureShop template imports |
+
+**Verification boundary.** VoxelCore's CI smoke matrix has covered 1.12.2, 1.13.2, 1.14.4, 1.19.4, 1.20.5, 1.21.4 and 26.2 (see [smoke workflow](https://github.com/VoxelHorizons/VoxelCore/actions/workflows)). The latest atlas-fix PR's distribution builds and all seven MVP smokes passed. That proves those exercised **VoxelCore** startup/basic flows, not the complete three-plugin runtime on seven versions. VoxelFurniture's legacy renderer is implemented, whereas VoxelVehicles' README explicitly says older versions lack a drive input bridge. The main-branch VoxelCore README still has some older MVP-only introductory/status wording; align it separately so readers are not told existing block/action/addon functionality is unimplemented.
+
+**Repository coordination.** At this checkpoint the three central repositories have no open PRs. VoxelVehicles issues [#2](https://github.com/VoxelHorizons/VoxelVehicles/issues/2), [#3](https://github.com/VoxelHorizons/VoxelVehicles/issues/3) and [#4](https://github.com/VoxelHorizons/VoxelVehicles/issues/4) remain open and provide concrete acceptance criteria. Preserve those as tracking issues rather than treating the implementation roadmap as a substitute for tests.
 
 ## 1. Recommendation and scope
 
@@ -185,7 +203,7 @@ Implemented Java MVP layout:
 - UI font definitions use compact cropped-image metadata while final font composition remains compiler-owned.
 - `build/resource-packs/<target>.zip`: deterministic generated output, separate from authored assets.
 
-Pack priorities, blocks, furniture, crops, vehicles, menus, Java fonts/sounds, and Bedrock-specific asset trees remain planned extensions rather than accepted input in the current compiler.
+**Historical September MVP note:** Pack priorities, blocks, furniture, crops, vehicles, menus, Java fonts/sounds, and Bedrock-specific asset trees were then planned. **October update:** The compiler now supports custom block assets, authored font/language assets, generated modern item definitions, UI glyph atlases and model texture compatibility; VoxelFurniture/VoxelVehicles consume VoxelCore's model/content definitions rather than being separate pack compilers. Bedrock conversion/mappings, general recipe/crop compilation and an independent generic menu schema remain future work. See the checkpoint for implemented vs tested distinctions.
 
 Compile configuration inheritance and resource-pack model inheritance as separate graphs. They are related but have different merge semantics. Resolve textures, model parents, animation frames, sounds, fonts, particle references and target-specific references transitively.
 
@@ -215,6 +233,8 @@ Delivery must occur where Geyser runs. If it runs on the proxy, a backend writin
 ## 8. Furniture, vehicles, mobs and moving structures
 
 Use one authoritative placement and multiple render adapters. Separate visual transforms, interaction hitboxes, physical collision, riding seats, storage and real lighting. Display entities are excellent visuals, but have no native physical hitbox and do not supply pathfinding or vehicle simulation. Display brightness is not emitted world light. [Paper display entities](https://docs.papermc.io/paper/dev/display-entities/)
+
+**October implementation note:** VoxelFurniture now owns furniture placement state with version-aware renderers, seats, storage, animation and persistent neighbour variants. VoxelVehicles independently owns modern land-vehicle state and simulation, including attached chest visuals/storage and optimized occupied-vehicle updates. These are functioning code paths, *not* new systems to write from scratch. The next work is validation of collisions, lifecycle and owner/cargo invariants; the explicit version-adapter, import and multi-seat gaps remain separate. See the checkpoint above and vehicle issues #2–#4.
 
 Start with real server entities and supported APIs. Virtual per-viewer entities are an optimization/compatibility tool when measured or required, not an automatic first step. They introduce spawn/destroy lifecycle, chunk tracking, entity-ID mapping, metadata ordering and interaction validation.
 
@@ -276,32 +296,32 @@ Each row is a separately reviewable feature slice. Dependencies should be satisf
 
 | Phase | Slice and source | Status | Required outcome before proceeding |
 | --- | --- | --- | --- |
-| 0 | VoxelCore build, lifecycle, config and CI baseline | Implemented | Keep pinned targets, successful-init checks, preserved config migration, and clean shutdown covered by CI |
-| 1 | Content IDs, inheritance, registry and item factory — HavenCore | Implemented core; legacy aliases deferred | Keep deterministic inheritance, immutable registries, isolated stacks, and failed-reload rollback; add legacy aliases only with the migration slice |
-| 2a | Minimal Java pack compiler — new | Implemented | Maintain stable allocations and exact validated legacy/modern pack profiles |
-| 2b | Bedrock items, pack and mappings — new/integrations | Planned | Same item behaves correctly in hand, inventory, drop and equip contexts; pack/reconnect lifecycle documented |
-| 2c | Java UI font content and stable glyph allocation — new/HavenCore assets | Implemented | Cropped bitmap definitions, compact scale/position metadata, collision-free stable codepoints, deterministic merged font output, aliases, and target capability checks |
-| 3a | Java item actions and interaction dispatch — HavenCore | **Next** | Typed triggers, immutable compiled actions, central context/result dispatch, execution-time validation, reload safety, and legacy/modern smoke coverage |
-| 3b | Menus and session lifecycle — HavenCore | Planned after 3a | Presentation-independent actions, deterministic close/disconnect cleanup, and duplicate/stale action rejection before adding alternate frontends |
-| 4a | Basic items, books, heads, prefixes and bound rules — HavenCore | Planned | Correct cloning and metadata; optional permission integration; bound semantics cover all intended transfer paths |
-| 4b | Tool actions and upgrades — HavenCore | Planned | Water/moisture tools and implemented upgrades first; consumption/durability correct; partial enum effects specified separately |
-| 5a | Placement/storage/index services; custom blocks — HavenCore | Planned | State allocation, drops, protection, physics/explosions/pistons and restart identity covered |
-| 5b | Furniture placement/rotation/variants — HavenFurniture | Planned | Preflight rollback; owner enforcement; chunk reload without duplicates; version-appropriate visuals demonstrated |
-| 5c | Furniture seats, storage, light and animations | Planned after 5b and 3b | Multiple viewers share authoritative storage; cleanup; actual lighting separated from brightness; animation state persists |
-| 5d | Gate prototype, then drawbridge feasibility — new | Planned | Obstruction/collision behavior proved before broader moving-platform support |
-| 6a | Crops/seeds/stages/harvest — HavenFarms | Planned | Loaded-chunk growth scheduler; deterministic neighbor tests; drops/seed consumption once; restart policy |
-| 6b | Plot selection/schematics/XP/spawn control — HavenFarms | Planned | Optional PlotSquared/WorldEdit integration; bounded edits; database-disabled operation; plot permissions |
-| 7a | Levels, skill points, drops, XP and tool gates — HavenSkills | Planned | Correct level thresholds and multi-level awards; buffered persistence; frontend-neutral services |
-| 7b | Region access/discovery and HUD — HavenSkills | Planned | Indexed region checks, block-boundary movement filtering, cached HUD and client-safe text |
-| 7c | Shared regeneration engine — HavenSkills/RegenMines | Planned | Sparse changed-block records, deadline queue, bounded restoration, chunk unload and restart recovery |
-| 8a | NPC dialogue/relationships/actions — HavenNPCs | Planned | Citizens adapter; stable NPC identity; timed conversation cleanup; persisted standing |
-| 8b | Furniture showroom/templates — HavenFurnitureShop | Planned | Configurable world/regions; relative template positions; bounded capture/reset; implement missing spawn behavior |
-| 9a | Vehicle input and land simulation — HavenVehicles | Planned | Replace ItemsAdder through item services; fixed-tick motion; safe input boundary; driving/riding validation |
-| 9b | Vehicle variants/storage/trailers/flight | Planned | Cycle-free trailer chains; persistence; packet/entity budgets; collision and passenger edge cases |
-| 10 | Games, lobbies, Tag, bomb rules — HavenGames | Planned | UUID-to-session index; empty-lobby handling; explicit game state transitions; independent inventory group |
-| 11a | Proxy commands and pack distribution — HavenNetwork/new | Planned | Correct deployment location, revision coordination, validated messages |
-| 11b | Escrow exchange — requested behavior not found in main | Planned | Durable transfer record; duplicate retries safe; capacity and unavailable-content policy |
-| 11c | Shared inventory groups — new | Planned | Fenced ownership, crash/timeout/duplicate tests, cross-version serialization policy |
+| 0 | VoxelCore build, lifecycle, config and CI baseline | **Implemented; regression maintenance** | Keep pinned targets, successful-init checks, preserved config migration and clean shutdown covered by CI |
+| 1 | Content IDs, inheritance, registry and item factory — HavenCore | **Implemented core; legacy aliases/import deferred** | Retain deterministic inheritance, immutable registries, isolated stacks, failed-reload rollback; add legacy ID mapping with dry-run migration |
+| 2a | Java pack compiler and authored asset/atlas pipeline — new | **Implemented Java MVP; expanded** | Stable allocations, generated blocks/UI/fonts and exact target profiles; verify geometry, vanilla mob/chest aliases, client acceptance and pack reproducibility |
+| 2b | Bedrock items, pack and mappings — new/integrations | **Planned** | Same item works in hand, inventory, drop and equip contexts on pinned Geyser/Floodgate; document reconnect/pack lifecycle |
+| 2c | Java UI font content and stable glyph allocation — new/HavenCore assets | **Implemented and expanded** | Stable glyphs, offset placeholders, overlays/tooltips, authored fonts, configurable titles, safe reload; real-client screenshot/golden-pack checks |
+| 3a | Java item actions and interaction dispatch — HavenCore | **MVP implemented; hardening remains** | Item/right-click and placed-block actions exist; add full lifecycle and trigger/permission tests plus execution-time safety guarantees |
+| 3b | Menus and session lifecycle — HavenCore | **Partial: admin/vehicle GUI + text APIs exist; generic sessions planned** | Independent, player-bound action/session API; deterministic close/disconnect/reload cleanup and stale/duplicate action rejection |
+| 4a | Basic items, books, heads, prefixes and bound rules — HavenCore | **Partial** | Core item/render/tint metadata exists; bound ownership enforcement and rich legacy metadata require deliberate parity testing |
+| 4b | Tool actions and upgrades — HavenCore | **Partial: generic actions/block tools, not Haven tool parity** | Water/moisture tools and real upgrade effects must be ported/tested; consumption/durability/permissions correct |
+| 5a | Placement/storage/index services; custom blocks — HavenCore | **Custom-block MVP implemented; broader physics/legacy migration pending** | State allocation, harvesting, hardness and placement exist; test protection, chunk/physics/explosions/pistons, stored identity and unsupported carrier modes |
+| 5b | Furniture placement/rotation/variants — HavenFurniture | **VoxelFurniture MVP implemented** | Preflight rollback, chunk/restart duplication checks, owner enforcement, legacy/modern renderer parity and HavenFurniture data import still need acceptance |
+| 5c | Furniture seats, storage, light and animations | **Seats/storage/animation implemented; light and edge-case work remaining** | Storage across viewers, cleanup/rollback, animation/interaction restart tests; distinguish real lighting from brightness |
+| 5d | Gate prototype, then drawbridge feasibility — new | **Planned** | Obstruction and collision behavior proved before claiming walkable moving geometry |
+| 6a | Crops/seeds/stages/harvest — HavenFarms | **Planned** | Loaded-chunk growth scheduler, deterministic neighbor tests, drops/seed consumption once, restart policy |
+| 6b | Plot selection/schematics/XP/spawn control — HavenFarms | **Planned** | Optional PlotSquared/WorldEdit, bounded edits, database-disabled mode and plot permissions |
+| 7a | Levels, skill points, drops, XP and tool gates — HavenSkills | **Planned** | Correct thresholds and multi-level awards; buffered persistence; frontend-neutral services |
+| 7b | Region access/discovery and HUD — HavenSkills | **Planned** | Indexed region checks, block-boundary movement filtering, cached HUD and client-safe text |
+| 7c | Shared regeneration engine — HavenSkills/RegenMines | **Planned** | Sparse changed-block records, deadline queue, bounded restoration, chunk unload/restart recovery |
+| 8a | NPC dialogue/relationships/actions — HavenNPCs | **Planned** | Citizens adapter; stable NPC identity; timed conversation cleanup; persisted standing |
+| 8b | Furniture showroom/templates — HavenFurnitureShop | **New VoxelFurnitureShop rotating-showroom MVP implemented** | Fixture animation, restart/edit and supported tile metadata exist; legacy template import and native-NBT completeness remain unresolved |
+| 9a | Vehicle input and land simulation — HavenVehicles | **VoxelVehicles 26.2-focused MVP implemented** | Test driver/passenger, accurate collision, shutdown/chunk handling, owner checks, no forced loads and realistic per-tick budgets |
+| 9b | Vehicle variants/storage/trailers/flight | **Partial: storage/chest accessories, render/particles/tint; trailers/flight planned** | Legacy version adapter and HavenVehicles import (#2/#3); multi-seat/trailers; precise collisions and performance (#4) |
+| 10 | Games, lobbies, Tag, bomb rules — HavenGames | **Planned** | UUID-to-session index, empty-lobby handling, explicit game transitions, isolated inventory group |
+| 11a | Proxy commands and pack distribution — HavenNetwork/new | **Planned** | Correct deployment location, pack revision coordination and validated messaging |
+| 11b | Escrow exchange — requested behavior not found in old main | **Planned** | Durable transfer record; duplicate retries safe; capacity and unavailable-content policy |
+| 11c | Shared inventory groups — new | **Planned** | Fenced ownership, crash/timeout/duplicate tests, cross-version serialization policy |
 
 Recipes, general custom-mob AI, a complete economy, arbitrary combat/food behavior and a generic animation editor are not established implementations in the inspected core. Add them deliberately if wanted; an ItemType enum entry alone is not a mechanic to port.
 
@@ -326,35 +346,54 @@ Test exact pinned combinations at feature boundaries: one legacy numeric-CMD bac
 
 Each feature's test fixture should cover every frontend and runtime combination that the feature actually claims to support, plus restart, chunk unload/load, invalid config, reload failure, and optional dependency absence where relevant. For high-value state also include duplicate actions, crashes, and recovery. Treat asynchronous callbacks and server-thread ownership as explicit verification items.
 
-## 13. Next implementation unit
+## 13. Next implementation units — October 2026 execution plan
 
-Phase 2c implements **Java UI font-content compilation** before runtime menu functionality. VoxelCore owns final font composition because namespaces disambiguate texture paths but Unicode codepoints remain global within a font.
+**Direction:** Consolidate the implemented VoxelCore + VoxelFurniture + VoxelVehicles stack into a reproducible release baseline. Do **not** restart at the historical phase 2c/3a milestones or mark all original phase 5/9 acceptance criteria complete simply because their MVP repos exist. Use small reviewable PRs with gates, avoid destabilizing deployed worlds and track exact server/client support.
 
-The implemented slice includes:
+### Priority 0 — Cross-plugin release confidence and documentation (next PRs)
 
-- compiler-owned positive and negative spacing providers
-- namespaced `ui:` definitions with stable private-use codepoint allocation and tombstones
-- compact cropped-image metadata: `path`, optional `scale_ratio`, optional `y_position`, optional `gui`, and optional explicit `symbol`
-- deterministic bitmap provider generation and merged `minecraft:default` output
-- validation for duplicate symbols, missing textures, unsafe paths, dimensions, properties, and incompatible targets
-- white-safe `:name:` and `:namespace/name:` alias resolution plus exact `:offset_<pixels>:` spacing placeholders for VoxelCore-owned text
-- admin `ui list`, `ui info`, and `ui copy` commands with ID/alias completion and clickable clipboard output where supported
+**Owner repos:** VoxelCore, VoxelFurniture, VoxelVehicles; exercise VoxelFurnitureShop as a dependent integration fixture.
 
-Example:
+1. **Fix stale canonical docs first.** Update VoxelCore README's initial `Current implementation status`, `Next development milestone` and `Deliberately outside this MVP` paragraphs: they still claim blocks, actions, furniture and vehicles are not implemented. Keep the definition that VoxelCore itself does not *own* the gameplay addons.
+2. **Add one end-to-end CI/test-server matrix** with mutually compatible release artifacts (pin exact JAR/commit IDs), initially **Paper 26.2 + Java 25**. Confirm every addon enables with no missing optional classes, installs VoxelCore authored items/models, places and reloads furniture/vehicles, handles shared interactions and stops cleanly. Broaden the matrix only after each addon passes its own target capability checks; VoxelCore's seven-version smoke suite alone is not evidence of addon compatibility.
+3. **State durability and rollback fixtures.** For Furniture, test placed seats, inventories, colours, multipart animations and chunk unload/reload/no orphan renderer. For Vehicles, chest installation vs next click, driver dismount, reclaim + cargo conservation, colour/item metadata, ownership, restarts and unloads. For FurnitureShop, verify variant reapply with custom-head profile and **four decorated-pot sherds**, door/fixture state, editing closure after disconnect/restart and manual rotation. Use disposable worlds and restored backups.
+4. **Prove the produced client pack.** Test authored Blockbench models, mixed block/item/entity texture atlases (including scarecrow/hat), generated item definitions, custom glyphs and inherited render rules on the actual 26.2 client, not just ZIP JSON validity. Record warnings, visual screenshots and a known-good pack hash.
 
-```yaml
-ui:
-  warps_menu:
-    path: ui/npc/warps_menu.png
-    scale_ratio: 18
-    y_position: 8
-```
+**Gate:** All repository builds and a combined integration smoke pass, destructive-state tests recover without inventory/cargo loss or duplication, and one documented restart/chunk recovery rehearsal on Paper 26.2. Add a published support matrix that explicitly distinguishes CI-only from in-game verified.
 
-The path is relative to the pack namespace's texture root. The scale defaults to the PNG height and the position defaults to `min(8, scale_ratio)`. `gui: true` appends an automatically calculated negative bitmap advance during placeholder resolution, while inline images keep normal text flow. Neither inventory row count nor transparent padding is required.
+### Priority 1 — Performance baseline and runtime hardening (then)
 
-Colon aliases are runtime placeholder syntax, not a resource-pack feature. UI aliases are prefixed with white to prevent title tinting, and offset aliases resolve to compiler-owned spacing characters. VoxelCore resolves them in player chat with independent inline and GUI permissions and exposes a reload-safe service for text it owns. Third-party menu plugins must call that service through an integration or use the literal character from `ui copy`.
+1. Run **spark** and `/vv perf` under reproducible idle, parked and driven scenarios (e.g. 25/50/100/200/300 loaded vehicles and 100/1,000 furniture placements) on the same world/render distance, separating warm chunks from new chunk loads. Record MSPT p50/p95/p99, per-plugin task costs, heap/GC, entity count, save durations and client FPS/network effects. The counts are *test fixtures*, not throughput promises.
+2. Use the profile results to prioritize expensive hot paths: VoxelFurniture definition/neighbor lookup and idle effects; VoxelVehicles collision/suspension, rider teleports and autosave; VoxelFurnitureShop large cuboid capture/replay and synchronous file writes. Maintain dirty-only updates and bounded chunk sweeps. **No unsupported Folia or thread-unsafe Bukkit async world mutation.**
+3. Add rollback/atomicity tests for I/O failure during pickup, chest/cargo detach, furniture removal, shop variant switch and resource-pack publish. Every durable file format needs a backup and explicit schema migration; no silent truncation of third-party tile metadata.
 
-This phase is resource-pack content only. It does not open inventories, dispatch clicks, or introduce menu sessions. Phase 3a remains the next recommended implementation slice.
+**Gate:** Publish reproducible measurements and fix identified regressions, with budgets agreed from actual server hardware. Do not claim a percentage speed-up without an A/B trace.
+
+### Priority 2 — Finish vehicle compatibility and real Haven data migration
+
+Use existing issue acceptance criteria instead of inventing a separate competing plan:
+
+- [VoxelVehicles #2: version adapters](https://github.com/VoxelHorizons/VoxelVehicles/issues/2): implement the legacy steering/renderer/seat bridges, prohibit unsupported class loading, and run feature-specific tests for 1.12–1.19.3, 1.19.4+, component-era releases and modern native-input behavior. Until this is tested, label older vehicles **non-drivable / unsupported**, even if the core plugin starts.
+- [VoxelVehicles #4: precise collision and performance](https://github.com/VoxelHorizons/VoxelVehicles/issues/4): slabs/stairs/fences/fluids, yaw-correct physical hitbox, dismount/teleport/passenger lifecycle, cross-chunk driving and repeatable parking/driving benchmarks.
+- [VoxelVehicles #3: HavenVehicles import](https://github.com/VoxelHorizons/VoxelVehicles/issues/3): build a **dry-run only first** mapper from old ItemsAdder IDs/config and world records to VoxelCore ContentIDs + VoxelVehicles instances. Report unknown/unsupported state, preserve owner/location/inventory, back up originals, ensure retries are idempotent. Multi-seat and trailers should be independent follow-up slices, not blockers to initial land-vehicle data import if the user approves a restricted subset.
+- Extend the same **legacy-ID/owner/placement migration contract** to HavenCore items and HavenFurniture saved objects after fixture-based validation. Do not run old and new writers against the same data concurrently.
+
+**Gate:** A copy of real saved world data survives import/dry-run/repeated restart without duplicated or lost items, furniture or vehicles. Never auto-migrate on first enable.
+
+### Priority 3 — Reusable actions, menus and frontend parity
+
+- Finish **phase 3b** as a small VoxelCore menu/session API: player-owned session token, lifecycle, one shared action execution path, duplicate/stale response rejection, permission/balance re-check, and close/reload/disconnect cleanup. Keep VoxelFurniture/VoxelVehicles independent: consume a public API, do not import each other's managers.
+- Finish the remaining **phase 3a/4a/4b** behaviors only from actual content requirements: bind/drop/transfer enforcement, more rich item metadata, real tool effects/upgrades and event action validity. Do not mistake today's generic `events` implementation for the entire HavenCore feature set.
+- **Economies:** Keep merged VaultUnlocked-backed Token/provider behavior distinct from the abandoned internal SQLite ledger PR #66. Agree on authoritative currency ownership, shop purchase idempotency and consistent display/placeholders before adding more backend providers.
+- Prototype **phase 2b Bedrock** separately: pin Geyser/Floodgate, register a minimal item/furniture/vehicle rendering subset and map the UI action service to Bedrock forms or safe inventory translation. Track supported/approximate/unsupported behavior and pack distribution/reconnect requirements. Avoid promising automatic arbitrary Java asset conversion.
+
+**Gate:** One validated end-to-end menu/purchase/storage flow on Java; the same domain action called through a Bedrock prototype without duplicate grants, with known visual limitations documented.
+
+### Subsequent feature backlog
+
+After the release baseline and compatibility decisions, sequence HavenFarms crops (6a) → optionally plots (6b), HavenSkills/regeneration (7a–7c), NPC dialogues (8a), gates/drawbridges (5d), games (10) and network/escrow/shared inventories (11a–c) as separately estimated plugins. Bedrock and cross-server inventory consistency are **not** small finishing tasks; they are independent projects with version/operational policy decisions.
+
+**Recommended first delivery:** A documentation/status cleanup plus cross-plugin Paper 26.2 integration-test harness. That supplies a reliable regression foundation for the next feature and prevents another cycle of individually passing builds masking interaction regressions.
 
 ## Appendix A. Reviewed snapshots
 
