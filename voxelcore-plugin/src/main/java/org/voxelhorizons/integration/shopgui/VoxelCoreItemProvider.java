@@ -33,15 +33,37 @@ final class VoxelCoreItemProvider extends ItemProvider {
         if (configuredId == null || configuredId.trim().isEmpty()) return null;
 
         try {
-            return items.create(parseReference(configuredId));
+            ContentID id = parseReference(configuredId);
+            // ShopGUI+ uses the same item provider for both real shop stock and
+            // presentation-only buttons. Allow abstract render variants ONLY in
+            // settings GUI button slots. Normal shop entries must remain concrete.
+            return isGuiButtonItem(section.getCurrentPath())
+                    ? items.createRender(id)
+                    : items.create(id);
         } catch (IllegalArgumentException exception) {
+            String path = section.getCurrentPath();
             String message = "ShopGUI+ references invalid VoxelCore item '" + configuredId
-                    + "' at " + section.getCurrentPath() + ": " + exception.getMessage();
+                    + "' at " + path + ": " + exception.getMessage()
+                    + (isGuiButtonItem(path) ? " (GUI buttons require a renderable model and material)"
+                        : " (shop stock requires a non-abstract item definition)");
             logger.log(Level.SEVERE, message);
             // Returning null here allows ShopGUI+ to retain an incomplete GuiButton and crash later
             // in AmountSelectionGui. Fail at the authored configuration instead.
             throw new IllegalArgumentException(message, exception);
         }
+    }
+
+    /**
+     * ShopGUI+ global settings contain decorative buttons at e.g.
+     * buttons.goBack.item. These are displays, not buyable shop contents.
+     * Do NOT allow this path to match arbitrary shop entries by suffix:
+     * shops.<name>.items.<id>.item always uses createItem.
+     */
+    static boolean isGuiButtonItem(String path) {
+        if (path == null) return false;
+        String[] parts = path.split("\\.", -1);
+        return parts.length == 3 && "buttons".equalsIgnoreCase(parts[0])
+                && !parts[1].isEmpty() && "item".equalsIgnoreCase(parts[2]);
     }
 
     static ContentID parseReference(String configuredId) {
