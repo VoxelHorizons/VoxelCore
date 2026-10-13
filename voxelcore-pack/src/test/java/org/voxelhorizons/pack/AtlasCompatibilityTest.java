@@ -155,6 +155,11 @@ public class AtlasCompatibilityTest {
                 + "\"faces\":{\"north\":{\"uv\":[1,11,3,15],"
                 + "\"texture\":\"#1\",\"tintindex\":0}}}]}";
         entries.put(path, text(original));
+        // The uploaded resource pack also contains scarecrow_hat using the
+        // very same mob skin: both should resolve to one shared atlas sprite.
+        String hat = "assets/voxel/models/furniture/farming/deco/scarecrow_hat.json";
+        entries.put(hat, text("{\"textures\":{\"1\":\"entity/illager/illusioner\","
+                + "\"5\":\"block/hay_block_side\"}}"));
         entries.put("assets/voxel/items/furniture/farming/deco/scarecrow.json",
                 text("{\"model\":{\"type\":\"minecraft:model\","
                         + "\"model\":\"voxel:furniture/farming/deco/scarecrow\"}}"));
@@ -165,6 +170,8 @@ public class AtlasCompatibilityTest {
         assertTrue(model.contains("\"2\":\"block/carved_pumpkin\""));
         assertTrue(model.contains("\"5\":\"block/hay_block_side\""));
         assertTrue(model.contains("\"particle\":\"block/pumpkin_top\""));
+        assertTrue(read(entries, hat).contains(
+                "\"1\":\"voxelcore:atlas_compat/blocks/minecraft/entity/illager/illusioner\""));
         assertTrue(model.contains("\"tintindex\":0"));
         // Gson represents JSON numeric values as doubles when rewriting.
         assertTrue(model.contains("\"uv\":[1.0,11.0,3.0,15.0]"));
