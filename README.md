@@ -300,9 +300,26 @@ Merge behavior:
 - provided scalar → replace parent
 - explicit `false` → replaces inherited `true`
 - list → child replaces parent list
-- `properties` maps → recursive deep merge
-- render metadata → field-by-field merge
+- `properties` maps → recursive deep merge; explicit `null` clears inherited keys
+- render metadata → field-by-field merge; `render.rule` maps also merge recursively
 - structured `custom_model_data` → semantic-key merge when both sides are structured
+- `events` → merge by event path; a child's actions list replaces only that event's list,
+  while explicitly empty `events: {}` disables all inherited event actions
+
+Child-authored values always take precedence in the compiled definition. An addon
+should read the **resolved `ItemDefinition.properties()`** from VoxelCore rather
+than reimplementing inheritance. In nested property maps, omitted keys inherit;
+a child-authored map merges recursively, a child-authored list replaces the parent
+list, and `false`, `0`, an empty string, or explicit `null` replaces a parent
+value. This makes optional capabilities (for example,
+`properties.vehicle: null` on render-only descendants) possible without
+special cases in the addon.
+
+**Item identity vs. inherited references:** A literal property such as
+`vehicle.model_item: voxel:tractor` is an explicit reference and remains
+`voxel:tractor` in `tractor-yellow` unless overridden. When the addon provides
+a current-item-ID default, omit `model_item` (and `drop`) from the base item
+so variants naturally use their own IDs.
 
 Compiled definitions and nested property/render-rule structures are immutable.
 
