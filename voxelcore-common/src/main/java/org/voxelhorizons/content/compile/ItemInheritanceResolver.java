@@ -1,6 +1,8 @@
 package org.voxelhorizons.content.compile;
 
 import org.voxelhorizons.content.ContentID;
+import org.voxelhorizons.content.action.ActionDefinition;
+import org.voxelhorizons.content.action.EventActions;
 import org.voxelhorizons.content.item.CustomModelDataDefinition;
 import org.voxelhorizons.content.item.RawItemDefinition;
 import org.voxelhorizons.content.item.RawItemRenderDefinition;
@@ -64,7 +66,7 @@ public final class ItemInheritanceResolver {
                 child.abstractDefinition() != null ? child.abstractDefinition() : parent.abstractDefinition(),
                 mergeRender(parent.render(), child.render()),
                 mergeMaps(parent.properties(), child.properties()),
-                child.events() != null ? child.events() : parent.events()
+                mergeEvents(parent.events(), child.events())
         );
     }
 
@@ -78,8 +80,24 @@ public final class ItemInheritanceResolver {
                 mergeBooleanMaps(parent.attributes(), child.attributes()),
                 mergeCustomModelData(parent.customModelData(), child.customModelData()),
                 child.oversizedInGui() != null ? child.oversizedInGui() : parent.oversizedInGui(),
-                child.rule() != null ? deepCopyMap(child.rule()) : deepCopyMap(parent.rule())
+                mergeMaps(parent.rule(), child.rule())
         );
+    }
+
+    /**
+     * Events are maps of event-path -> action list. A child replaces only the
+     * event paths it authors, retaining unrelated parent events, while each
+     * authored list replaces (rather than appends to) the corresponding list.
+     * An explicitly empty events mapping disables all inherited actions.
+     */
+    private EventActions mergeEvents(EventActions parent, EventActions child) {
+        if (parent == null) return child;
+        if (child == null) return parent;
+        if (child.isEmpty()) return child;
+        Map<String, List<ActionDefinition>> events =
+                new LinkedHashMap<String, List<ActionDefinition>>(parent.entries());
+        events.putAll(child.entries());
+        return new EventActions(events);
     }
 
     private Map<String, Boolean> mergeBooleanMaps(Map<String, Boolean> parent, Map<String, Boolean> child) {
