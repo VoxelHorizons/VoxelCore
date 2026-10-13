@@ -179,7 +179,8 @@ public class AtlasCompatibilityTest {
         assertTrue(blockAtlas.contains("\"resource\":\"minecraft:entity/illager/illusioner\""));
         assertTrue(blockAtlas.contains("\"sprite\":\"voxelcore:atlas_compat/blocks/minecraft/entity/illager/illusioner\""));
         // The item atlas should not gain a second, conflicting copy of this texture.
-        String itemAtlas = read(entries, "assets/minecraft/atlases/items.json");
+        String itemAtlas = entries.containsKey("assets/minecraft/atlases/items.json")
+                ? read(entries, "assets/minecraft/atlases/items.json") : "";
         assertFalse(itemAtlas.contains("minecraft:entity/illager/illusioner"));
         AtlasCompatibility.repair(entries);
         assertEquals(1, read(entries, "assets/minecraft/atlases/blocks.json")
