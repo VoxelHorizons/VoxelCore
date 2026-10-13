@@ -49,13 +49,13 @@ public class ConfigMigrationSupportTest {
     @Test
     public void addsBrowserTitleDefaultsWhilePreservingExistingUiSettings() throws Exception {
         YamlConfiguration current = new YamlConfiguration();
-        current.loadFromString("version: 6\\nui:\\n  chest_titles:\\n    single: '&eExisting title'\\n"
-                + "  browser:\\n    titles:\\n      items: '&f:my_custom_items:'\\n");
+        current.loadFromString("version: 6\nui:\n  chest_titles:\n    single: '&eExisting title'\n"
+                + "  browser:\n    titles:\n      items: '&f:my_custom_items:'\n");
         YamlConfiguration defaults = new YamlConfiguration();
-        defaults.loadFromString("version: 7\\nui:\\n  browser:\\n    titles:\\n"
-                + "      items: 'VC Items {page}/{pages}'\\n"
-                + "      blocks: 'VC Blocks {page}/{pages}'\\n"
-                + "    page_titles:\\n      items: {}\\n      blocks: {}\\n");
+        defaults.loadFromString("version: 7\nui:\n  browser:\n    titles:\n"
+                + "      items: 'VC Items {page}/{pages}'\n"
+                + "      blocks: 'VC Blocks {page}/{pages}'\n"
+                + "    page_titles:\n      items: {}\n      blocks: {}\n");
 
         ConfigMigrationSupport.merge(current, defaults, 7);
 
