@@ -47,9 +47,26 @@ public final class ContentRuntimeReloader {
         this.modernBlockStates = modernBlockStates;
     }
 
+    /**
+     * File parsing and inheritance compilation are independent of Bukkit and can
+     * run on the worker thread. The result is not published until reloadPrepared.
+     */
+    public ContentDefinitions prepare() {
+        return loader.loadDefinitions(contentRoot);
+    }
+
     public ContentReloadResult reload() {
         try {
-            ContentDefinitions definitions = loader.loadDefinitions(contentRoot);
+            return reloadPrepared(prepare());
+        } catch (RuntimeException exception) {
+            return ContentReloadResult.failure(runtime.current(), exception.getMessage());
+        }
+    }
+
+    /** Must be invoked on the primary server thread when used by the plugin. */
+    public ContentReloadResult reloadPrepared(ContentDefinitions definitions) {
+        try {
+            Objects.requireNonNull(definitions, "definitions");
             ItemDefinitionRegistry nextRegistry = definitions.items();
             RenderAllocationRegistry nextAllocations = allocationStore == null
                     ? runtime.current().renderAllocations()
@@ -61,7 +78,7 @@ public final class ContentRuntimeReloader {
 
             if (validator != null) {
                 validator.validate(nextRegistry, nextAllocations);
-                validator.validateBlocks(definitions.blocks(), nextBlockAllocations);
+                validator.validateBlocks(definitions.blocks(), nextBlockAllocations, nextRegistry);
             }
             if (allocationStore != null) allocationStore.save(nextAllocations);
             if (blockAllocationStore != null) blockAllocationStore.save(nextBlockAllocations);
