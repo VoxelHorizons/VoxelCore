@@ -2,6 +2,7 @@ package org.voxelhorizons.command.ui;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.configuration.Configuration;
 import org.bukkit.Material;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
@@ -24,6 +25,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 public final class ContentBrowser implements Listener {
     static final int INVENTORY_SIZE = 54;
@@ -33,17 +35,23 @@ public final class ContentBrowser implements Listener {
     static final int NEXT_SLOT = 53;
 
     public enum Type {
-        ITEMS("Items"),
-        BLOCKS("Blocks");
+        ITEMS("Items", "items"),
+        BLOCKS("Blocks", "blocks");
 
         private final String title;
+        private final String configKey;
 
-        Type(String title) {
+        Type(String title, String configKey) {
             this.title = title;
+            this.configKey = configKey;
         }
 
         String title() {
             return title;
+        }
+
+        String configKey() {
+            return configKey;
         }
     }
 
@@ -69,7 +77,8 @@ public final class ContentBrowser implements Listener {
 
         BrowserHolder holder = new BrowserHolder(type, ids, page, revision);
         Inventory inventory = Bukkit.createInventory(holder, INVENTORY_SIZE,
-                "VC " + type.title() + " " + (page + 1) + "/" + pages);
+                configuredTitle(plugin.getConfig(), type, page, pages, ids.size(),
+                        text -> plugin.getTextPlaceholderService().resolve(text, true, true)));
         holder.inventory = inventory;
 
         int start = page * CONTENT_SLOTS;
@@ -98,6 +107,38 @@ public final class ContentBrowser implements Listener {
         }
 
         player.openInventory(inventory);
+    }
+
+    /**
+     * Resolve browser page titles from VoxelCore config, not hard-coded GUI strings.
+     * Explicit 1-based per-page entries win over the per-browser template; missing
+     * entries retain the familiar default title for existing installations.
+     *
+     * Expand pagination tokens before resolving VoxelCore font/offset placeholders:
+     * ":browser_items_page_{page}:" must become ":browser_items_page_2:"
+     * before the shared UI resolver looks up its glyph.
+     */
+    static String configuredTitle(Configuration config, Type type, int page, int pages,
+                                  int totalItems, Function<String, String> resolveGlyphs) {
+        if (page < 0 || pages < 1 || page >= pages) {
+            throw new IllegalArgumentException("Invalid browser page " + page + "/" + pages);
+        }
+        String override = config.getString("ui.browser.page_titles."
+                + type.configKey() + "." + (page + 1), null);
+        String template = override != null ? override
+                : config.getString("ui.browser.titles." + type.configKey(),
+                        "VC " + type.title() + " {page}/{pages}");
+        return formatTitle(template, type, page, pages, totalItems, resolveGlyphs);
+    }
+
+    static String formatTitle(String template, Type type, int page, int pages,
+                              int totalItems, Function<String, String> resolveGlyphs) {
+        String populated = template
+                .replace("{page}", Integer.toString(page + 1))
+                .replace("{pages}", Integer.toString(pages))
+                .replace("{total}", Integer.toString(totalItems))
+                .replace("{type}", type.title());
+        return ChatColor.translateAlternateColorCodes('&', resolveGlyphs.apply(populated));
     }
 
     private ItemStack preview(ContentID id) {
