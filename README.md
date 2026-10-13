@@ -1,12 +1,12 @@
 # VoxelCore
 
-VoxelCore is the version-aware content foundation for Voxel Horizons. The current MVP covers the complete custom-item pipeline: deterministic YAML pack discovery, inheritance compilation, immutable runtime snapshots, stable content identity, version-specific `ItemStack` creation, stable render allocations, deterministic Java resource-pack compilation, stable UI glyph/font compilation, and safe atomic reloads.
+VoxelCore is the version-aware content foundation for Voxel Horizons. It owns deterministic YAML pack discovery and inheritance, immutable runtime content, item identity/creation, Java resource-pack and UI glyph compilation, basic actions, and carrier-backed custom blocks. Higher-level placed furniture and drivable vehicles are implemented as separate [VoxelFurniture](https://github.com/VoxelHorizons/VoxelFurniture) and [VoxelVehicles](https://github.com/VoxelHorizons/VoxelVehicles) addons; VoxelCore does not own their world placement or simulation.
 
-Higher-level gameplay systems such as placed blocks, furniture, vehicles, crops, GUIs, Bedrock/Geyser presentation, and legacy HavenCore migration are deliberately outside this MVP.
+Crops, skills, generic session-driven menus, Bedrock/Geyser assets, legacy HavenCore data conversion and network inventory remain distinct follow-up work. See [Migration-Roadmap.md](Migration-Roadmap.md) for the October 2026 status and integration priorities.
 
 ## Current implementation status
 
-The repository has completed the roadmap's foundation, content/item, minimal Java pack, and Java UI font-content milestones (phases 0, 1, 2a, and 2c):
+The repository has completed the roadmap's foundation, content/item, Java pack, UI font, basic action and custom-block MVP milestones (phases 0, 1, 2a, 2c, parts of 3a and 5a):
 
 - multi-module Maven build with per-version shaded distributions
 - automatic Paper capability detection with a Bukkit-compatible fallback
@@ -18,8 +18,13 @@ The repository has completed the roadmap's foundation, content/item, minimal Jav
 - compact cropped UI glyph definitions, stable private-use codepoints, generated bitmap/spacing font providers, white-safe UI/offset placeholders, and admin glyph lookup/copy commands
 - exact real-server smoke coverage from Minecraft 1.12.2 through Minecraft 26.2
 - snapshot JAR publication from `main`
+- reusable item and placed-block actions (including `set_block`, `command`, `give_item`, `drop_item`, `message` and `cancel`)
+- carrier-backed custom blocks with placeable items, harvesting/tool rules, selected native hardness support and Creative pick-block
+- configurable item/block browser inventory titles, GUI glyphs and runtime tooltip overlays
+- model/atlas compatibility repair for mixed block, item and entity textures
+- optional ShopGUIPlus integrations and VaultUnlocked-backed token currency support (independent of the unmerged custom-ledger proposal)
 
-Bedrock items/mappings, item actions and menu sessions, richer item metadata and behavior, placed blocks, furniture, crops, skills, NPCs, vehicles, and network persistence have not been implemented yet.
+VoxelFurniture and VoxelVehicles provide their own working gameplay MVPs against VoxelCore content; their full compatibility, old-world migration and complex edge-case acceptance remain separate addon responsibilities. Generic player-owned menu sessions, broad rich item/legacy HavenCore behavior parity, Bedrock mappings and shared network persistence are **not** complete.
 
 ## Java UI font content
 
@@ -120,9 +125,11 @@ Player-specific lore that ShopGUI+ generates while opening a menu (including cal
 
 ## Next development milestone
 
-The next recommended slice is **phase 3a: Java item actions and interaction dispatch**. It should add typed triggers and immutable compiled actions behind a central dispatcher while keeping menu session lifecycle in phase 3b.
+The former phase-3a plan has been partly delivered via VoxelCore's reusable item and block actions. The next highest-value work is **cross-plugin integration and durability validation**, rather than reimplementing actions or the existing VoxelFurniture and VoxelVehicles foundations.
 
-This milestone adds resource-pack content only. It does not yet open inventories, handle clicks, introduce runtime menu sessions, or add alternate-client UI. Java item actions move back one place and follow after the UI content contract is proven.
+Start with a single combined **Paper 26.2 + Java 25** integration test installation of matching VoxelCore, VoxelFurniture and VoxelVehicles builds; include VoxelFurnitureShop snapshot/edit recovery checks. Verify restart, chunk lifecycle, owner permissions, vehicle chest/cargo conservation, client resource-pack loading and addon reloads. Profile the workload with spark and `/vv perf`. Then complete [VoxelVehicles adapter and migration issues](https://github.com/VoxelHorizons/VoxelVehicles/issues) and the presentation-independent menu session contract. Bedrock/legacy Haven data migration are separate gated milestones.
+
+See [Migration-Roadmap.md](Migration-Roadmap.md#13-next-implementation-units--october-2026-execution-plan) for the detailed acceptance criteria, support boundaries and subsequent phases.
 
 ## Item MVP
 
@@ -692,18 +699,19 @@ GitHub Actions performs:
 
 ## Deliberately outside this MVP
 
-These are next systems, not blockers for the item/content MVP:
+These are **not fully provided by VoxelCore itself**, or remain later roadmap phases:
 
-- placed custom blocks
-- furniture and display-entity placement lifecycle
-- vehicles
-- crops
-- GUI/menu framework and Bedrock presentation
-- Geyser/Floodgate mappings
-- true Minecraft attribute modifiers
-- richer potion/skull/book/map/firework metadata
+- furniture placement and world persistence (**provided by VoxelFurniture addon**)
+- vehicle driving/simulation and stored cargo (**provided by VoxelVehicles addon on validated modern targets**)
+- old HavenCore/HavenFurniture/HavenVehicles conversion and alias imports
+- generic session-driven menu framework and Bedrock presentation
+- Geyser/Floodgate item and entity mappings, Bedrock resource packs
+- crops, skills, NPC and games systems
+- true Minecraft attribute modifiers and additional rich potion/skull/book/map/firework metadata
+- full bound-item enforcement across inventory, death, containers and cross-server transfers
 - generic low-level post-1.20.5 component escape hatches
-- HavenCore backward-compatibility/import aliases
 - support for additional Minecraft families beyond the explicit validated adapters
+
+**Already provided by VoxelCore itself:** basic item/block actions and carrier-backed custom blocks. Do not classify them as future MVP work. Full legacy parity and edge-case validation are still outstanding.
 
 See `Migration-Roadmap.md` for the broader rebuild plan and architectural rationale. Its repository review appendices describe the original audited snapshots; the implementation-status section in this README is the canonical description of current VoxelCore functionality.
