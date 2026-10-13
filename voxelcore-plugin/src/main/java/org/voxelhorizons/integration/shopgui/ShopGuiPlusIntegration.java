@@ -54,6 +54,10 @@ public final class ShopGuiPlusIntegration implements Listener {
                 return itemManager.createItem(id);
             }
 
+            @Override public org.bukkit.inventory.ItemStack createRender(ContentID id) {
+                return itemManager.createRenderItem(id);
+            }
+
             @Override public java.util.Optional<ContentID> identify(org.bukkit.inventory.ItemStack stack) {
                 return itemManager.identify(stack);
             }
