@@ -57,11 +57,11 @@ public class ContentBrowserTest {
                 config, ContentBrowser.Type.ITEMS, 1, 5, 190,
                 value -> {
                     received.set(value);
-                    return value.replace(":offset_-8:", "\\uF800")
-                            .replace(":vc_items_page_2:", "\\uE002");
+                    return value.replace(":offset_-8:", "\uF800")
+                            .replace(":vc_items_page_2:", "\uE002");
                 });
         assertEquals("&f:offset_-8::vc_items_page_2:", received.get());
-        assertEquals("§f\\uF800\\uE002", title);
+        assertEquals("§f\uF800\uE002", title);
     }
 
     @Test
