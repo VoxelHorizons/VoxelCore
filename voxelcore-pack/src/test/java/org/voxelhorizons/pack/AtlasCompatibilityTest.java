@@ -166,7 +166,8 @@ public class AtlasCompatibilityTest {
         assertTrue(model.contains("\"5\":\"block/hay_block_side\""));
         assertTrue(model.contains("\"particle\":\"block/pumpkin_top\""));
         assertTrue(model.contains("\"tintindex\":0"));
-        assertTrue(model.contains("\"uv\":[1,11,3,15]"));
+        // Gson represents JSON numeric values as doubles when rewriting.
+        assertTrue(model.contains("\"uv\":[1.0,11.0,3.0,15.0]"));
         String blockAtlas = read(entries, "assets/minecraft/atlases/blocks.json");
         assertTrue(blockAtlas.contains("\"resource\":\"minecraft:entity/illager/illusioner\""));
         assertTrue(blockAtlas.contains("\"sprite\":\"voxelcore:atlas_compat/blocks/minecraft/entity/illager/illusioner\""));
