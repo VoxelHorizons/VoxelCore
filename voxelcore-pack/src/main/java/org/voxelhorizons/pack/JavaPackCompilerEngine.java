@@ -7,6 +7,7 @@ import org.voxelhorizons.content.item.ItemDefinition;
 import org.voxelhorizons.content.item.ItemDefinitionRegistry;
 import org.voxelhorizons.content.item.ItemRenderDefinition;
 import org.voxelhorizons.content.load.ContentLoader;
+import org.voxelhorizons.content.load.ContentDefinitions;
 import org.voxelhorizons.content.pack.ContentPack;
 import org.voxelhorizons.content.pack.ContentPackDiscovery;
 import org.voxelhorizons.content.render.RenderAllocation;
@@ -55,8 +56,9 @@ final class JavaPackCompilerEngine {
 
         List<ContentPack> packs = packDiscovery.discover(contentRoot);
         Map<String, ContentPack> packsByNamespace = indexPacks(packs);
-        ItemDefinitionRegistry registry = contentLoader.load(contentRoot);
-        BlockDefinitionRegistry blocks = contentLoader.loadBlocks(contentRoot);
+        ContentDefinitions definitions = contentLoader.loadDefinitions(contentRoot);
+        ItemDefinitionRegistry registry = definitions.items();
+        BlockDefinitionRegistry blocks = definitions.blocks();
         Path glyphAllocationPath = allocationManifestPath.resolveSibling("glyph-allocations.yml");
         UiGlyphLoader glyphLoader = new UiGlyphLoader();
         UiGlyphRegistry glyphs = glyphLoader.load(contentRoot, glyphAllocationPath, false);
