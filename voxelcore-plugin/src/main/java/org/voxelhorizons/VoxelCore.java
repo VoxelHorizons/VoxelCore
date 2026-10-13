@@ -153,8 +153,9 @@ public final class VoxelCore extends JavaPlugin {
                             validateForPlatform(items, allocations);
                         }
                         @Override public void validateBlocks(BlockDefinitionRegistry blocks,
-                                                             BlockAllocationRegistry allocations) {
-                            VoxelCore.this.validateBlocks(blocks, allocations, contentLoader.load(contentRoot));
+                                                             BlockAllocationRegistry allocations,
+                                                             ItemDefinitionRegistry items) {
+                            VoxelCore.this.validateBlocks(blocks, allocations, items);
                         }
                     }, blockAllocationStore, modernBlockStates);
             packManager = new PackManager(getDataFolder().toPath(), contentRoot, versionAdapter.version());
@@ -252,7 +253,27 @@ public final class VoxelCore extends JavaPlugin {
         catch (IOException exception) { logger.log(Level.SEVERE, "Unable to save VoxelCore configuration", exception); }
     }
 
+    /** Disk-only candidate compilation. Safe to run off the primary server thread. */
+    public ContentDefinitions prepareContentReload() {
+        if (contentReloader == null) throw new IllegalStateException("VoxelCore runtime not initialized");
+        return contentReloader.prepare();
+    }
+
+    /** Existing synchronous reload entry point, retained for admin/content commands. */
     public ContentReloadResult onReload() {
+        return applyContentReload(null);
+    }
+
+    /** Publishes a worker-prepared snapshot on the primary server thread. */
+    public ContentReloadResult onReloadPrepared(ContentDefinitions prepared) {
+        if (prepared == null) throw new IllegalArgumentException("Prepared definitions cannot be null");
+        if (!getServer().isPrimaryThread()) {
+            throw new IllegalStateException("Prepared content must be published on the server thread");
+        }
+        return applyContentReload(prepared);
+    }
+
+    private ContentReloadResult applyContentReload(ContentDefinitions prepared) {
         if (contentReloader == null || contentRuntime == null || packManager == null) {
             throw new IllegalStateException("VoxelCore content runtime is not initialized");
         }
@@ -265,7 +286,8 @@ public final class VoxelCore extends JavaPlugin {
             logger.warning("Content reload failed; revision " + failure.activeRevision() + " remains active. " + failure.message());
             return failure;
         }
-        ContentReloadResult result = contentReloader.reload();
+        ContentReloadResult result = prepared == null
+                ? contentReloader.reload() : contentReloader.reloadPrepared(prepared);
         if (result.success()) {
             blockMiningSpeedController.clearAll();
             org.voxelhorizons.pack.UiGlyphRegistry currentGlyphs = packManager.uiGlyphs(true);
