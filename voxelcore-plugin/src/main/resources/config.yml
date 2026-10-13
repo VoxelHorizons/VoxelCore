@@ -1,4 +1,4 @@
-version: 6 # DO NOT CHANGE
+version: 7 # DO NOT CHANGE
 game:
   bedrock_support: false # Reserved for a future integration; currently has no runtime effect
 
@@ -39,6 +39,32 @@ ui:
     # Full titles used for real physical chests. Normal VoxelCore UI/offset placeholders are supported.
     single: ''
     double: ''
+
+  browser:
+    # Inventory titles for /vc admin item ui and /vc admin block ui.
+    # Supports & colors, VoxelCore :font_glyph: and :offset_<pixels>: placeholders.
+    # {page} = current page (starts at 1), {pages} = total pages,
+    # {total} = item/block count, {type} = Items or Blocks.
+    # The placeholders expand BEFORE font glyph lookup, so names like
+    # ':browser_items_page_{page}:' resolve to the correct page's texture.
+    titles:
+      items: 'VC Items {page}/{pages}'
+      blocks: 'VC Blocks {page}/{pages}'
+    # Optional exact page overrides, useful when every page has its own
+    # background/font composition. Page numbers are 1-based.
+    # If a page is not configured here, its 'titles' template applies.
+    page_titles:
+      items: {}
+      blocks: {}
+    # Example:
+    # titles:
+    #   items: '&f:offset_-8::vc_items_page_{page}:'
+    #   blocks: '&f:offset_-8::vc_blocks_page_{page}:'
+    # page_titles:
+    #   items:
+    #     '1': '&f:offset_-8::vc_item_browser_first_page:'
+    #   blocks:
+    #     '2': '&f:offset_-8::vc_block_browser_second_page:'
 
 # Optional independent VaultUnlocked (Vault2) currencies.
 # Essentials remains the legacy Coins provider; VoxelCore does not touch it.
