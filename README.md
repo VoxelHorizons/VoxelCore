@@ -115,7 +115,7 @@ When ShopGUI+ is installed, VoxelCore registers an optional custom-item provider
 
 ShopGUI+ creates the same persistent item stack as `/vc admin item give voxel:item` for purchasable/sellable shop inventory. Buying, selling, and comparison use the VoxelCore ContentID rather than display name, lore, material, or model data. Abstract IDs are **still rejected for tradeable shop entries**. VoxelCore continues to work when ShopGUI+ is absent.
 
-**ShopGUI+ decorative GUI buttons are different from shop stock.** The global ShopGUI+ `buttons.<buttonName>.item` settings (such as `buttons.goBack.item`) may now use *renderable abstract* VoxelCore item definitions as icon models:
+**ShopGUI+ GUI icons are different from shop stock.** The global ShopGUI+ `buttons.<buttonName>.item`, nested GUI `<guiSection>.buttons.<buttonName>.item` (such as `amountSelectionGUI.buttons.set1.item` and `amountSelectionGUIBulkBuy.buttons.buy1.item`), and `shopMenuItems.<entry>.item` entries may use *renderable abstract* VoxelCore item definitions as decorative icons:
 
 ```yaml
 # plugins/ShopGUIPlus/config.yml — GUI-only button
@@ -125,7 +125,7 @@ buttons:
       voxelcore: "voxel:ui-blank"
 ```
 
-At this path VoxelCore uses `ItemManager.createRenderItem`, which accepts an abstract definition **only when it has an inherited or declared material and render.model**. It does not make `ui-blank` giveable or purchasable. In contrast, `shops.<shop>.items.<slot>.item` and other contexts continue through `createItem` and reject abstract IDs as before. Invalid IDs or missing render assets still fail at the actual config path instead of creating a broken empty GUI button.
+At these display-only paths VoxelCore uses `ItemManager.createRenderItem`, which accepts an abstract definition **only when it has an inherited or declared material and render.model**. This does not make `ui-blank` giveable or purchasable. The nested-button rule recognizes GUI section names containing `GUI` (including bulk buy/sell variants), without hardcoding individual buttons. In contrast, `shops.<shop>.items.<slot>.item` and other inventory/trading contexts continue through `createItem` and reject abstract IDs as before. Invalid IDs or missing render assets still fail at the actual config path instead of creating a broken empty GUI button.
 
 The value normally uses the exact key beneath `items:` (for example `voxel:ui-blank`). ShopGUI+ configurations may also use resource-style slash shorthand such as `voxel:ui/blank`; the provider resolves that to the hyphenated VoxelCore ContentID. A present but invalid `voxelcore:` reference fails immediately with its configuration path instead of leaving ShopGUI+ with a null button or shop item.
 
