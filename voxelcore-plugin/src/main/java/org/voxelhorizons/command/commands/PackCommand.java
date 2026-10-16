@@ -4,6 +4,7 @@ import org.bukkit.command.CommandSender;
 import org.voxelhorizons.VoxelCore;
 import org.voxelhorizons.command.SubCommand;
 import org.voxelhorizons.content.runtime.ContentReloadResult;
+import org.voxelhorizons.content.load.ContentDefinitions;
 import org.voxelhorizons.pack.JavaPackBuildResult;
 import org.voxelhorizons.pack.JavaPackTarget;
 import org.voxelhorizons.pack.PackManager;
@@ -12,6 +13,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
 
 public final class PackCommand implements SubCommand {
     private final Map<String, SubCommand> children = new HashMap<String, SubCommand>();
@@ -94,30 +97,99 @@ public final class PackCommand implements SubCommand {
     }
 
     private static final class BuildCommand implements SubCommand {
+        private final AtomicBoolean working = new AtomicBoolean(false);
+
         @Override public String getName() { return "build"; }
         @Override public List<String> getAliases() { return Collections.emptyList(); }
         @Override public String getPermission() { return "voxelcore.admin.pack.build"; }
         @Override public boolean playerOnly() { return false; }
+
         @Override public void execute(CommandSender sender, String[] args) {
             JavaPackTarget target = target(sender, args);
             if (target == null) return;
+            if (!working.compareAndSet(false, true)) {
+                sender.sendMessage("VoxelCore pack build/reload is already running.");
+                return;
+            }
+
+            final VoxelCore plugin = VoxelCore.getInstance();
+            final long startingRevision = plugin.getContentRuntime().current().revision();
+            sender.sendMessage("VoxelCore pack build for " + target.id()
+                    + " started asynchronously; the server will remain responsive.");
+
             try {
-                VoxelCore plugin = VoxelCore.getInstance();
-                JavaPackBuildResult result = plugin.getPackManager().build(target);
-                sender.sendMessage("VoxelCore pack built for " + target.id() + ": " + result.output()
-                        + " (" + result.renderedItems() + " rendered items, " + result.renderedBlocks()
-                        + " rendered blocks, " + result.copiedAssets() + " authored assets)");
-                ContentReloadResult reload = plugin.onReload();
-                if (reload.success()) {
-                    sender.sendMessage("Published content revision " + reload.activeRevision() + " with "
-                            + reload.itemCount() + " items and " + reload.blockCount()
-                            + " blocks; UI placeholders are now active.");
-                } else {
-                    sender.sendMessage("Pack built, but live content reload failed; revision "
-                            + reload.activeRevision() + " remains active: " + reload.message());
-                }
-            } catch (RuntimeException exception) {
-                sender.sendMessage("VoxelCore pack build failed for " + target.id() + ": " + exception.getMessage());
+                // The compiler and candidate loader operate on disk/immutable Java data,
+                // never touch Bukkit inventories, blocks or live mutable server state.
+                plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+                    final JavaPackBuildResult output;
+                    try {
+                        output = plugin.getPackManager().build(target);
+                    } catch (RuntimeException failure) {
+                        complete(plugin, () -> sender.sendMessage("VoxelCore pack build failed for "
+                                + target.id() + ": " + failure.getMessage()));
+                        return;
+                    }
+
+                    ContentDefinitions candidate = null;
+                    String loadError = null;
+                    try {
+                        candidate = plugin.prepareContentReload();
+                    } catch (RuntimeException failure) {
+                        loadError = failure.getMessage();
+                    }
+                    final ContentDefinitions prepared = candidate;
+                    final String prepareError = loadError;
+                    complete(plugin, () -> {
+                        sender.sendMessage("VoxelCore pack built for " + target.id() + ": " + output.output()
+                                + " (" + output.renderedItems() + " rendered items, " + output.renderedBlocks()
+                                + " rendered blocks, " + output.copiedAssets() + " authored assets)");
+                        if (prepared == null) {
+                            sender.sendMessage("Pack built, but live content reload failed; revision "
+                                    + plugin.getContentRuntime().current().revision()
+                                    + " remains active: " + prepareError);
+                            return;
+                        }
+                        if (plugin.getContentRuntime().current().revision() != startingRevision) {
+                            sender.sendMessage("Pack built, but content changed during the build; "
+                                    + "skipped publishing an outdated snapshot. Run /vc admin content reload.");
+                            return;
+                        }
+
+                        // Runtime configuration, world/platform validation, allocation persistence,
+                        // glyph publishing and event/plugin visibility stay on the primary thread.
+                        ContentReloadResult reload = plugin.onReloadPrepared(prepared);
+                        if (reload.success()) {
+                            sender.sendMessage("Published content revision " + reload.activeRevision() + " with "
+                                    + reload.itemCount() + " items and " + reload.blockCount()
+                                    + " blocks; UI placeholders are now active.");
+                        } else {
+                            sender.sendMessage("Pack built, but live content reload failed; revision "
+                                    + reload.activeRevision() + " remains active: " + reload.message());
+                        }
+                    });
+                });
+            } catch (RuntimeException failure) {
+                working.set(false);
+                sender.sendMessage("Unable to start VoxelCore pack build: " + failure.getMessage());
+            }
+        }
+
+        private void complete(VoxelCore plugin, Runnable callback) {
+            try {
+                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                    try {
+                        callback.run();
+                    } catch (RuntimeException failure) {
+                        plugin.getLogger().log(Level.SEVERE,
+                                "Unable to finish asynchronous resource-pack reload", failure);
+                    } finally {
+                        working.set(false);
+                    }
+                });
+            } catch (RuntimeException failure) {
+                working.set(false);
+                plugin.getLogger().log(Level.WARNING,
+                        "Resource-pack completion could not be scheduled (plugin shutting down?)", failure);
             }
         }
     }
