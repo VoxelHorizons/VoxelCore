@@ -82,7 +82,11 @@ public final class ContentLoader {
     }
 
     public ItemDefinitionRegistry load(Path contentRoot) {
-        BlockDefinitionRegistry blocks = loadBlocks(contentRoot);
+        return compileItems(contentRoot, loadBlocks(contentRoot));
+    }
+
+    /** Both registries must be derived from the same one-pass block parse. */
+    private ItemDefinitionRegistry compileItems(Path contentRoot, BlockDefinitionRegistry blocks) {
         try {
             List<RawItemDefinition> items = new ArrayList<RawItemDefinition>(loadRaw(contentRoot));
             Map<ContentID, RawItemDefinition> byId = new LinkedHashMap<ContentID, RawItemDefinition>();
@@ -128,7 +132,8 @@ public final class ContentLoader {
     }
 
     public ContentDefinitions loadDefinitions(Path contentRoot) {
-        return new ContentDefinitions(load(contentRoot), loadBlocks(contentRoot));
+        BlockDefinitionRegistry blocks = loadBlocks(contentRoot);
+        return new ContentDefinitions(compileItems(contentRoot, blocks), blocks);
     }
 
     private static RawItemDefinition implicitBlockItem(BlockDefinition block) {
