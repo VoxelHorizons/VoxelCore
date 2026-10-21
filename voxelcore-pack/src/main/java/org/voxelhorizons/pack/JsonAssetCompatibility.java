@@ -40,7 +40,10 @@ final class JsonAssetCompatibility {
     private static JsonElement merge(JsonElement existing, JsonElement incoming, String jsonPath, String assetPath) {
         if (existing.equals(incoming)) return existing;
         if (existing.isJsonObject() && incoming.isJsonObject()) {
-            JsonObject result = existing.deepCopy();
+            JsonObject result = new JsonObject();
+            for (String key : existing.getAsJsonObject().keySet()) {
+                result.add(key, existing.getAsJsonObject().get(key).deepCopy());
+            }
             for (String key : incoming.getAsJsonObject().keySet()) {
                 JsonElement incomingValue = incoming.getAsJsonObject().get(key);
                 if (!result.has(key)) result.add(key, incomingValue.deepCopy());
