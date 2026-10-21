@@ -88,10 +88,26 @@ PACK_VALIDATE="$(rcon "voxelcore admin pack validate $PACK_TARGET")"
 echo "$PACK_VALIDATE"
 grep -q "pack valid for $PACK_TARGET" <<<"$PACK_VALIDATE"
 
-PACK_BUILD="$(rcon "voxelcore admin pack build $PACK_TARGET")"
-echo "$PACK_BUILD"
-grep -q "pack built for $PACK_TARGET" <<<"$PACK_BUILD"
-grep -q 'Published content revision 2 with 4 items' <<<"$PACK_BUILD"
+PACK_BUILD_START="$(rcon "voxelcore admin pack build $PACK_TARGET")"
+echo "$PACK_BUILD_START"
+grep -q "pack build for $PACK_TARGET started asynchronously" <<<"$PACK_BUILD_START"
+
+PACK_BUILD_LOGS=""
+for _ in $(seq 1 120); do
+  PACK_BUILD_LOGS="$(docker logs "$NAME" 2>&1 || true)"
+  if grep -q "VoxelCore pack built for $PACK_TARGET" <<<"$PACK_BUILD_LOGS" \
+      && grep -q 'Published content revision 2 with 4 items' <<<"$PACK_BUILD_LOGS"; then
+    break
+  fi
+  sleep 1
+done
+if ! grep -q "VoxelCore pack built for $PACK_TARGET" <<<"$PACK_BUILD_LOGS" \
+    || ! grep -q 'Published content revision 2 with 4 items' <<<"$PACK_BUILD_LOGS"; then
+  echo "Timed out waiting for asynchronous pack build/reload completion" >&2
+  echo "$PACK_BUILD_LOGS" >&2
+  exit 1
+fi
+echo "$PACK_BUILD_LOGS"
 test -f "$DATA_DIR/plugins/VoxelCore/build/resource-packs/$PACK_TARGET.zip"
 
 docker exec -i "$NAME" sh -c "cat > '$CONTAINER_ITEMS'" <<'BROKEN'
