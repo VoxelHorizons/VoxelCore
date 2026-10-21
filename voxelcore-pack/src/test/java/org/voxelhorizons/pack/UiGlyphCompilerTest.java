@@ -96,9 +96,9 @@ public class UiGlyphCompilerTest {
         File texture = new File(pack, "assets/voxel/textures/ui/background.png");
         assertTrue(texture.getParentFile().mkdirs());
         writePng(texture, 16, 16);
-        write(new File(pack, "pack.yml"), "schema: 1\\nnamespace: voxel\\n");
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
         File definition = new File(pack, "content/ui.yml");
-        write(definition, "ui:\\n  skills_background:\\n    path: ui/background.png\\n");
+        write(definition, "ui:\n  skills_background:\n    path: ui/background.png\n");
         Path allocations = temporaryFolder.newFolder("tombstone-build").toPath().resolve("glyph-allocations.yml");
 
         UiGlyphLoader loader = new UiGlyphLoader();
@@ -106,7 +106,7 @@ public class UiGlyphCompilerTest {
                 .get(ContentID.of("voxel", "skills_background")).get();
         assertEquals(0xE000, removed.codePoint());
 
-        write(definition, "ui:\\n  replacement_background:\\n    path: ui/background.png\\n");
+        write(definition, "ui:\n  replacement_background:\n    path: ui/background.png\n");
         UiGlyphDefinition replacement = loader.load(contentRoot.toPath(), allocations, true)
                 .get(ContentID.of("voxel", "replacement_background")).get();
         assertEquals(0xE001, replacement.codePoint());
