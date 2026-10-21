@@ -21,7 +21,7 @@ public class JsonAssetCompatibilityTest {
     }
 
     @Test
-    public void recursivelyMergesObjectsAndAppendsDistinctArrayEntries() {
+    public void recursivelyMergesObjectsAndPreservesArrayEntries() {
         String merged = text(JsonAssetCompatibility.merge(
                 bytes("{\"animation\":{\"frametime\":2,\"frames\":[0,1]}}"),
                 bytes("{\"animation\":{\"frames\":[1,2],\"interpolate\":true}}"),
