@@ -27,7 +27,7 @@ final class JsonAssetCompatibility {
     }
 
     /**
-     * Combines object members and additive arrays. Equal values are kept once; incompatible
+     * Combines object members and appends arrays. Equal object values are kept once; incompatible
      * values at the same location fail with a JSON path so the source conflict is actionable.
      */
     static byte[] merge(byte[] existingBytes, byte[] incomingBytes, String path) {
