@@ -108,7 +108,7 @@ public class JavaPackAuthoredAssetsTest {
 
         String defaultFont = zipText(output, "assets/minecraft/font/default.json");
         assertTrue(defaultFont.contains("minecraft:gui/sprites/container/brewing_stand.png"));
-        assertTrue(defaultFont.contains("\\uEF00"));
+        assertTrue(defaultFont.contains(String.valueOf((char) 0xEF00)));
     }
 
     @Test
