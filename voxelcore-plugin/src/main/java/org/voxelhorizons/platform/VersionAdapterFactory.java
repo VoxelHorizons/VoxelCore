@@ -11,10 +11,10 @@ public final class VersionAdapterFactory {
     }
 
     public static VersionAdapter create(Plugin plugin) {
-        String minecraftVersion = Bukkit.getBukkitVersion().split("-")[0];
+        String minecraftVersion = MinecraftVersionDetector.detect();
         Version version = Version.parse(minecraftVersion);
 
-        plugin.getLogger().info("Detected Minecraft version: " + minecraftVersion);
+        plugin.getLogger().info("Detected Minecraft game version: " + minecraftVersion);
 
         ServiceLoader<PlatformProvider> providers = ServiceLoader.load(
                 PlatformProvider.class,
