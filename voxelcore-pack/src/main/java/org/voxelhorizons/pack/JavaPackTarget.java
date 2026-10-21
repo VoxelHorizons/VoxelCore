@@ -15,9 +15,10 @@ public final class JavaPackTarget {
     public static final JavaPackTarget MC_1_20_5 = numericCmd("mc-1.20.5", 32);
     public static final JavaPackTarget MC_1_21_4 = modern("mc-1.21.4", 46);
     public static final JavaPackTarget MC_26_2 = modernRange("mc-26.2", 88, 0);
+    public static final JavaPackTarget MC_26_3 = modernRange("mc-26.3", 97, 1);
 
     private static final List<JavaPackTarget> KNOWN = Collections.unmodifiableList(Arrays.asList(
-            MC_1_12_2, MC_1_13_2, MC_1_14_4, MC_1_19_4, MC_1_20_5, MC_1_21_4, MC_26_2));
+            MC_1_12_2, MC_1_13_2, MC_1_14_4, MC_1_19_4, MC_1_20_5, MC_1_21_4, MC_26_2, MC_26_3));
 
     private final String id;
     private final int packFormat;
@@ -87,6 +88,7 @@ public final class JavaPackTarget {
         if (version.compareTo(Version.of(1, 20, 5)) == 0) return MC_1_20_5;
         if (version.compareTo(Version.of(1, 21, 4)) == 0) return MC_1_21_4;
         if (version.compareTo(Version.of(26, 2, 0)) == 0) return MC_26_2;
+        if (version.compareTo(Version.of(26, 3, 0)) == 0) return MC_26_3;
         return null;
     }
 

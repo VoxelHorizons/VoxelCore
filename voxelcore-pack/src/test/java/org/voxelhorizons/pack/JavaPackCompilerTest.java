@@ -181,6 +181,29 @@ public class JavaPackCompilerTest {
     }
 
     @Test
+    public void selectsMinecraft263PackProfileExactly() {
+        assertEquals(JavaPackTarget.MC_26_3, JavaPackTarget.forVersion(org.voxelhorizons.platform.Version.of(26, 3, 0)));
+        assertEquals(JavaPackTarget.MC_26_3, JavaPackTarget.byId("mc-26.3"));
+        assertEquals(97, JavaPackTarget.MC_26_3.packFormat());
+        assertEquals(1, JavaPackTarget.MC_26_3.packFormatMinor());
+    }
+
+    @Test
+    public void writesModernRangeMetadataForMinecraft263() throws Exception {
+        File contentRoot = temporaryFolder.newFolder("metadata-263-content");
+        File pack = new File(contentRoot, "mypack");
+        assertTrue(new File(pack, "content").mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: mypack\n");
+        Path build = temporaryFolder.newFolder("metadata-263-build").toPath();
+        Path zip = build.resolve("mc-26.3.zip");
+        new JavaPackCompiler().compile(contentRoot.toPath(), zip, build.resolve("allocations.yml"), JavaPackTarget.MC_26_3);
+        String metadata = zipText(zip, "pack.mcmeta");
+        assertTrue(metadata.contains("\"min_format\":[97,1]"));
+        assertTrue(metadata.contains("\"max_format\":[97,1]"));
+        assertTrue(!metadata.contains("\"pack_format\""));
+    }
+
+    @Test
     public void compilesStructuredModernDecisionTreeUsingStableIndices() throws Exception {
         File contentRoot = temporaryFolder.newFolder("rule-content");
         File pack = new File(contentRoot, "mypack");

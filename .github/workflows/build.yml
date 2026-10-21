@@ -52,6 +52,7 @@ jobs:
           verify_api_version 'voxelcore-v1_20_5/target/VoxelCore-*.jar' '1.20.5'
           verify_api_version 'voxelcore-v1_21_4/target/VoxelCore-*.jar' '1.21.4'
           verify_api_version 'voxelcore-v26_2/target/VoxelCore-*.jar' '26.2'
+          verify_api_version 'voxelcore-v26_3/target/VoxelCore-*.jar' '26.3'
 
       - name: Upload Minecraft 1.12-1.13 artifact
         uses: actions/upload-artifact@v4
@@ -83,6 +84,12 @@ jobs:
           name: VoxelCore-mc1.21.4
           path: voxelcore-v1_21_4/target/VoxelCore-*.jar
 
+      - name: Upload Minecraft 26.3 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoxelCore-mc26.3
+          path: voxelcore-v26_3/target/VoxelCore-*.jar
+
       - name: Upload Minecraft 26.2 artifact
         uses: actions/upload-artifact@v4
         with:
@@ -103,3 +110,4 @@ jobs:
             voxelcore-v1_20_5/target/VoxelCore-*.jar
             voxelcore-v1_21_4/target/VoxelCore-*.jar
             voxelcore-v26_2/target/VoxelCore-*.jar
+            voxelcore-v26_3/target/VoxelCore-*.jar
