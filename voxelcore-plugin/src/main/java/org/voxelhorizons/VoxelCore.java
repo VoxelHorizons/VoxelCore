@@ -43,6 +43,8 @@ import org.voxelhorizons.block.BlockMiningSpeedController;
 import org.voxelhorizons.action.ActionExecutor;
 import org.voxelhorizons.action.ItemActionListener;
 import org.voxelhorizons.pack.PackManager;
+import org.voxelhorizons.pack.ResourcePackHost;
+import org.voxelhorizons.pack.PlayerResourcePackService;
 import org.voxelhorizons.platform.VersionAdapter;
 import org.voxelhorizons.platform.VersionAdapterFactory;
 import org.voxelhorizons.platform.server.ServerPlatformCapabilities;
@@ -83,6 +85,8 @@ public final class VoxelCore extends JavaPlugin {
     private BlockMiningSpeedController blockMiningSpeedController;
     private ActionExecutor actionExecutor;
     private PackManager packManager;
+    private ResourcePackHost resourcePackHost;
+    private PlayerResourcePackService playerResourcePackService;
     private TextPlaceholderService textPlaceholderService;
     private TooltipRenderer tooltipRenderer;
     private InventoryTitlePlaceholderListener inventoryTitlePlaceholderListener;
@@ -159,6 +163,8 @@ public final class VoxelCore extends JavaPlugin {
                         }
                     }, blockAllocationStore, modernBlockStates);
             packManager = new PackManager(getDataFolder().toPath(), contentRoot, versionAdapter.version());
+            resourcePackHost = new ResourcePackHost(getDataFolder().toPath());
+            playerResourcePackService = new PlayerResourcePackService(this, resourcePackHost);
             textPlaceholderService = new TextPlaceholderService(packManager.uiGlyphs(true));
             tooltipRenderer = new TooltipRenderer(textPlaceholderService,
                     packManager.uiGlyphs(false), () -> getConfig());
@@ -177,6 +183,8 @@ public final class VoxelCore extends JavaPlugin {
         }
 
         itemManager = new ItemManager(contentRuntime, versionAdapter);
+        getServer().getPluginManager().registerEvents(playerResourcePackService, this);
+        playerResourcePackService.reloadHost();
         blockManager = new BlockManager(contentRuntime, versionAdapter.version().atLeast(1, 13, 0));
         contentBrowser = new ContentBrowser(this);
         getServer().getPluginManager().registerEvents(contentBrowser, this);
@@ -245,6 +253,7 @@ public final class VoxelCore extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (resourcePackHost != null) resourcePackHost.stop();
         if (currencyBridge != null) currencyBridge.shutdown();
         if (advancementsMenuOverride != null) advancementsMenuOverride.shutdown();
         if (blockMiningSpeedController != null) blockMiningSpeedController.clearAll();
@@ -304,6 +313,7 @@ public final class VoxelCore extends JavaPlugin {
     private void reloadRuntimeConfiguration() {
         reloadConfig();
         config = getConfig();
+        if (playerResourcePackService != null) playerResourcePackService.reloadHost();
         if (advancementsMenuOverride != null) advancementsMenuOverride.reload();
         if (inventoryTitlePlaceholderListener != null) {
             inventoryTitlePlaceholderListener.updateChestTitles(
@@ -321,6 +331,8 @@ public final class VoxelCore extends JavaPlugin {
     public BlockManager getBlockManager() { return blockManager; }
     public BlockDefinitionRegistry getBlockRegistry() { return contentRuntime.current().blocks(); }
     public PackManager getPackManager() { return packManager; }
+    public ResourcePackHost getResourcePackHost() { return resourcePackHost; }
+    public PlayerResourcePackService getPlayerResourcePackService() { return playerResourcePackService; }
     public TextPlaceholderService getTextPlaceholderService() { return textPlaceholderService; }
     public TooltipRenderer getTooltipRenderer() { return tooltipRenderer; }
     public ContentBrowser getContentBrowser() { return contentBrowser; }
