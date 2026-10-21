@@ -134,11 +134,15 @@ public final class PackCommand implements SubCommand {
                                 + target.id() + ": " + failure.getMessage()));
                         return;
                     }
+                    JavaPackTarget serverTarget = plugin.getPackManager().currentTarget();
+                    final boolean currentServerTarget = serverTarget != null && serverTarget.id().equals(target.id());
                     String hostPublishError = null;
-                    try {
-                        plugin.getResourcePackHost().publish(output.output());
-                    } catch (Exception failure) {
-                        hostPublishError = failure.getMessage();
+                    if (currentServerTarget) {
+                        try {
+                            plugin.getResourcePackHost().publish(output.output());
+                        } catch (Exception failure) {
+                            hostPublishError = failure.getMessage();
+                        }
                     }
                     final String publishError = hostPublishError;
 
@@ -155,12 +159,14 @@ public final class PackCommand implements SubCommand {
                         sender.sendMessage("VoxelCore pack built for " + target.id() + ": " + output.output()
                                 + " (" + output.renderedItems() + " rendered items, " + output.renderedBlocks()
                                 + " rendered blocks, " + output.copiedAssets() + " authored assets)");
-                        if (publishError != null) {
+                        if (!currentServerTarget) {
+                            sender.sendMessage("This target differs from the running server version; it was not published to players.");
+                        } else if (publishError != null) {
                             sender.sendMessage("Pack built, but self-hosted pack file was not updated: " + publishError);
                         } else {
                             sender.sendMessage("Updated self-hosted pack file: " + plugin.getResourcePackHost().hostedPack());
                         }
-                        if (publishError == null && plugin.getResourcePackHost().isRunning()) {
+                        if (currentServerTarget && publishError == null && plugin.getResourcePackHost().isRunning()) {
                             plugin.getPlayerResourcePackService().sendUpdatedPackToOnlinePlayers();
                         }
                         if (prepared == null) {
