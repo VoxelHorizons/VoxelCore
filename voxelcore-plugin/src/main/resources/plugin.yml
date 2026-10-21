@@ -53,6 +53,10 @@ permissions:
     default: op
   voxelcore.admin.pack.info:
     default: op
+  voxelcore.admin.pack.host:
+    default: op
+  voxelcore.admin.pack.send:
+    default: op
   voxelcore.admin.pack.validate:
     default: op
   voxelcore.admin.pack.build:

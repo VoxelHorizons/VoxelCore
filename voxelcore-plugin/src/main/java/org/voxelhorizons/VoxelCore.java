@@ -163,7 +163,7 @@ public final class VoxelCore extends JavaPlugin {
                         }
                     }, blockAllocationStore, modernBlockStates);
             packManager = new PackManager(getDataFolder().toPath(), contentRoot, versionAdapter.version());
-            resourcePackHost = new ResourcePackHost(getDataFolder().toPath());
+            resourcePackHost = new ResourcePackHost(getDataFolder().toPath(), getLogger());
             playerResourcePackService = new PlayerResourcePackService(this, resourcePackHost);
             textPlaceholderService = new TextPlaceholderService(packManager.uiGlyphs(true));
             tooltipRenderer = new TooltipRenderer(textPlaceholderService,

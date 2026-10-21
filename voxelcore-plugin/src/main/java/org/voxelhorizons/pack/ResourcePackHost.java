@@ -12,22 +12,34 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.concurrent.Executors;
 
 /** Small, read-only HTTP endpoint for the currently published Java resource pack. */
 public final class ResourcePackHost {
     public static final String RESOURCE_PATH = "/resourcepack.zip";
     private final Path hostedPack;
+    private final Logger logger;
     private HttpServer server;
     private byte[] sha1;
     private String bindAddress;
     private int port;
+    private volatile boolean requestDebug;
 
     public ResourcePackHost(Path dataRoot) {
+        this(dataRoot, Logger.getLogger("VoxelCore"));
+    }
+
+    public ResourcePackHost(Path dataRoot, Logger logger) {
+        if (dataRoot == null || logger == null) throw new IllegalArgumentException("Host arguments cannot be null");
         this.hostedPack = dataRoot.resolve("resource-pack-host").resolve("resourcepack.zip");
+        this.logger = logger;
     }
 
     public synchronized void start(String bindAddress, int port) throws IOException {
+        if (bindAddress == null || bindAddress.trim().isEmpty()) throw new IllegalArgumentException("Bind address cannot be blank");
+        if (port < 0 || port > 65535) throw new IllegalArgumentException("Port must be from 0 through 65535");
         if (server != null && bindAddress.equals(this.bindAddress) && port == this.port) return;
         stop();
         Files.createDirectories(hostedPack.getParent());
@@ -54,6 +66,12 @@ public final class ResourcePackHost {
     }
 
     public synchronized boolean isRunning() { return server != null; }
+    public synchronized String bindAddress() { return bindAddress; }
+    public synchronized int port() { return server == null ? -1 : server.getAddress().getPort(); }
+    public synchronized long hostedPackSize() throws IOException {
+        return Files.isRegularFile(hostedPack) ? Files.size(hostedPack) : -1L;
+    }
+    public void setRequestDebug(boolean enabled) { requestDebug = enabled; }
 
     /** Atomically swaps the public file only after the new build is complete. */
     public synchronized void publish(Path completedPack) throws IOException {
@@ -101,20 +119,30 @@ public final class ResourcePackHost {
     }
 
     public synchronized byte[] sha1() { return sha1 == null ? null : sha1.clone(); }
+    public synchronized String sha1Hex() {
+        if (sha1 == null) return "unavailable";
+        StringBuilder hex = new StringBuilder(sha1.length * 2);
+        for (byte value : sha1) hex.append(String.format(java.util.Locale.ROOT, "%02x", value & 0xff));
+        return hex.toString();
+    }
     public Path hostedPack() { return hostedPack; }
 
     private void servePack(HttpExchange exchange) throws IOException {
+        int status = 500;
+        long bytesSent = 0L;
         try {
             if (!RESOURCE_PATH.equals(exchange.getRequestURI().getPath())
                     || !("GET".equals(exchange.getRequestMethod()) || "HEAD".equals(exchange.getRequestMethod()))) {
                 exchange.getResponseHeaders().set("Allow", "GET, HEAD");
                 exchange.sendResponseHeaders(404, -1);
+                status = 404;
                 return;
             }
             Path file;
             synchronized (this) { file = Files.isRegularFile(hostedPack) ? hostedPack : null; }
             if (file == null) {
                 exchange.sendResponseHeaders(404, -1);
+                status = 404;
                 return;
             }
             long length = Files.size(file);
@@ -126,15 +154,29 @@ public final class ResourcePackHost {
             if ("HEAD".equals(exchange.getRequestMethod())) {
                 headers.set("Content-Length", Long.toString(length));
                 exchange.sendResponseHeaders(200, -1);
+                status = 200;
+                bytesSent = length;
                 return;
             }
             exchange.sendResponseHeaders(200, length);
+            status = 200;
             try (OutputStream output = exchange.getResponseBody(); java.io.InputStream input = Files.newInputStream(file)) {
                 byte[] buffer = new byte[16384];
                 int read;
-                while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
+                while ((read = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, read);
+                    bytesSent += read;
+                }
             }
+        } catch (IOException failure) {
+            logger.log(Level.WARNING, "Resource-pack HTTP request failed: method=" + exchange.getRequestMethod()
+                    + " path=" + exchange.getRequestURI().getPath() + " remote="
+                    + exchange.getRemoteAddress() + " status=" + status + " bytes=" + bytesSent, failure);
+            throw failure;
         } finally {
+            if (requestDebug) logger.info("Resource-pack HTTP request: method=" + exchange.getRequestMethod()
+                    + " path=" + exchange.getRequestURI().getPath() + " remote=" + exchange.getRemoteAddress()
+                    + " status=" + status + " bytes=" + bytesSent);
             exchange.close();
         }
     }
