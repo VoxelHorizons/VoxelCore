@@ -191,7 +191,7 @@ Install exactly one distribution jar matching the server family.
 
 Each shaded distribution embeds the corresponding `api-version` in `plugin.yml`; CI inspects the finished JARs to prevent legacy material compatibility from being enabled accidentally.
 
-The real-server smoke matrix covers **1.12.2, 1.13.2, 1.14.4, 1.19.4, 1.20.5, 1.21.4, 26.2, and 26.3**; 26.3 was added in this change and remains pending its CI run. Intermediate versions in the first four family ranges are selected by their providers but are not individually smoke-tested.
+The real-server smoke matrix covers **1.12.2, 1.13.2, 1.14.4, 1.19.4, 1.20.5, 1.21.4, 26.2, and 26.3**. CI passed the 26.3 Paper startup, content/item checks, pack build and reload, and failed-reload recovery smoke. Intermediate versions in the first four family ranges are selected by their providers but are not individually smoke-tested.
 
 `voxelcore-v1_21_4`, `voxelcore-v26_2`, and `voxelcore-v26_3` intentionally accept only their exact validated versions. VoxelCore does not treat the gap between 1.21.4 and 26.2, or a future version after 26.3, as compatible without a dedicated adapter and pack profile.
 
