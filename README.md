@@ -636,6 +636,8 @@ plugins/VoxelCore/build/resource-packs/<target>.zip
 /voxelcore admin block identify
 
 /voxelcore admin pack info
+/voxelcore admin pack host [status|test]
+/voxelcore admin pack send <online-player>
 /voxelcore admin pack validate [target]
 /voxelcore admin pack build [target]
 ```
@@ -643,6 +645,8 @@ plugins/VoxelCore/build/resource-packs/<target>.zip
 When `[target]` is omitted, VoxelCore uses the current server version only when an exact validated pack profile exists. Otherwise specify a target explicitly.
 
 `pack build` publishes the completed ZIP atomically, preserving the previous successful artifact when compilation fails. After a successful build it also performs the safe content reload below, so new items and `:name:` UI placeholders become active without a second command. If live reload validation fails, the built ZIP is retained while the previous runtime revision stays active and the command reports both outcomes.
+
+`pack host` reports the bind address, active socket, advertised URL, hosted file size, and SHA-1. `pack send <online-player>` (alias `pack push`) sends the current pack request immediately, independent of the join setting; the global required/prompt settings still apply. A successful command means the request was issued, while the host request log shows whether the client connected to download it. `pack host test` downloads the file through the local listener and verifies its byte count and SHA-1; this confirms the host inside the Minecraft process/container, but does not test Docker/Pterodactyl port exposure or a public tunnel. Startup logs report the same details and include bind exceptions. With `resource_pack.host.debug: true`, each HTTP request is logged with its remote address, method, path, response status, and bytes sent.
 
 The final pack is size-optimized deterministically: JSON and `pack.mcmeta` whitespace is removed without modifying string values, PNGs are losslessly re-encoded only when the result is smaller, and each ZIP entry uses maximum DEFLATE compression only when it beats storing the optimized bytes directly. Rebuilding identical content therefore produces identical pack bytes without inflating already-compressed images.
 

@@ -1,4 +1,4 @@
-version: 8 # DO NOT CHANGE
+version: 9 # DO NOT CHANGE
 game:
   bedrock_support: false # Reserved for a future integration; currently has no runtime effect
 
@@ -8,6 +8,8 @@ resource_pack:
     enabled: false
     bind_address: '0.0.0.0'
     port: 24464
+    # Logs every GET/HEAD request with remote address, response status, and bytes sent.
+    debug: true
     # Set this to the public IP/DNS name players can reach. Leave blank to use server-ip.
     public_host: ''
     # Optional external base URL, useful behind a TLS reverse proxy (example: https://packs.example.com).
