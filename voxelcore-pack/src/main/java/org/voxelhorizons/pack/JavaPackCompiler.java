@@ -258,6 +258,8 @@ public final class JavaPackCompiler {
                 entries.put(asset.path, AuthoredFontSupport.mergeDefault(bytes, previous));
             } else if (previous != null && AtlasCompatibility.isAtlas(asset.path)) {
                 entries.put(asset.path, AtlasCompatibility.merge(previous, bytes, asset.path));
+            } else if (previous != null && BlockStateCompatibility.isBlockState(asset.path)) {
+                entries.put(asset.path, BlockStateCompatibility.merge(previous, bytes, asset.path));
             } else if (previous != null && !Arrays.equals(previous, bytes)) {
                 throw new JavaPackCompileException("Resource pack path collision: " + asset.path);
             }
