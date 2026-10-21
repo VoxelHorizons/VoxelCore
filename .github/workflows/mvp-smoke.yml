@@ -45,6 +45,11 @@ jobs:
             image: itzg/minecraft-server:java21
             server_type: PAPER
             fixture_root: mvp-content-modern
+          - minecraft: '26.3'
+            module: voxelcore-v26_3
+            image: itzg/minecraft-server:java25
+            server_type: PAPER
+            fixture_root: mvp-content-modern
           - minecraft: '26.2'
             module: voxelcore-v26_2
             image: itzg/minecraft-server:java25
