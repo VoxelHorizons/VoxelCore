@@ -38,35 +38,52 @@ public final class PlayerResourcePackService implements Listener {
         for (Player player : plugin.getServer().getOnlinePlayers()) send(player);
     }
 
-    public void send(Player player) {
-        if (player == null || !host.isRunning() || host.sha1() == null) return;
+    public boolean send(Player player) {
+        if (player == null) return false;
+        if (!host.isRunning()) {
+            plugin.getLogger().warning("Resource pack not sent to " + player.getName() + ": HTTP host is not running. "
+                    + "Check resource_pack.host.enabled, bind address/port, startup errors, and container port allocation.");
+            return false;
+        }
+        if (host.sha1() == null) {
+            plugin.getLogger().warning("Resource pack not sent to " + player.getName() + ": no hosted pack file is loaded. "
+                    + "Run /vc admin pack build for the running server target.");
+            return false;
+        }
         String url = configuredPackUrl();
         if (url == null) {
             plugin.getLogger().warning("Resource pack was not sent: set resource_pack.host.public_url or public_host to an address clients can reach.");
-            return;
+            return false;
         }
         boolean required = plugin.getConfig().getBoolean("resource_pack.players.required", false);
         String prompt = color(plugin.getConfig().getString("resource_pack.players.prompt", ""));
         if (required) pendingRequired.add(player.getUniqueId());
         try {
+            plugin.getLogger().info("Sending resource pack to " + player.getName() + ": url=" + url
+                    + " required=" + required + " sha1=" + host.sha1Hex());
             invokeCompatibleSend(player, url, host.sha1(), required, prompt);
+            return true;
         } catch (ReflectiveOperationException | RuntimeException failure) {
             pendingRequired.remove(player.getUniqueId());
             plugin.getLogger().log(Level.WARNING, "Unable to send the VoxelCore resource pack to " + player.getName(), failure);
             if (required) player.kickPlayer(color(plugin.getConfig().getString("resource_pack.players.failure_kick_message",
                     "You must accept and load the server resource pack to play.")));
+            return false;
         }
     }
 
     public void reloadHost() {
         boolean enabled = plugin.getConfig().getBoolean("resource_pack.host.enabled", false);
+        host.setRequestDebug(plugin.getConfig().getBoolean("resource_pack.host.debug", false));
         if (!enabled) {
             host.stop();
+            plugin.getLogger().info("Self-hosted resource-pack HTTP server is disabled (resource_pack.host.enabled=false).");
             return;
         }
+        String bindAddress = plugin.getConfig().getString("resource_pack.host.bind_address", "0.0.0.0");
+        int configuredPort = plugin.getConfig().getInt("resource_pack.host.port", 24464);
         try {
-            host.start(plugin.getConfig().getString("resource_pack.host.bind_address", "0.0.0.0"),
-                    plugin.getConfig().getInt("resource_pack.host.port", 24464));
+            host.start(bindAddress, configuredPort);
             if (host.sha1() == null && !host.loadExisting() && plugin instanceof VoxelCore) {
                 VoxelCore voxelCore = (VoxelCore) plugin;
                 JavaPackTarget target = voxelCore.getPackManager().currentTarget();
@@ -75,12 +92,23 @@ public final class PlayerResourcePackService implements Listener {
                     if (java.nio.file.Files.isRegularFile(builtPack)) host.publish(builtPack);
                 }
             }
-            plugin.getLogger().info("Resource-pack HTTP host listening on "
-                    + plugin.getConfig().getString("resource_pack.host.bind_address", "0.0.0.0") + ":"
-                    + plugin.getConfig().getInt("resource_pack.host.port", 24464));
+            String url = configuredPackUrl();
+            long fileSize = host.hostedPackSize();
+            plugin.getLogger().info("Resource-pack HTTP host started: bind=" + bindAddress + ":" + host.port()
+                    + " configuredPort=" + configuredPort + " endpoint=" + ResourcePackHost.RESOURCE_PATH
+                    + " advertisedUrl=" + (url == null ? "not configured" : url)
+                    + " packFile=" + host.hostedPack() + " packBytes=" + (fileSize < 0 ? "missing" : fileSize)
+                    + " sha1=" + host.sha1Hex() + " requestDebug="
+                    + plugin.getConfig().getBoolean("resource_pack.host.debug", false));
+            if (url == null) plugin.getLogger().warning("Resource-pack host is listening but no advertised URL can be formed. "
+                    + "Set resource_pack.host.public_host or resource_pack.host.public_url.");
+            plugin.getLogger().info("If this server runs in Docker/Pterodactyl, expose the container port "
+                    + host.port() + " on the host before testing its LAN address.");
         } catch (Exception failure) {
             host.stop();
-            plugin.getLogger().log(Level.SEVERE, "Could not start the resource-pack HTTP host", failure);
+            plugin.getLogger().log(Level.SEVERE, "Could not start the resource-pack HTTP host at "
+                    + bindAddress + ":" + configuredPort + ". Check for another listener, a valid bind address, "
+                    + "and permission to bind this port.", failure);
         }
     }
 
