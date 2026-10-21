@@ -117,6 +117,29 @@ public class UiGlyphCompilerTest {
     }
 
     @Test
+    public void repairsPersistedCollisionWithInactiveGlyph() throws Exception {
+        File contentRoot = temporaryFolder.newFolder("stale-tombstone-content");
+        File pack = new File(contentRoot, "voxel");
+        assertTrue(new File(pack, "content").mkdirs());
+        File texture = new File(pack, "assets/voxel/textures/ui/background.png");
+        assertTrue(texture.getParentFile().mkdirs());
+        writePng(texture, 16, 16);
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
+        write(new File(pack, "content/ui.yml"), "ui:\n  replacement_background:\n    path: ui/background.png\n");
+        Path allocations = temporaryFolder.newFolder("stale-tombstone-build").toPath().resolve("glyph-allocations.yml");
+        write(allocations.toFile(), "schema: 1\nglyphs:\n  'voxel:replacement_background': 57344\n"
+                + "inactive:\n  'voxel:skills_background': 57344\n");
+
+        UiGlyphDefinition repaired = new UiGlyphLoader().load(contentRoot.toPath(), allocations, true)
+                .get(ContentID.of("voxel", "replacement_background")).get();
+        assertEquals(0xE001, repaired.codePoint());
+
+        String manifest = new String(Files.readAllBytes(allocations), StandardCharsets.UTF_8);
+        assertTrue(manifest.contains("'voxel:replacement_background': 57345"));
+        assertTrue(manifest.contains("'voxel:skills_background': 57344"));
+    }
+
+    @Test
     public void noLongerEmbedsTooltipBackgroundTextures() throws Exception {
         File contentRoot = temporaryFolder.newFolder("tooltip-content");
         File pack = new File(contentRoot, "voxel");
