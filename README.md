@@ -16,7 +16,7 @@ The repository has completed the roadmap's foundation, content/item, Java pack, 
 - stable numeric and structured render allocations
 - deterministic Java resource-pack validation and compilation
 - compact cropped UI glyph definitions, stable private-use codepoints, generated bitmap/spacing font providers, white-safe UI/offset placeholders, and admin glyph lookup/copy commands
-- exact real-server smoke coverage from Minecraft 1.12.2 through Minecraft 26.2
+- exact real-server smoke coverage from Minecraft 1.12.2 through Minecraft 26.3
 - snapshot JAR publication from `main`
 - reusable item and placed-block actions (including `set_block`, `command`, `give_item`, `drop_item`, `message` and `cancel`)
 - carrier-backed custom blocks with placeable items, harvesting/tool rules, selected native hardness support and Creative pick-block
@@ -139,7 +139,7 @@ Player-specific lore that ShopGUI+ generates while opening a menu (including cal
 
 The former phase-3a plan has been partly delivered via VoxelCore's reusable item and block actions. The next highest-value work is **cross-plugin integration and durability validation**, rather than reimplementing actions or the existing VoxelFurniture and VoxelVehicles foundations.
 
-Start with a single combined **Paper 26.2 + Java 25** integration test installation of matching VoxelCore, VoxelFurniture and VoxelVehicles builds; include VoxelFurnitureShop snapshot/edit recovery checks. Verify restart, chunk lifecycle, owner permissions, vehicle chest/cargo conservation, client resource-pack loading and addon reloads. Profile the workload with spark and `/vv perf`. Then complete [VoxelVehicles adapter and migration issues](https://github.com/VoxelHorizons/VoxelVehicles/issues) and the presentation-independent menu session contract. Bedrock/legacy Haven data migration are separate gated milestones.
+Start with a single combined **Paper 26.3 + Java 25** integration test installation of matching VoxelCore, VoxelFurniture and VoxelVehicles builds; include VoxelFurnitureShop snapshot/edit recovery checks. Verify restart, chunk lifecycle, owner permissions, vehicle chest/cargo conservation, client resource-pack loading and addon reloads. Profile the workload with spark and `/vv perf`. Then complete [VoxelVehicles adapter and migration issues](https://github.com/VoxelHorizons/VoxelVehicles/issues) and the presentation-independent menu session contract. Bedrock/legacy Haven data migration are separate gated milestones.
 
 See [Migration-Roadmap.md](Migration-Roadmap.md#13-next-implementation-units--october-2026-execution-plan) for the detailed acceptance criteria, support boundaries and subsequent phases.
 
@@ -187,16 +187,17 @@ Install exactly one distribution jar matching the server family.
 | 1.20.5–1.21.3 | `voxelcore-v1_20_5` | `1.20.5` | data-component-era family with scalar CMD compatibility |
 | 1.21.4 | `voxelcore-v1_21_4` | `1.21.4` | item-model component and structured Custom Model Data |
 | 26.2 | `voxelcore-v26_2` | `26.2` | Paper 26.2 item-model component and structured Custom Model Data |
+| 26.3 | `voxelcore-v26_3` | `26.3` | Paper 26.3 item-model component, structured Custom Model Data and pack format 97.1 |
 
 Each shaded distribution embeds the corresponding `api-version` in `plugin.yml`; CI inspects the finished JARs to prevent legacy material compatibility from being enabled accidentally.
 
-The real-server matrix validates **1.12.2, 1.13.2, 1.14.4, 1.19.4, 1.20.5, 1.21.4, and 26.2**. Intermediate versions in the first four family ranges are selected by their providers but are not individually smoke-tested.
+The real-server smoke matrix covers **1.12.2, 1.13.2, 1.14.4, 1.19.4, 1.20.5, 1.21.4, 26.2, and 26.3**. CI passed the 26.3 Paper startup, content/item checks, pack build and reload, and failed-reload recovery smoke. Intermediate versions in the first four family ranges are selected by their providers but are not individually smoke-tested.
 
-`voxelcore-v1_21_4` and `voxelcore-v26_2` intentionally accept only their exact validated versions. VoxelCore does not treat the gap between 1.21.4 and 26.2, or a future version after 26.2, as compatible without a dedicated adapter and pack profile.
+`voxelcore-v1_21_4`, `voxelcore-v26_2`, and `voxelcore-v26_3` intentionally accept only their exact validated versions. VoxelCore does not treat the gap between 1.21.4 and 26.2, or a future version after 26.3, as compatible without a dedicated adapter and pack profile.
 
 ## Build
 
-Building the complete reactor requires **JDK 25** because the Minecraft 26.2/Paper module targets Java 25. Older distribution modules still emit bytecode for their own required Java level.
+Building the complete reactor requires **JDK 25** because the Minecraft 26.3/Paper module targets Java 25. Older distribution modules still emit bytecode for their own required Java level.
 
 Build every distribution:
 
@@ -586,8 +587,9 @@ The MVP compiler intentionally exposes exact validated profiles instead of prete
 | `mc-1.20.5` | numeric Custom Model Data | 32 |
 | `mc-1.21.4` | item-model / structured CMD | 46 |
 | `mc-26.2` | item-model / structured CMD | 88.0 |
+| `mc-26.3` | item-model / structured CMD | 97.1 |
 
-Minecraft 26.2 uses modern `min_format`/`max_format` pack metadata. Earlier targets retain the legacy `pack_format` field.
+Minecraft 26.2 and 26.3 use modern `min_format`/`max_format` pack metadata. Earlier targets retain the legacy `pack_format` field.
 
 Pack output is deterministic and stored below:
 
@@ -704,7 +706,7 @@ GitHub Actions performs:
 
 - full Maven build of all distribution jars
 - unit tests for parsing, inheritance, immutable snapshots, allocation persistence/tombstones, UI/offset placeholder resolution, structured indices, modern rule generation, and reload rollback
-- real-server smoke tests for 1.12.2, 1.13.2, 1.14.4, 1.19.4, 1.20.5, 1.21.4, and 26.2
+- real-server smoke tests for 1.12.2, 1.13.2, 1.14.4, 1.19.4, 1.20.5, 1.21.4, 26.2, and 26.3
 - item create/identify verification
 - exact-target pack validate/build
 - failed reload preservation followed by successful reload
