@@ -1,6 +1,29 @@
-version: 7 # DO NOT CHANGE
+version: 8 # DO NOT CHANGE
 game:
   bedrock_support: false # Reserved for a future integration; currently has no runtime effect
+
+resource_pack:
+  host:
+    # Serves the latest successfully built pack at /resourcepack.zip.
+    enabled: false
+    bind_address: '0.0.0.0'
+    port: 24464
+    # Set this to the public IP/DNS name players can reach. Leave blank to use server-ip.
+    public_host: ''
+    # Optional external base URL, useful behind a TLS reverse proxy (example: https://packs.example.com).
+    # When set, it takes precedence over public_host/protocol/port.
+    public_url: ''
+    protocol: 'http'
+  players:
+    # Request the currently hosted pack when a player joins.
+    send_on_join: false
+    # Re-request the newly built pack for online players after /vc admin pack build.
+    send_on_build: true
+    # Kick players who decline the pack or fail to download/reload it.
+    required: false
+    # Shown with clients that support a custom resource-pack prompt.
+    prompt: '&6Voxel Horizons resource pack'
+    failure_kick_message: '&cYou must accept and load the server resource pack to play.'
 
 menu_overrides:
   advancements:

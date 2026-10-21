@@ -74,6 +74,11 @@ public final class PackCommand implements SubCommand {
             sender.sendMessage("VoxelCore Java pack target: " + (current == null ? "no exact target for this server" : current.id() + " (format " + current.packFormat() + ")"));
             sender.sendMessage("Allocation manifest: " + manager.allocationManifest());
             sender.sendMessage("Build output: " + manager.outputRoot());
+            sender.sendMessage("Self-hosted delivery: " + (VoxelCore.getInstance().getResourcePackHost().isRunning()
+                    ? "listening on port " + VoxelCore.getInstance().getConfig().getInt("resource_pack.host.port", 24464)
+                    : "disabled; enable resource_pack.host.enabled in config.yml"));
+            sender.sendMessage("Hosted URL: " + (VoxelCore.getInstance().getPlayerResourcePackService() == null
+                    ? "unavailable" : VoxelCore.getInstance().getPlayerResourcePackService().configuredPackUrl()));
             sender.sendMessage("Known targets: " + knownTargets());
         }
     }
@@ -129,6 +134,17 @@ public final class PackCommand implements SubCommand {
                                 + target.id() + ": " + failure.getMessage()));
                         return;
                     }
+                    JavaPackTarget serverTarget = plugin.getPackManager().currentTarget();
+                    final boolean currentServerTarget = serverTarget != null && serverTarget.id().equals(target.id());
+                    String hostPublishError = null;
+                    if (currentServerTarget) {
+                        try {
+                            plugin.getResourcePackHost().publish(output.output());
+                        } catch (Exception failure) {
+                            hostPublishError = failure.getMessage();
+                        }
+                    }
+                    final String publishError = hostPublishError;
 
                     ContentDefinitions candidate = null;
                     String loadError = null;
@@ -143,6 +159,16 @@ public final class PackCommand implements SubCommand {
                         sender.sendMessage("VoxelCore pack built for " + target.id() + ": " + output.output()
                                 + " (" + output.renderedItems() + " rendered items, " + output.renderedBlocks()
                                 + " rendered blocks, " + output.copiedAssets() + " authored assets)");
+                        if (!currentServerTarget) {
+                            sender.sendMessage("This target differs from the running server version; it was not published to players.");
+                        } else if (publishError != null) {
+                            sender.sendMessage("Pack built, but self-hosted pack file was not updated: " + publishError);
+                        } else {
+                            sender.sendMessage("Updated self-hosted pack file: " + plugin.getResourcePackHost().hostedPack());
+                        }
+                        if (currentServerTarget && publishError == null && plugin.getResourcePackHost().isRunning()) {
+                            plugin.getPlayerResourcePackService().sendUpdatedPackToOnlinePlayers();
+                        }
                         if (prepared == null) {
                             sender.sendMessage("Pack built, but live content reload failed; revision "
                                     + plugin.getContentRuntime().current().revision()
