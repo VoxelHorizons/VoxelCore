@@ -67,6 +67,16 @@ public final class UiGlyphLoader {
                         + codePoint(previous.intValue()) + " to " + codePoint(glyph.explicitCodePoint.intValue()));
             }
             Integer allocated = glyph.explicitCodePoint == null ? previous : glyph.explicitCodePoint;
+            // Recover manifests written by older versions that assigned a newly added glyph
+            // a codepoint already tombstoned by a glyph removed in the same load.
+            if (allocated != null && glyph.explicitCodePoint == null) {
+                for (Map.Entry<ContentID, Integer> reserved : inactive.entrySet()) {
+                    if (!reserved.getKey().equals(id) && reserved.getValue().equals(allocated)) {
+                        allocated = null;
+                        break;
+                    }
+                }
+            }
             if (allocated != null) {
                 requirePrivateUse(allocated.intValue(), id);
                 if (authoredSymbols.contains(allocated)) {
