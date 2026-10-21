@@ -591,6 +591,22 @@ The MVP compiler intentionally exposes exact validated profiles instead of prete
 
 Minecraft 26.2 and 26.3 use modern `min_format`/`max_format` pack metadata. Earlier targets retain the legacy `pack_format` field.
 
+### Self-hosted delivery
+
+VoxelCore can optionally serve the latest successfully built pack at `http://<public-host>:24464/resourcepack.zip`.
+Enable `resource_pack.host.enabled`, allow the configured port through the machine and network firewalls, and set
+`resource_pack.host.public_host` to the address clients can reach. `public_url` can instead point to a TLS reverse
+proxy base URL. The host exposes only the pack endpoint, supports GET/HEAD, and replaces the served ZIP atomically.
+If a pack already exists for the current target, it is made available after startup. Every successful pack build
+updates the hosted copy and, when enabled, sends the new pack to online players.
+
+Player delivery is controlled separately with `resource_pack.players.send_on_join` and `send_on_build`. Set
+`required: true` to kick players who decline the pack or encounter a download/reload failure, and configure
+`prompt` and `failure_kick_message` for client-facing text. VoxelCore sends the pack SHA-1 on API versions that
+support it; custom prompts are passed on server APIs that expose them. A public address is required for clients
+outside the server machine; when `public_host` and `public_url` are both blank, the server's configured `server-ip`
+is used if available.
+
 Pack output is deterministic and stored below:
 
 ```text
