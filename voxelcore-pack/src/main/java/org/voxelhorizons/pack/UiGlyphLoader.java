@@ -50,6 +50,15 @@ public final class UiGlyphLoader {
         List<ContentID> ids = new ArrayList<ContentID>(raw.keySet());
         Collections.sort(ids, byId());
 
+        // Retire disappeared allocations before assigning symbols to newly added glyphs.
+        // Otherwise a new glyph can receive the codepoint of a glyph removed in this same
+        // load, creating an active/inactive collision that makes the next build fail.
+        Set<ContentID> currentIds = new HashSet<ContentID>(ids);
+        Map<ContentID, Integer> inactive = new LinkedHashMap<ContentID, Integer>(state.inactive);
+        for (Map.Entry<ContentID, Integer> old : state.active.entrySet()) {
+            if (!currentIds.contains(old.getKey())) inactive.put(old.getKey(), old.getValue());
+        }
+
         for (ContentID id : ids) {
             RawGlyph glyph = raw.get(id);
             Integer previous = state.active.containsKey(id) ? state.active.get(id) : state.inactive.get(id);
@@ -64,7 +73,7 @@ public final class UiGlyphLoader {
                     throw new ContentLoadException("UI glyph " + id + " symbol "
                             + codePoint(allocated.intValue()) + " is reserved by an authored font");
                 }
-                for (Map.Entry<ContentID, Integer> reserved : state.inactive.entrySet()) {
+                for (Map.Entry<ContentID, Integer> reserved : inactive.entrySet()) {
                     if (!reserved.getKey().equals(id) && reserved.getValue().equals(allocated)) {
                         throw new ContentLoadException("UI glyph codepoint " + codePoint(allocated.intValue())
                                 + " is reserved by inactive glyph " + reserved.getKey());
@@ -79,16 +88,12 @@ public final class UiGlyphLoader {
             if (active.containsKey(id)) continue;
             int value = FIRST_CODE_POINT;
             while (value <= LAST_CODE_POINT && (used.contains(Integer.valueOf(value))
-                    || state.inactive.containsValue(Integer.valueOf(value)))) value++;
+                    || inactive.containsValue(Integer.valueOf(value)))) value++;
             if (value > LAST_CODE_POINT) throw new ContentLoadException("No private-use Unicode codepoints remain for UI glyph " + id);
             active.put(id, Integer.valueOf(value));
             used.add(Integer.valueOf(value));
         }
 
-        Map<ContentID, Integer> inactive = new LinkedHashMap<ContentID, Integer>(state.inactive);
-        for (Map.Entry<ContentID, Integer> old : state.active.entrySet()) {
-            if (!active.containsKey(old.getKey())) inactive.put(old.getKey(), old.getValue());
-        }
         for (ContentID id : active.keySet()) inactive.remove(id);
 
         Map<ContentID, UiGlyphDefinition> resolved = new LinkedHashMap<ContentID, UiGlyphDefinition>();
