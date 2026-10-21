@@ -92,6 +92,26 @@ public class JavaPackAuthoredAssetsTest {
     }
 
     @Test
+    public void acceptsEscapedSlashesInFontJsonOnMinecraft263() throws Exception {
+        File contentRoot = temporaryFolder.newFolder("escaped-slash-font-content");
+        File pack = new File(contentRoot, "voxel");
+        assertTrue(new File(pack, "content").mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
+        write(new File(pack, "assets/minecraft/font/default.json"),
+                "{\"providers\":[{\"type\":\"bitmap\",\"file\":\"minecraft:gui\\/sprites\\/container\\/brewing_stand.png\","
+                        + "\"height\":8,\"ascent\":8,\"chars\":[\"\\uEF00\"]}]}\n");
+
+        Path build = temporaryFolder.newFolder("escaped-slash-font-build").toPath();
+        Path output = build.resolve("pack.zip");
+        new JavaPackCompiler().compile(contentRoot.toPath(), output,
+                build.resolve("render-allocations.yml"), JavaPackTarget.MC_26_3);
+
+        String defaultFont = zipText(output, "assets/minecraft/font/default.json");
+        assertTrue(defaultFont.contains("minecraft:gui/sprites/container/brewing_stand.png"));
+        assertTrue(defaultFont.contains("\\uEF00"));
+    }
+
+    @Test
     public void rejectsUiSymbolsReservedByAuthoredFonts() throws Exception {
         File contentRoot = temporaryFolder.newFolder("font-collision-content");
         File pack = new File(contentRoot, "voxel");
