@@ -1,11 +1,12 @@
 package org.voxelhorizons.pack;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 import org.voxelhorizons.content.pack.ContentPack;
-import org.voxelhorizons.content.pack.ContentPackDiscovery;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -90,10 +91,8 @@ final class AuthoredFontSupport {
 
     private static Map<String, Object> parse(byte[] bytes, String source) {
         Object loaded;
-        try (InputStream input = new ByteArrayInputStream(bytes)) {
-            loaded = ContentPackDiscovery.yaml().load(input);
-        } catch (IOException impossible) {
-            throw new AssertionError(impossible);
+        try {
+            loaded = fromJson(JsonParser.parseString(new String(bytes, StandardCharsets.UTF_8)));
         } catch (RuntimeException exception) {
             throw new JavaPackCompileException("Invalid font JSON in " + source + ": " + exception.getMessage(), exception);
         }
@@ -107,6 +106,28 @@ final class AuthoredFontSupport {
         }
         providers(result, source);
         return result;
+    }
+
+    private static Object fromJson(JsonElement element) {
+        if (element == null || element.isJsonNull()) return null;
+        if (element.isJsonObject()) {
+            Map<String, Object> result = new LinkedHashMap<String, Object>();
+            JsonObject object = element.getAsJsonObject();
+            for (Map.Entry<String, JsonElement> entry : object.entrySet()) {
+                result.put(entry.getKey(), fromJson(entry.getValue()));
+            }
+            return result;
+        }
+        if (element.isJsonArray()) {
+            List<Object> result = new ArrayList<Object>();
+            JsonArray array = element.getAsJsonArray();
+            for (JsonElement value : array) result.add(fromJson(value));
+            return result;
+        }
+        JsonPrimitive primitive = element.getAsJsonPrimitive();
+        if (primitive.isBoolean()) return Boolean.valueOf(primitive.getAsBoolean());
+        if (primitive.isNumber()) return primitive.getAsNumber();
+        return primitive.getAsString();
     }
 
     private static List<Object> providers(Map<String, Object> root, String source) {
