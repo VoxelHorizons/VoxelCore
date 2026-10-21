@@ -1,6 +1,8 @@
 package org.voxelhorizons.command.commands;
 
+import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.voxelhorizons.VoxelCore;
 import org.voxelhorizons.command.SubCommand;
 import org.voxelhorizons.content.runtime.ContentReloadResult;
@@ -8,12 +10,16 @@ import org.voxelhorizons.content.load.ContentDefinitions;
 import org.voxelhorizons.pack.JavaPackBuildResult;
 import org.voxelhorizons.pack.JavaPackTarget;
 import org.voxelhorizons.pack.PackManager;
+import org.voxelhorizons.pack.ResourcePackHost;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.security.MessageDigest;
 import java.util.logging.Level;
 
 public final class PackCommand implements SubCommand {
@@ -21,6 +27,8 @@ public final class PackCommand implements SubCommand {
 
     public PackCommand() {
         register(new InfoCommand());
+        register(new HostCommand());
+        register(new SendCommand());
         register(new ValidateCommand());
         register(new BuildCommand());
     }
@@ -36,7 +44,7 @@ public final class PackCommand implements SubCommand {
     @Override public boolean playerOnly() { return false; }
     @Override public Map<String, SubCommand> getChildren() { return children; }
     @Override public void execute(CommandSender sender, String[] args) {
-        sender.sendMessage("Usage: /voxelcore admin pack <info|validate|build> [target]");
+        sender.sendMessage("Usage: /voxelcore admin pack <info|host|send|validate|build> [player|target]");
     }
 
     private static JavaPackTarget target(CommandSender sender, String[] args) {
@@ -79,7 +87,153 @@ public final class PackCommand implements SubCommand {
                     : "disabled; enable resource_pack.host.enabled in config.yml"));
             sender.sendMessage("Hosted URL: " + (VoxelCore.getInstance().getPlayerResourcePackService() == null
                     ? "unavailable" : VoxelCore.getInstance().getPlayerResourcePackService().configuredPackUrl()));
+            sender.sendMessage("Hosted file: " + VoxelCore.getInstance().getResourcePackHost().hostedPack()
+                    + " (" + hostedFileSize(VoxelCore.getInstance().getResourcePackHost()) + " bytes; SHA-1 "
+                    + VoxelCore.getInstance().getResourcePackHost().sha1Hex() + ")");
             sender.sendMessage("Known targets: " + knownTargets());
+        }
+    }
+
+    private static String hostedFileSize(ResourcePackHost host) {
+        try {
+            long size = host.hostedPackSize();
+            return size < 0 ? "missing" : Long.toString(size);
+        } catch (Exception failure) {
+            return "unavailable: " + failure.getMessage();
+        }
+    }
+
+    private static final class HostCommand implements SubCommand {
+        @Override public String getName() { return "host"; }
+        @Override public List<String> getAliases() { return Collections.emptyList(); }
+        @Override public String getPermission() { return "voxelcore.admin.pack.host"; }
+        @Override public boolean playerOnly() { return false; }
+
+        @Override public void execute(CommandSender sender, String[] args) {
+            VoxelCore plugin = VoxelCore.getInstance();
+            ResourcePackHost host = plugin.getResourcePackHost();
+            sender.sendMessage("Resource-pack host: " + (host.isRunning() ? "RUNNING" : "STOPPED"));
+            sender.sendMessage("Configured bind: " + plugin.getConfig().getString("resource_pack.host.bind_address", "0.0.0.0")
+                    + ":" + plugin.getConfig().getInt("resource_pack.host.port", 24464)
+                    + "; active socket: " + (host.isRunning() ? host.bindAddress() + ":" + host.port() : "none"));
+            sender.sendMessage("Advertised URL: " + plugin.getPlayerResourcePackService().configuredPackUrl());
+            sender.sendMessage("Pack file: " + host.hostedPack() + "; bytes=" + hostedFileSize(host)
+                    + "; SHA-1=" + host.sha1Hex());
+            if (args.length == 0 || "status".equalsIgnoreCase(args[0])) {
+                sender.sendMessage("Run /vc admin pack host test to download the pack through the local listener.");
+                return;
+            }
+            if (!"test".equalsIgnoreCase(args[0])) {
+                sender.sendMessage("Usage: /vc admin pack host [status|test]");
+                return;
+            }
+            testLocalHost(sender, plugin, host);
+        }
+
+        private void testLocalHost(CommandSender sender, VoxelCore plugin, ResourcePackHost host) {
+            if (!host.isRunning()) {
+                sender.sendMessage("Local HTTP test failed: host is stopped. See startup log for the bind error.");
+                return;
+            }
+            if (host.sha1() == null) {
+                sender.sendMessage("Local HTTP test failed: no pack is published. Run /vc admin pack build.");
+                return;
+            }
+            String bind = host.bindAddress();
+            String connectHost = bind == null || bind.isEmpty() || "0.0.0.0".equals(bind) || "::".equals(bind)
+                    ? "127.0.0.1" : bind;
+            if (connectHost.contains(":" ) && !connectHost.startsWith("[")) connectHost = "[" + connectHost + "]";
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL("http://" + connectHost + ":" + host.port() + ResourcePackHost.RESOURCE_PATH);
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setConnectTimeout(3000);
+                connection.setReadTimeout(10000);
+                connection.setRequestMethod("GET");
+                int status = connection.getResponseCode();
+                if (status != 200) {
+                    sender.sendMessage("Local HTTP test failed: GET " + url + " returned HTTP " + status);
+                    return;
+                }
+                MessageDigest digest = MessageDigest.getInstance("SHA-1");
+                long bytes = 0;
+                try (java.io.InputStream input = connection.getInputStream()) {
+                    byte[] buffer = new byte[16384];
+                    int count;
+                    while ((count = input.read(buffer)) != -1) {
+                        digest.update(buffer, 0, count);
+                        bytes += count;
+                    }
+                }
+                String actualHash = toHex(digest.digest());
+                boolean matches = actualHash.equals(host.sha1Hex());
+                sender.sendMessage("Local HTTP test " + (matches ? "PASSED" : "FAILED") + ": GET " + url
+                        + " returned HTTP 200, downloaded " + bytes + " bytes; SHA-1 "
+                        + (matches ? "matches" : "does not match the published pack"));
+                if (!matches) plugin.getLogger().warning("Local resource-pack HTTP test returned SHA-1 " + actualHash
+                        + " but current hosted SHA-1 is " + host.sha1Hex());
+            } catch (Exception failure) {
+                sender.sendMessage("Local HTTP test failed: " + failure.getClass().getSimpleName() + ": " + failure.getMessage());
+                plugin.getLogger().log(Level.WARNING, "Local resource-pack HTTP self-test failed", failure);
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        }
+
+        private static String toHex(byte[] bytes) {
+            StringBuilder out = new StringBuilder(bytes.length * 2);
+            for (byte value : bytes) out.append(String.format(java.util.Locale.ROOT, "%02x", value & 0xff));
+            return out.toString();
+        }
+    }
+
+    private static final class SendCommand implements SubCommand {
+        @Override public String getName() { return "send"; }
+        @Override public List<String> getAliases() { return Collections.singletonList("push"); }
+        @Override public String getPermission() { return "voxelcore.admin.pack.send"; }
+        @Override public boolean playerOnly() { return false; }
+
+        @Override public List<String> onTabComplete(CommandSender sender, String[] args) {
+            if (args.length != 1) return Collections.emptyList();
+            String prefix = args[0].toLowerCase(java.util.Locale.ROOT);
+            java.util.ArrayList<String> names = new java.util.ArrayList<String>();
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                if (player.getName().toLowerCase(java.util.Locale.ROOT).startsWith(prefix)) names.add(player.getName());
+            }
+            Collections.sort(names, String.CASE_INSENSITIVE_ORDER);
+            return names;
+        }
+
+        @Override public void execute(CommandSender sender, String[] args) {
+            if (args.length != 1) {
+                sender.sendMessage("Usage: /voxelcore admin pack send <online-player>");
+                return;
+            }
+            Player target = Bukkit.getPlayerExact(args[0]);
+            if (target == null) {
+                sender.sendMessage("Player '" + args[0] + "' is not online. Player pack requests can only be sent to online players.");
+                return;
+            }
+            VoxelCore plugin = VoxelCore.getInstance();
+            ResourcePackHost host = plugin.getResourcePackHost();
+            if (!host.isRunning()) {
+                sender.sendMessage("Pack not sent: resource-pack HTTP host is stopped. Check /vc admin pack host and startup logs.");
+                return;
+            }
+            if (host.sha1() == null) {
+                sender.sendMessage("Pack not sent: no pack is published. Run /vc admin pack build first.");
+                return;
+            }
+            if (plugin.getPlayerResourcePackService().configuredPackUrl() == null) {
+                sender.sendMessage("Pack not sent: configure resource_pack.host.public_url or public_host to an address the player can reach.");
+                return;
+            }
+            if (plugin.getPlayerResourcePackService().send(target)) {
+                sender.sendMessage("Sent the current resource-pack request to " + target.getName()
+                        + ". This confirms the request was issued; check the host request log for the player's download connection.");
+            } else {
+                sender.sendMessage("Pack request failed for " + target.getName() + ". See the server log for details.");
+            }
         }
     }
 
