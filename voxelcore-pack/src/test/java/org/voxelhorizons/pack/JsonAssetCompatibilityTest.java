@@ -40,7 +40,7 @@ public class JsonAssetCompatibilityTest {
             fail("Expected incompatible duplicate translation key to fail");
         } catch (JavaPackCompileException expected) {
             assertTrue(expected.getMessage().contains("assets/minecraft/lang/af_za.json"));
-            assertTrue(expected.getMessage().contains("$.menu.play"));
+            assertTrue(expected.getMessage().contains("$['menu.play']"));
         }
     }
 
@@ -51,7 +51,7 @@ public class JsonAssetCompatibilityTest {
                     bytes("{}"), "assets/minecraft/lang/af_za.json");
             fail("Expected duplicate input key to fail");
         } catch (JavaPackCompileException expected) {
-            assertTrue(expected.getMessage().contains("duplicate key $.menu.play"));
+            assertTrue(expected.getMessage().contains("duplicate key $['menu.play']"));
         }
     }
 
