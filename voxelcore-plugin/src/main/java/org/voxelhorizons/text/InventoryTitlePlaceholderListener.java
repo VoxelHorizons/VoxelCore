@@ -16,6 +16,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * Resolves VoxelCore UI placeholders in inventory titles created by VoxelCore or third-party plugins.
@@ -155,7 +156,7 @@ public final class InventoryTitlePlaceholderListener implements Listener {
             }
             if (original == null) return false;
 
-            Object resolved = resolveComponentTitle(original, paper);
+            Object resolved = resolveComponentTitle(original, paper, this::resolveTitle);
             if (resolved == original) {
                 // A placeholder split across components is not yet supported by the rich path;
                 // retain the legacy fallback rather than leaving unresolved aliases on-screen.
@@ -175,7 +176,8 @@ public final class InventoryTitlePlaceholderListener implements Listener {
      * emitted by the VoxelCore glyph resolver are interpreted only in the replacement leaf.
      * Its style is inherited from the original text node unless a colour code overrides it.
      */
-    private Object resolveComponentTitle(Object component, PaperTitleOverrideSupport paper)
+    private static Object resolveComponentTitle(Object component, PaperTitleOverrideSupport paper,
+                                                Function<String, String> resolver)
             throws InvocationTargetException, IllegalAccessException {
         List<?> existingChildren = (List<?>) paper.childrenMethod.invoke(component);
         List<Object> newChildren = new ArrayList<Object>(existingChildren.size() + 1);
@@ -184,7 +186,7 @@ public final class InventoryTitlePlaceholderListener implements Listener {
 
         if (paper.textComponentClass.isInstance(component)) {
             String original = (String) paper.contentMethod.invoke(component);
-            String resolved = resolveTitle(original);
+            String resolved = resolver.apply(original);
             if (resolved != null && !resolved.equals(original)) {
                 rewritten = paper.withContentMethod.invoke(component, "");
                 newChildren.add(paper.legacyDeserializeMethod.invoke(paper.serializer, resolved));
@@ -193,7 +195,7 @@ public final class InventoryTitlePlaceholderListener implements Listener {
         }
 
         for (Object child : existingChildren) {
-            Object replacement = resolveComponentTitle(child, paper);
+            Object replacement = resolveComponentTitle(child, paper, resolver);
             newChildren.add(replacement);
             if (replacement != child) changed = true;
         }
