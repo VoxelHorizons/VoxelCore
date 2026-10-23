@@ -14,6 +14,9 @@ import org.bukkit.plugin.Plugin;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Function;
 
 /**
  * Resolves VoxelCore UI placeholders in inventory titles created by VoxelCore or third-party plugins.
@@ -31,9 +34,8 @@ public final class InventoryTitlePlaceholderListener implements Listener {
     private volatile String singleChestTitle;
     private volatile String doubleChestTitle;
 
-    private final Method titleOverrideMethod;
-    private final Object legacySectionSerializer;
-    private final Method legacyDeserializeMethod;
+    /** Modern Paper bridge is discovered at runtime to retain 1.12 binary compatibility. */
+    private final PaperTitleOverrideSupport paperTitleSupport;
     private boolean warnedUnavailable;
     private boolean warnedFailure;
 
@@ -52,10 +54,7 @@ public final class InventoryTitlePlaceholderListener implements Listener {
         updateChestTitles(chestTitlesEnabled, singleChestTitle, doubleChestTitle);
         this.setTitleMethod = findSetTitleMethod();
 
-        PaperTitleOverrideSupport paper = findPaperTitleOverrideSupport();
-        this.titleOverrideMethod = paper == null ? null : paper.titleOverrideMethod;
-        this.legacySectionSerializer = paper == null ? null : paper.serializer;
-        this.legacyDeserializeMethod = paper == null ? null : paper.deserializeMethod;
+        this.paperTitleSupport = findPaperTitleOverrideSupport();
     }
 
     public void updateChestTitles(boolean enabled, String singleTitle, String doubleTitle) {
@@ -81,7 +80,7 @@ public final class InventoryTitlePlaceholderListener implements Listener {
 
         // Paper 1.20.2+ exposes InventoryOpenEvent#titleOverride(Component). This value is used
         // in the initial open-screen packet, so the client never renders the original title first.
-        if (applyInitialTitleOverride(event, resolvedTitle)) return;
+        if (applyInitialTitleOverride(event, configuredChestTitle, resolvedTitle)) return;
 
         // Older Bukkit/Paper versions have no pre-open title override. Retain the legacy
         // one-tick setTitle fallback for compatibility, accepting that those versions may flash.
@@ -130,18 +129,79 @@ public final class InventoryTitlePlaceholderListener implements Listener {
         return configured == null || configured.isEmpty() ? null : configured;
     }
 
-    private boolean applyInitialTitleOverride(InventoryOpenEvent event, String title) {
-        if (titleOverrideMethod == null || legacySectionSerializer == null || legacyDeserializeMethod == null) {
-            return false;
-        }
+    /**
+     * On modern Paper, preserve the rich title tree supplied by a menu plugin. Deserializing
+     * InventoryView#getTitle() loses Adventure fonts (and click/hover/decorations), even if the
+     * text itself is unchanged. Resolve placeholders inside text leaves instead.
+     *
+     * Physical chest title templates deliberately originate as legacy strings and can be
+     * deserialized safely because there is no existing rich title to preserve.
+     */
+    private boolean applyInitialTitleOverride(InventoryOpenEvent event, String configuredChestTitle,
+                                              String resolvedLegacyTitle) {
+        PaperTitleOverrideSupport paper = paperTitleSupport;
+        if (paper == null) return false;
         try {
-            Object component = legacyDeserializeMethod.invoke(legacySectionSerializer, title);
-            titleOverrideMethod.invoke(event, component);
+            if (configuredChestTitle != null) {
+                Object component = paper.legacyDeserializeMethod.invoke(paper.serializer, resolvedLegacyTitle);
+                paper.titleOverrideMethod.invoke(event, component);
+                return true;
+            }
+
+            // A prior listener's title override has precedence over the view's original title.
+            Object original = paper.currentOverrideMethod == null ? null
+                    : paper.currentOverrideMethod.invoke(event);
+            if (original == null && paper.viewTitleMethod != null) {
+                original = paper.viewTitleMethod.invoke(event.getView());
+            }
+            if (original == null) return false;
+
+            Object resolved = resolveComponentTitle(original, paper, this::resolveTitle);
+            if (resolved == original) {
+                // A placeholder split across components is not yet supported by the rich path;
+                // retain the legacy fallback rather than leaving unresolved aliases on-screen.
+                return false;
+            }
+            paper.titleOverrideMethod.invoke(event, resolved);
             return true;
         } catch (IllegalAccessException | InvocationTargetException | IllegalArgumentException exception) {
             warnFailureOnce(exception);
             return false;
         }
+    }
+
+    /**
+     * Rewrites text nodes without flattening Adventure components. Existing parents, fonts,
+     * decorations, event metadata and sibling components are retained. Legacy colour codes
+     * emitted by the VoxelCore glyph resolver are interpreted only in the replacement leaf.
+     * Its style is inherited from the original text node unless a colour code overrides it.
+     */
+    private static Object resolveComponentTitle(Object component, PaperTitleOverrideSupport paper,
+                                                Function<String, String> resolver)
+            throws InvocationTargetException, IllegalAccessException {
+        List<?> existingChildren = (List<?>) paper.childrenMethod.invoke(component);
+        List<Object> newChildren = new ArrayList<Object>(existingChildren.size() + 1);
+        Object rewritten = component;
+        boolean changed = false;
+
+        if (paper.textComponentClass.isInstance(component)) {
+            String original = (String) paper.contentMethod.invoke(component);
+            String resolved = resolver.apply(original);
+            if (resolved != null && !resolved.equals(original)) {
+                rewritten = paper.withContentMethod.invoke(component, "");
+                newChildren.add(paper.legacyDeserializeMethod.invoke(paper.serializer, resolved));
+                changed = true;
+            }
+        }
+
+        for (Object child : existingChildren) {
+            Object replacement = resolveComponentTitle(child, paper, resolver);
+            newChildren.add(replacement);
+            if (replacement != child) changed = true;
+        }
+
+        if (!changed) return component;
+        return paper.withChildrenMethod.invoke(rewritten, newChildren);
     }
 
     private static boolean sameInventory(Inventory current, Inventory opened) {
@@ -151,12 +211,21 @@ public final class InventoryTitlePlaceholderListener implements Listener {
     private static PaperTitleOverrideSupport findPaperTitleOverrideSupport() {
         try {
             Class<?> componentType = Class.forName("net.kyori.adventure.text.Component");
+            Class<?> textComponentType = Class.forName("net.kyori.adventure.text.TextComponent");
             Method override = InventoryOpenEvent.class.getMethod("titleOverride", componentType);
+            Method currentOverride = InventoryOpenEvent.class.getMethod("titleOverride");
+            Method viewTitle = InventoryView.class.getMethod("title");
+            Method children = componentType.getMethod("children");
+            Method withChildren = componentType.getMethod("children", List.class);
+            Method content = textComponentType.getMethod("content");
+            Method withContent = textComponentType.getMethod("content", String.class);
             Class<?> serializerType = Class.forName(
                     "net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer");
             Object serializer = serializerType.getMethod("legacySection").invoke(null);
             Method deserialize = serializerType.getMethod("deserialize", String.class);
-            return new PaperTitleOverrideSupport(override, serializer, deserialize);
+            return new PaperTitleOverrideSupport(override, currentOverride, viewTitle,
+                    textComponentType, children, withChildren, content, withContent,
+                    serializer, deserialize);
         } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException
                  | InvocationTargetException ignored) {
             return null;
@@ -180,13 +249,31 @@ public final class InventoryTitlePlaceholderListener implements Listener {
 
     private static final class PaperTitleOverrideSupport {
         private final Method titleOverrideMethod;
+        private final Method currentOverrideMethod;
+        private final Method viewTitleMethod;
+        private final Class<?> textComponentClass;
+        private final Method childrenMethod;
+        private final Method withChildrenMethod;
+        private final Method contentMethod;
+        private final Method withContentMethod;
         private final Object serializer;
-        private final Method deserializeMethod;
+        private final Method legacyDeserializeMethod;
 
-        private PaperTitleOverrideSupport(Method titleOverrideMethod, Object serializer, Method deserializeMethod) {
+        private PaperTitleOverrideSupport(Method titleOverrideMethod, Method currentOverrideMethod,
+                                          Method viewTitleMethod, Class<?> textComponentClass,
+                                          Method childrenMethod, Method withChildrenMethod,
+                                          Method contentMethod, Method withContentMethod,
+                                          Object serializer, Method legacyDeserializeMethod) {
             this.titleOverrideMethod = titleOverrideMethod;
+            this.currentOverrideMethod = currentOverrideMethod;
+            this.viewTitleMethod = viewTitleMethod;
+            this.textComponentClass = textComponentClass;
+            this.childrenMethod = childrenMethod;
+            this.withChildrenMethod = withChildrenMethod;
+            this.contentMethod = contentMethod;
+            this.withContentMethod = withContentMethod;
             this.serializer = serializer;
-            this.deserializeMethod = deserializeMethod;
+            this.legacyDeserializeMethod = legacyDeserializeMethod;
         }
     }
 
