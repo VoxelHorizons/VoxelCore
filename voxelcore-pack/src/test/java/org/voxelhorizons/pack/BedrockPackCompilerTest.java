@@ -62,6 +62,69 @@ public class BedrockPackCompilerTest {
         try { new BedrockPackCompiler().compile(root,temp.newFolder().toPath()); fail(); }
         catch(java.io.IOException expected) { assertTrue(expected.getMessage().contains("generated")); }
     }
+    @Test public void generatedLongItemIdentifiersUseShortUniqueValidBedrockPaths() throws Exception {
+        Path root = fixture(), out = temp.newFolder().toPath();
+        Path definitions = root.resolve("demo/content/items.yml");
+        String prefix = new String(Files.readAllBytes(definitions), StandardCharsets.UTF_8);
+        String[] names = {
+                "furniture_stripped_dark_oak_chair_corner_outer_left_variant",
+                "furniture_stripped_dark_oak_log_wall_shelf_single_extended"
+        };
+        for (int i = 0; i < names.length; i++) {
+            prefix += "  " + names[i] + ":\\n    material: minecraft:paper\\n"
+                    + "    render:\\n      model: demo:item/model" + i + "\\n"
+                    + "    properties:\\n      bedrock:\\n        texture: demo:item/token\\n";
+        }
+        write(definitions, prefix);
+        BedrockPackCompiler.Result built = new BedrockPackCompiler().compile(root, out);
+        assertEquals(3, built.mappedItems);
+        JsonObject mappings = JsonParser.parseString(new String(
+                Files.readAllBytes(built.directory.resolve("voxelcore-items.json")), StandardCharsets.UTF_8))
+                .getAsJsonObject();
+        JsonObject atlas;
+        java.util.Set<String> identifiers = new java.util.HashSet<String>();
+        try (ZipFile zip = new ZipFile(built.directory.resolve("voxelcore.mcpack").toFile())) {
+            java.util.Enumeration<? extends java.util.zip.ZipEntry> files = zip.entries();
+            while (files.hasMoreElements()) {
+                String path = files.nextElement().getName();
+                assertTrue("Bedrock has >=80 byte path: " + path,
+                        path.getBytes(StandardCharsets.UTF_8).length < 80);
+            }
+            java.util.zip.ZipEntry entry = zip.getEntry("textures/item_texture.json");
+            assertNotNull(entry);
+            try (java.io.InputStream input = zip.getInputStream(entry)) {
+                java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+                byte[] chunk = new byte[4096]; int n;
+                while ((n = input.read(chunk)) != -1) buffer.write(chunk, 0, n);
+                atlas = JsonParser.parseString(new String(buffer.toByteArray(), StandardCharsets.UTF_8))
+                        .getAsJsonObject().getAsJsonObject("texture_data");
+            }
+            for (JsonElement element : mappings.getAsJsonObject("items").getAsJsonArray("minecraft:paper")) {
+                JsonObject def = element.getAsJsonObject();
+                String id = def.get("bedrock_identifier").getAsString();
+                assertTrue("duplicate identifier " + id, identifiers.add(id));
+                assertTrue(id.length() <= 48);
+                String icon = def.getAsJsonObject("bedrock_options").get("icon").getAsString();
+                String texturePath = atlas.getAsJsonObject(icon).get("textures").getAsString() + ".png";
+                assertNotNull("Missing generated texture: " + texturePath, zip.getEntry(texturePath));
+            }
+        }
+        assertEquals(3, identifiers.size());
+        assertEquals(built.revision, new BedrockPackCompiler().compile(root, out).revision);
+    }
+    @Test public void rejectsLongAuthoredBedrockPathsRatherThanSilentlyBreakingReferences() throws Exception {
+        Path root = fixture();
+        String longName = new String(new char[75]).replace('\\0', 'x');
+        String path = "ui/" + longName + ".json";
+        write(root.resolve("demo/bedrock/resource_pack/" + path), "{}");
+        try {
+            new BedrockPackCompiler().compile(root, temp.newFolder().toPath());
+            fail("Long authored file path must be rejected");
+        } catch (java.io.IOException expected) {
+            assertTrue(expected.getMessage().contains("maximum 79"));
+            assertTrue(expected.getMessage().contains(path));
+        }
+    }
     @Test public void automaticallyPublishesToLoadedLocalGeyserDirectory() throws Exception {
         Path root = fixture(), out = temp.newFolder().toPath();
         Path actualGeyser = temp.newFolder("Geyser-Spigot").toPath();
