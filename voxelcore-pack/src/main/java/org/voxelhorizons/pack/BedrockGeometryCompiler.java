@@ -195,11 +195,38 @@ final class BedrockGeometryCompiler {
         attachRoot.addProperty("format_version","1.10.0");
         attachRoot.add("minecraft:attachable",attach);
 
+        // Java ITEM_DISPLAY has no Bedrock equivalent. Declare a separate
+        // native Bedrock client entity using the same geometry and face atlas;
+        // the Geyser extension must register the exact identifier at startup
+        // and replace a known Paper display spawn (never every item display).
+        String visualEntityId = "voxelcore:entity_" + shortId;
+        JsonObject entityDescription = new JsonObject();
+        entityDescription.addProperty("identifier", visualEntityId);
+        JsonObject entityMaterials = new JsonObject();
+        entityMaterials.addProperty("default", "entity_alphatest");
+        entityDescription.add("materials", entityMaterials);
+        JsonObject entityTextures = new JsonObject();
+        entityTextures.addProperty("default", "textures/voxelcore/g_" + shortId);
+        entityDescription.add("textures", entityTextures);
+        JsonObject entityShape = new JsonObject();
+        entityShape.addProperty("default", geometryId);
+        entityDescription.add("geometry", entityShape);
+        JsonArray entityControllers = new JsonArray();
+        entityControllers.add("controller.render.default");
+        entityDescription.add("render_controllers", entityControllers);
+        JsonObject clientEntity = new JsonObject();
+        clientEntity.add("description", entityDescription);
+        JsonObject clientEntityRoot = new JsonObject();
+        clientEntityRoot.addProperty("format_version", "1.10.0");
+        clientEntityRoot.add("minecraft:client_entity", clientEntity);
+
         ByteArrayOutputStream png = new ByteArrayOutputStream();
         if (!ImageIO.write(atlas,"png",png)) throw new IOException("PNG encoder missing");
         Map<String,byte[]> assets = new TreeMap<String,byte[]>();
         assets.put("models/entity/voxelcore/"+shortId+".geo.json",JSON.toJson(geoRoot).getBytes(StandardCharsets.UTF_8));
         assets.put("attachables/"+shortId+".json",JSON.toJson(attachRoot).getBytes(StandardCharsets.UTF_8));
+        assets.put("entity/voxelcore/"+shortId+".entity.json",
+                JSON.toJson(clientEntityRoot).getBytes(StandardCharsets.UTF_8));
         assets.put("textures/voxelcore/g_"+shortId+".png",png.toByteArray());
         return new Output(assets,cubes.size());
     }
