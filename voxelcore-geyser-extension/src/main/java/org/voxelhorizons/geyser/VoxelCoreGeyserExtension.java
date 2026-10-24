@@ -1,6 +1,9 @@
 package org.voxelhorizons.geyser;
 
 import org.geysermc.event.subscribe.Subscribe;
+import org.geysermc.geyser.api.command.Command;
+import org.geysermc.geyser.api.command.CommandSource;
+import org.geysermc.geyser.api.event.lifecycle.GeyserDefineCommandsEvent;
 import org.geysermc.geyser.api.event.lifecycle.GeyserDefineResourcePacksEvent;
 import org.geysermc.geyser.api.event.lifecycle.GeyserPostInitializeEvent;
 import org.geysermc.geyser.api.extension.Extension;
@@ -17,6 +20,25 @@ public final class VoxelCoreGeyserExtension implements Extension {
         report("resource pack registration phase");
         logger().info("Geyser currently has " + event.resourcePacks().size()
                 + " registered packs; VoxelCore uses the normal packs/ scan.");
+    }
+
+    @Subscribe
+    public void onDefineCommands(GeyserDefineCommandsEvent event) {
+        event.register(Command.builder(this)
+                .name("status")
+                .description("Inspect VoxelCore's Geyser pack and mapping revision on disk")
+                .source(CommandSource.class)
+                .playerOnly(false)
+                .suggestedOpOnly(true)
+                .permission("voxelcore.geyser.status")
+                .executor((source, command, args) -> {
+                    PublicationVerifier.State state = PublicationVerifier.inspect(geyserApi().configDirectory());
+                    source.sendMessage("VoxelCore Bedrock: " + state.status()
+                            + (state.revision().isEmpty() ? "" : " revision=" + state.revision())
+                            + " (" + state.details() + ")");
+                    source.sendMessage("Note: this verifies on-disk artifacts, not each client's active resources.");
+                })
+                .build());
     }
 
     @Subscribe
