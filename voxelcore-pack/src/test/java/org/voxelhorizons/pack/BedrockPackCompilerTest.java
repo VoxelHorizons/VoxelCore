@@ -103,6 +103,31 @@ public class BedrockPackCompilerTest {
         try (java.util.stream.Stream<Path> files = Files.list(out.resolve("icon-cache"))) { assertEquals(1,files.count()); }
         assertEquals(result.revision,new BedrockPackCompiler().compile(root,out).revision);
     }
+    @Test public void mergesDisjointNativeBedrockJsonAssets() throws Exception {
+        Path root = fixture(), out = temp.newFolder().toPath();
+        write(root.resolve("other/pack.yml"), "schema: 1\\nnamespace: other\\n");
+        write(root.resolve("demo/bedrock/resource_pack/ui/_global_variables.json"), "{\"first\": 1}");
+        write(root.resolve("other/bedrock/resource_pack/ui/_global_variables.json"), "{\"second\": 2}");
+        BedrockPackCompiler.Result built = new BedrockPackCompiler().compile(root, out);
+        try (ZipFile zip = new ZipFile(built.directory.resolve("voxelcore.mcpack").toFile())) {
+            byte[] contents;
+            try (java.io.InputStream input = zip.getInputStream(zip.getEntry("ui/_global_variables.json"))) {
+                java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+                byte[] bytes = new byte[1024]; int n;
+                while ((n = input.read(bytes)) != -1) buffer.write(bytes, 0, n);
+                contents = buffer.toByteArray();
+            }
+            JsonObject value = JsonParser.parseString(new String(contents, StandardCharsets.UTF_8)).getAsJsonObject();
+            assertEquals(1, value.get("first").getAsInt());
+            assertEquals(2, value.get("second").getAsInt());
+        }
+    }
+    @Test public void rejectsJavaFormatAssetsMisplacedInBedrockPack() throws Exception {
+        Path root = fixture();
+        write(root.resolve("demo/bedrock/resource_pack/assets/minecraft/font/default.json"), "{}");
+        try { new BedrockPackCompiler().compile(root, temp.newFolder().toPath()); fail(); }
+        catch (java.io.IOException expected) { assertTrue(expected.getMessage().contains("Java Edition asset")); }
+    }
     @Test public void mapsRenderableAbstractUiItems() throws Exception {
         Path root = fixture(), out = temp.newFolder().toPath();
         Path items = root.resolve("demo/content/items.yml");
