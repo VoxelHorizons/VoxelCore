@@ -81,6 +81,15 @@ ui:
     page_titles:
       items: {}
       blocks: {}
+    # Bedrock inventory windows do not support Java bitmap glyph/negative-offset title art.
+    # Use separate readable titles; Bedrock retains the inventory contents and click actions.
+    # Supports & colors and {page}, {pages}, {total}, {type}, but not Java :glyph: aliases.
+    bedrock_titles:
+      items: 'VC Items {page}/{pages}'
+      blocks: 'VC Blocks {page}/{pages}'
+    bedrock_page_titles:
+      items: {}
+      blocks: {}
     # Example:
     # titles:
     #   items: '&f:offset_-8::vc_items_page_{page}:'
