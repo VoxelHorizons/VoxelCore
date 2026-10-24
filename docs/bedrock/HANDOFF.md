@@ -1,5 +1,27 @@
 # Bedrock recovery handoff — 24 October 2026 (Australia/Melbourne)
 
+## Latest verified repository checkpoint — 24 October 2026
+
+This section **supersedes any older SHA, CI status, or next-task claim below**. Refresh the remote branch HEAD on every new session; this document is not a git ref.
+
+- **VoxelCore** `feat/bedrock-pack-publishing`, [PR #84](https://github.com/VoxelHorizons/VoxelCore/pull/84): code HEAD before this checkpoint `c1f3b5360f9534fe7d2f5b5ea2f095aa2402380b`. Latest [distribution build](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40077217228) **SUCCESS**, [MVP smoke](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40077217237) **SUCCESS (8/8)**. Older RCON failures are intermittent and unresolved, not reason to disable the tests.
+- **VoxelFurniture** [PR #47](https://github.com/VoxelHorizons/VoxelFurniture/pull/47): `2332b3ebea2cfcee41bbe97bf59bf5e1c148280f`, [build SUCCESS](https://github.com/VoxelHorizons/VoxelFurniture/actions/runs/40077356575). Includes `plugin.yml` Geyser-Spigot optional startup ordering, so the existing publisher can detect an enabled Geyser instance before starting.
+- **VoxelVehicles** [PR #21](https://github.com/VoxelHorizons/VoxelVehicles/pull/21): `6eb79cbf84bebc24d262e3a9c72d92a047299ead`, [build SUCCESS](https://github.com/VoxelHorizons/VoxelVehicles/actions/runs/40077363366). Same optional load-order fix.
+- Code added since prior handoff: `200eab4f4410eedaf7b94bbaf7c8056a2feb2329` and test fixture correction `a58450602d6cd7d558baeb3315e6e19982e19f2f`: schema-v1 projection now carries an optional, bounded **uniform scale** from furniture main display, ITEM part or vehicle model. `VoxelCoreGeyserExtension#onServerEntitySpawn` uses Geyser's public `preSpawnConsumer`/`GeyserEntityDataTypes.SCALE`. Non-uniform XYZ values are *not* silently converted. [Build and 8/8 smoke for scale commit](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40077155518) / [smoke](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40077155527) SUCCESS. **TESTED** by CI, **NOT VERIFIED** on live Bedrock.
+- `c1f3b536` adds failure-only SIGQUIT JVM thread-dump capture to `.github/scripts/mvp-smoke.sh#rcon`. The runner's next smoke [40077217237](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40077217237) passed 8/8, so no failing thread dump has been captured yet.
+
+**Current exact engineering boundary:** item-display spawn substitution, stale-file expiry and optional *uniform* scale are implemented/tested. B10 still lacks live state change (motion, rotation, dye, animation, non-uniform scale), chunk unload/reload, reconnect rehydration and authoritative interactions. Geyser client acceptance B19 remains BLOCKED pending a real Bedrock client/server. Other major B05–B08 and B14–B17 tasks still unfinished. Do not claim 100%.
+
+**Resume in order (three independent actions):**
+1. Recheck Core/furniture/vehicle HEAD and their most recent CI. Capture failing 1.13.2/1.14.4 JVM thread dump using failure-only diagnostic when reproducible. Keep entire smoke matrix enabled.
+2. Finish the next B10 feature in `voxelcore-geyser-extension/src/main/java/org/voxelhorizons/geyser/EntityProjectionIndex.java` and `VoxelCoreGeyserExtension.java`: synchronize Paper render-state updates and despawns/chunk/reconnection using supported, verified Geyser API events. Add focused regression tests; do not invent APIs or overwrite Paper authority. Amend companion schema-v1 producers only if necessary, in their existing draft PRs.
+3. Independently tackle B08 live addon item/variant registration or B14 authored glyph literal migration scanner, with deterministic fixtures. Obtain `unsupported-items.txt` and actual Bedrock client acceptance data when accessible, but continue independent coding meanwhile.
+
+**Installation note:** Geyser extension JAR is a separate artifact, pack and mappings must match a validated receipt and be loaded at Geyser restart, JSON publisher files are local/mounted-only; two competing display entity bridges must not be activated together. No PRs were merged.
+
+---
+
+
 **READ THIS FILE FIRST, THEN USE LIVE GITHUB HEAD.** Never reset to the anchor or create duplicate PRs.
 
 ## Branch and PRs
