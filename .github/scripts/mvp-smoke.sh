@@ -29,6 +29,12 @@ rcon() {
   done
   echo "RCON command did not succeed within 60 seconds: $command" >&2
   echo "$output" >&2
+  echo "===== CONTAINER STATE =====" >&2
+  docker inspect "$NAME" --format 'status={{.State.Status}} running={{.State.Running}} oom_killed={{.State.OOMKilled}} exit_code={{.State.ExitCode}}' >&2 || true
+  echo "===== RCON SOCKETS =====" >&2
+  docker exec "$NAME" sh -c 'cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | grep -Ei "(:63E7|local_address)" || true; ps -ef | head -30' >&2 || true
+  echo "===== SERVER OUTPUT =====" >&2
+  docker logs "$NAME" --tail 110 >&2 || true
   return 1
 }
 
