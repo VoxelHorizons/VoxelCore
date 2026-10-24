@@ -1,5 +1,35 @@
 # Bedrock recovery handoff — 24 October 2026 (Australia/Melbourne)
 
+## Latest checkpoint — 24 October 2026, session 4 (supersedes everything below)
+
+Fetch live HEADs first; this file is not a ref. No PR merged, no force push.
+
+| Repo | Branch / PR | Latest code this session | CI |
+| --- | --- | --- | --- |
+| VoxelCore | `feat/bedrock-pack-publishing`, [PR #84](https://github.com/VoxelHorizons/VoxelCore/pull/84) | this commit: exact Java `rescale` + flat planes (B05/B06), CI policy docs | `d0b84cb`: [build SUCCESS](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40081056409); [smoke](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40081056462) 7/8, 26.3 + 26.2 green, 1.14.4 = **KI-01, non-blocking** |
+| DeluxeMenus | `feat/bedrock-forms` (no PR yet; CI via `workflow_dispatch`) | `557bac4` Bedrock form frontend, `6b8d858` `bedrock_image` | `557bac4` [build SUCCESS](https://github.com/VoxelHorizons/DeluxeMenus/actions/runs/40082105372); `6b8d858` dispatched, re-check |
+| VoxelFurniture | `feat/bedrock-state-projection`, [PR #47](https://github.com/VoxelHorizons/VoxelFurniture/pull/47) | `b1b7585` | SUCCESS |
+| VoxelVehicles | `feat/bedrock-state-projection`, [PR #21](https://github.com/VoxelHorizons/VoxelVehicles/pull/21) | `09a0abb` | SUCCESS |
+
+**CI policy:** see TESTING.md "CI policy". KI-01 legacy smoke failures are recorded, not chased.
+
+**Done (cumulative, all IMPLEMENTED; TESTED where CI above is green; nothing VERIFIED live):** B10 live scale reconcile + companion model-change re-send; B14 glyph literal scanner/migrator + command; B08 unmapped-model status; B15 DeluxeMenus Bedrock forms (`com.extendedclip.deluxemenus.bedrock.*`, `menu/MenuClickDispatcher`); B16 partial (stats as text, avatar via `bedrock_image`); B05/B06 `rescale` exact + flat planes.
+
+**Findings to reuse**
+- Geyser API has **no plugin-messaging hook** (event/java: spawn, passengers, define commands, parrots, transfer, CoC). B17 remote transport therefore needs an out-of-band channel (signed HTTP pull or mounted folder).
+- `SEAT_OFFSET` is rider-side metadata whose baseline Geyser computes; overriding it blind risks sinking riders. Do B11 seat work only with a live client or a Geyser-core-derived baseline.
+- Cumulus via reflection: resolve methods on public interfaces (`FloodgateApi`, `GeyserApiBase`, `SimpleForm$Builder`, `SimpleFormResponse`), not impl classes.
+
+**Next actions (in order)**
+1. Confirm DeluxeMenus `6b8d858` dispatch build and VoxelCore CI for this commit (build + 26.3 only blocking).
+2. Open DeluxeMenus PR `feat/bedrock-forms` → `main` only if the user asks; otherwise keep branch and record.
+3. B05: modern 1.21.4+ `assets/*/items/*.json` item-model definitions (`minecraft:model`, `select`, `condition`, `range_dispatch`, `composite`) → pick the default/fallback model for Bedrock and report the rest; synthetic fixtures.
+4. B07 tint: bake `tintindex` faces with a configured default tint colour (opt-in) instead of rejecting.
+5. B17 design + implementation: HMAC-signed projection/receipt feed served over HTTP from Paper, pulled by the Geyser extension on proxies.
+6. B19 BLOCKED: real Bedrock client + VoxelHorizons Geyser server.
+
+---
+
 ## Latest checkpoint — 24 October 2026, session 3 (supersedes everything below)
 
 Fetch live HEADs first; this file is not a ref. No PR merged, no force push.

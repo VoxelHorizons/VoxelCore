@@ -57,22 +57,38 @@ final class BedrockGeometryCompiler {
         for (JsonElement entry : elements) {
             JsonObject element = entry.getAsJsonObject();
             double[] from = vector(element,"from"), to = vector(element,"to");
+            // One zero-length axis is a flat plane (crosses, foliage, decals); Bedrock
+            // geometry accepts a 0 size there just as Java does.
+            int flatAxes = 0;
             for (int a=0;a<3;a++) {
-                if (to[a] <= from[a] || !Double.isFinite(from[a]) || !Double.isFinite(to[a]))
-                    throw new IOException("Invalid/zero-size Java cuboid in " + javaModel);
+                if (to[a] < from[a] || !Double.isFinite(from[a]) || !Double.isFinite(to[a]))
+                    throw new IOException("Invalid Java cuboid bounds in " + javaModel);
+                if (to[a] == from[a]) flatAxes++;
             }
-            JsonObject cube = new JsonObject();
-            cube.add("origin", xyz(from[0]-8,from[1]-8,from[2]-8));
-            cube.add("size", xyz(to[0]-from[0],to[1]-from[1],to[2]-from[2]));
-            for(int a=0;a<3;a++) {
-                minX=Math.min(minX,from[0]-8); maxX=Math.max(maxX,to[0]-8);
-                minY=Math.min(minY,from[1]-8); maxY=Math.max(maxY,to[1]-8);
-                minZ=Math.min(minZ,from[2]-8); maxZ=Math.max(maxZ,to[2]-8);
-            }
+            if (flatAxes > 1) throw new IOException("Degenerate (line/point) Java cuboid in " + javaModel);
+            // Geometry bounds; default face UVs below still use the authored from/to, as Java does.
+            double[] lo = from.clone(), hi = to.clone();
             if (element.has("rotation")) {
                 JsonObject rotation = element.getAsJsonObject("rotation");
-                if (rotation.has("rescale") && rotation.get("rescale").getAsBoolean())
-                    throw new IOException("Java rescale=true cuboids require geometry transform conversion: " + javaModel);
+                double stretch = BedrockIconRenderer.rescaleFactor(rotation);
+                if (stretch != 1.0) {
+                    int axis = "xyz".indexOf(rotation.get("axis").getAsString());
+                    double[] origin = vector(rotation,"origin");
+                    for (int a=0;a<3;a++) {
+                        if (a == axis) continue;
+                        lo[a] = origin[a] + (from[a]-origin[a])*stretch;
+                        hi[a] = origin[a] + (to[a]-origin[a])*stretch;
+                    }
+                }
+            }
+            JsonObject cube = new JsonObject();
+            cube.add("origin", xyz(lo[0]-8,lo[1]-8,lo[2]-8));
+            cube.add("size", xyz(hi[0]-lo[0],hi[1]-lo[1],hi[2]-lo[2]));
+            minX=Math.min(minX,lo[0]-8); maxX=Math.max(maxX,hi[0]-8);
+            minY=Math.min(minY,lo[1]-8); maxY=Math.max(maxY,hi[1]-8);
+            minZ=Math.min(minZ,lo[2]-8); maxZ=Math.max(maxZ,hi[2]-8);
+            if (element.has("rotation")) {
+                JsonObject rotation = element.getAsJsonObject("rotation");
                 String axis = rotation.get("axis").getAsString();
                 if (!axis.matches("[xyz]")) throw new IOException("Unknown cuboid rotation axis " + axis);
                 double angle = rotation.get("angle").getAsDouble();

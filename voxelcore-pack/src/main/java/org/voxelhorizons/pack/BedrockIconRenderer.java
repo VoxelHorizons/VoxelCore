@@ -90,10 +90,13 @@ final class BedrockIconRenderer {
                 for(double[] point:p) {
                     if(element.has("rotation")) {
                         JsonObject r=element.getAsJsonObject("rotation");
-                        if(r.has("rescale")&&r.get("rescale").getAsBoolean()) throw new IOException("Rescaled element needs explicit texture");
                         double[] origin=vector(r,"origin",new double[]{8,8,8});
-                        double[] angles=new double[3]; angles["xyz".indexOf(r.get("axis").getAsString())]=r.get("angle").getAsDouble();
-                        for(int i=0;i<3;i++)point[i]-=origin[i]; rotate(point,angles); for(int i=0;i<3;i++)point[i]+=origin[i];
+                        int axis="xyz".indexOf(r.get("axis").getAsString());
+                        double angle=r.get("angle").getAsDouble();
+                        double[] angles=new double[3]; angles[axis]=angle;
+                        double stretch=rescaleFactor(r);
+                        for(int i=0;i<3;i++){point[i]-=origin[i]; if(i!=axis)point[i]*=stretch;}
+                        rotate(point,angles); for(int i=0;i<3;i++)point[i]+=origin[i];
                     }
                     for(int i=0;i<3;i++)point[i]-=8;
                     rotate(point,rotation);
@@ -122,6 +125,16 @@ final class BedrockIconRenderer {
         if (!visible) throw new IOException("Model rendered a fully transparent icon: "+model);
         ByteArrayOutputStream out=new ByteArrayOutputStream(); ImageIO.write(image,"png",out); return out.toByteArray();
     }
+    /**
+     * Java {@code rescale: true} stretches the two axes perpendicular to the rotation axis
+     * by 1/cos(angle) about the rotation origin. Scaling uniformly in that plane commutes
+     * with the rotation, so applying it before rotating is exact.
+     */
+    static double rescaleFactor(JsonObject rotation) {
+        if (!rotation.has("rescale") || !rotation.get("rescale").getAsBoolean()) return 1.0;
+        return 1.0 / Math.cos(Math.toRadians(Math.abs(rotation.get("angle").getAsDouble())));
+    }
+
     private static final class RenderedFace {
         final BufferedImage texture;
         final double[][] points, uv;
