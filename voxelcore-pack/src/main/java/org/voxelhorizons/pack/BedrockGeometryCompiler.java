@@ -107,7 +107,8 @@ final class BedrockGeometryCompiler {
         JsonObject all = new JsonObject(); all.addProperty("*", "Material.default"); materials.add(all);
         controller.add("materials", materials);
         JsonArray selected = new JsonArray();
-        selected.add("Array.dye[query.property('" + DYE_PROPERTY + "')]");
+        // Guarded: an unregistered property would make Molang fail and the entity not render.
+        selected.add("Array.dye[query.has_property('" + DYE_PROPERTY + "') ? query.property('" + DYE_PROPERTY + "') : 0]");
         controller.add("textures", selected);
         JsonObject controllers = new JsonObject(); controllers.add(DYE_CONTROLLER, controller);
         JsonObject root = new JsonObject();
@@ -309,7 +310,24 @@ final class BedrockGeometryCompiler {
         JsonArray bones = new JsonArray(); bones.add(bone);
         JsonObject geom = new JsonObject();
         geom.add("description",description); geom.add("bones",bones);
-        JsonArray geometries = new JsonArray(); geometries.add(geom);
+        // Held-item geometry: the same cubes under a bone bound to the holding hand. Without
+        // the binding Bedrock draws an attachable at the player's origin (at their feet).
+        String heldGeometryId = geometryId + ".held";
+        JsonObject heldDescription = description.deepCopy();
+        heldDescription.addProperty("identifier", heldGeometryId);
+        JsonObject handBone = new JsonObject();
+        handBone.addProperty("name","held");
+        handBone.addProperty("binding","q.item_slot_to_bone_name(c.item_slot)");
+        handBone.add("pivot",xyz(0,0,0));
+        JsonObject modelBone = new JsonObject();
+        modelBone.addProperty("name","model");
+        modelBone.addProperty("parent","held");
+        modelBone.add("pivot",xyz(0,0,0));
+        modelBone.add("cubes",cubes.deepCopy());
+        JsonArray heldBones = new JsonArray(); heldBones.add(handBone); heldBones.add(modelBone);
+        JsonObject heldGeom = new JsonObject();
+        heldGeom.add("description",heldDescription); heldGeom.add("bones",heldBones);
+        JsonArray geometries = new JsonArray(); geometries.add(geom); geometries.add(heldGeom);
         JsonObject geoRoot = new JsonObject();
         geoRoot.addProperty("format_version","1.12.0");
         geoRoot.add("minecraft:geometry",geometries);
@@ -324,10 +342,33 @@ final class BedrockGeometryCompiler {
         tex.addProperty("default","textures/voxelcore/g_"+shortId);
         tex.addProperty("enchanted","textures/misc/enchanted_item_glint");
         attachDescription.add("textures",tex);
-        JsonObject shape = new JsonObject();shape.addProperty("default",geometryId);
+        JsonObject shape = new JsonObject();shape.addProperty("default",heldGeometryId);
         attachDescription.add("geometry",shape);
         JsonArray controllers = new JsonArray();controllers.add("controller.render.item_default");
         attachDescription.add("render_controllers",controllers);
+        // Java display.thirdperson_righthand / firstperson_righthand become constant bone
+        // transforms so the model is hand-sized instead of a full block-scale model.
+        String heldAnimation = "animation.voxelcore." + shortId + ".held";
+        JsonObject display = model.has("display") && model.get("display").isJsonObject()
+                ? model.getAsJsonObject("display") : new JsonObject();
+        JsonObject attachAnimations = new JsonObject();
+        attachAnimations.addProperty("third_person", heldAnimation + ".third_person");
+        attachAnimations.addProperty("first_person", heldAnimation + ".first_person");
+        attachDescription.add("animations", attachAnimations);
+        JsonObject attachScripts = new JsonObject();
+        JsonArray attachAnimate = new JsonArray();
+        JsonObject third = new JsonObject(); third.addProperty("third_person", "!c.is_first_person"); attachAnimate.add(third);
+        JsonObject first = new JsonObject(); first.addProperty("first_person", "c.is_first_person"); attachAnimate.add(first);
+        attachScripts.add("animate", attachAnimate);
+        attachDescription.add("scripts", attachScripts);
+        JsonObject heldAnimations = new JsonObject();
+        heldAnimations.add(heldAnimation + ".third_person", heldPose(display, "thirdperson_righthand",
+                new double[]{75,45,0}, new double[]{0,2.5,0}, new double[]{0.375,0.375,0.375}));
+        heldAnimations.add(heldAnimation + ".first_person", heldPose(display, "firstperson_righthand",
+                new double[]{0,45,0}, new double[]{0,0,0}, new double[]{0.4,0.4,0.4}));
+        JsonObject heldAnimationRoot = new JsonObject();
+        heldAnimationRoot.addProperty("format_version", "1.8.0");
+        heldAnimationRoot.add("animations", heldAnimations);
         JsonObject attach = new JsonObject(); attach.add("description",attachDescription);
         JsonObject attachRoot = new JsonObject();
         attachRoot.addProperty("format_version","1.10.0");
@@ -370,11 +411,38 @@ final class BedrockGeometryCompiler {
         Map<String,byte[]> assets = new TreeMap<String,byte[]>();
         assets.put("models/entity/voxelcore/"+shortId+".geo.json",JSON.toJson(geoRoot).getBytes(StandardCharsets.UTF_8));
         assets.put("attachables/"+shortId+".json",JSON.toJson(attachRoot).getBytes(StandardCharsets.UTF_8));
+        assets.put("animations/voxelcore_held_"+shortId+".animation.json",
+                JSON.toJson(heldAnimationRoot).getBytes(StandardCharsets.UTF_8));
         assets.put("entity/voxelcore/"+shortId+".entity.json",
                 JSON.toJson(clientEntityRoot).getBytes(StandardCharsets.UTF_8));
         assets.put("textures/voxelcore/g_"+shortId+".png",png.toByteArray());
         assets.put(TRANSFORM_ANIMATION_PATH, transformAnimation());
         return new Output(assets,cubes.size(),tinted);
+    }
+
+    /** Constant looping pose for the held model bone from a Java display transform (vanilla block defaults). */
+    private static JsonObject heldPose(JsonObject display, String key, double[] rotation, double[] translation, double[] scale) {
+        if (display.has(key) && display.get(key).isJsonObject()) {
+            JsonObject transform = display.getAsJsonObject(key);
+            rotation = triple(transform, "rotation", new double[]{0,0,0});
+            translation = triple(transform, "translation", new double[]{0,0,0});
+            scale = triple(transform, "scale", new double[]{1,1,1});
+        }
+        JsonObject bone = new JsonObject();
+        bone.add("rotation", xyz(rotation[0], rotation[1], rotation[2]));
+        bone.add("position", xyz(translation[0], translation[1], translation[2]));
+        bone.add("scale", xyz(scale[0], scale[1], scale[2]));
+        JsonObject bones = new JsonObject(); bones.add("model", bone);
+        JsonObject animation = new JsonObject();
+        animation.addProperty("loop", true);
+        animation.add("bones", bones);
+        return animation;
+    }
+
+    private static double[] triple(JsonObject object, String field, double[] fallback) {
+        if (!object.has(field) || !object.get(field).isJsonArray() || object.getAsJsonArray(field).size() != 3) return fallback;
+        JsonArray values = object.getAsJsonArray(field);
+        return new double[]{values.get(0).getAsDouble(), values.get(1).getAsDouble(), values.get(2).getAsDouble()};
     }
 
     private static JsonArray xyz(double a,double b,double c) {
