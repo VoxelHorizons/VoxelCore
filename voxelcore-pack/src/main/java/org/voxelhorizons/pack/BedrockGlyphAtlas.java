@@ -24,17 +24,29 @@ final class BedrockGlyphAtlas {
 
     /** New Bedrock glyph pages: 512px = 32px cells, so high-res Java icons stay crisp. */
     static final int SHEET_SIZE = 512;
-    /** Wider pictures shrink to a speck in one square Bedrock glyph cell. */
-    static final double MAX_ASPECT = 4.0;
+    /**
+     * Bedrock draws every glyph as one square cell, so a wide rank tag squeezed into one cell
+     * becomes unreadable. Glyphs wider than this ratio are also cut into square tiles at
+     * Bedrock-only codepoints (U+F400..U+F8FF); VoxelCore swaps the Java character for the
+     * tile sequence in text sent to Bedrock players (see glyph-tiles.json). The original
+     * codepoint keeps a whole, scaled-down copy for text VoxelCore cannot rewrite.
+     */
+    static final double TILE_ASPECT = 1.25;
+    static final int FIRST_TILE = 0xF400, LAST_TILE = 0xF8FF;
 
     static int append(Path contentRoot, Path allocationManifest, Map<String, byte[]> javaAssets,
                       Map<String, byte[]> bedrockAssets) throws IOException {
-        return append(contentRoot, allocationManifest, javaAssets, bedrockAssets, new java.util.ArrayList<String>());
+        return append(contentRoot, allocationManifest, javaAssets, bedrockAssets, new java.util.ArrayList<String>(),
+                new TreeMap<Integer, int[]>());
     }
 
-    /** @param skipped receives one line per glyph that has no Bedrock cell, with the reason */
+    /**
+     * @param skipped receives one line per glyph that has no Bedrock cell, with the reason
+     * @param tiles   receives Java codepoint -> Bedrock tile codepoints for wide glyphs
+     */
     static int append(Path contentRoot, Path allocationManifest, Map<String, byte[]> javaAssets,
-                      Map<String, byte[]> bedrockAssets, java.util.List<String> skipped) throws IOException {
+                      Map<String, byte[]> bedrockAssets, java.util.List<String> skipped,
+                      Map<Integer, int[]> tiles) throws IOException {
         UiGlyphRegistry glyphs = new UiGlyphLoader().load(contentRoot, allocationManifest, false);
         Map<Integer, BufferedImage> sheets = new TreeMap<Integer, BufferedImage>();
         int count = 0;
@@ -56,9 +68,10 @@ final class BedrockGlyphAtlas {
             if (!place(sheets, bedrockAssets, codePoint, icon))
                 throw new IOException("Bedrock font cell U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT)
                         + " is already occupied (managed glyph " + glyph.id() + ")");
+            tile(sheets, bedrockAssets, codePoint, icon, tiles, skipped, label);
             count++;
         }
-        count += appendAuthored(contentRoot, javaAssets, sheets, bedrockAssets, skipped);
+        count += appendAuthored(contentRoot, javaAssets, sheets, bedrockAssets, skipped, tiles);
         for (Map.Entry<Integer,BufferedImage> entry : sheets.entrySet()) {
             String name = String.format(java.util.Locale.ROOT, "font/glyph_%02X.png", entry.getKey());
             ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -76,7 +89,8 @@ final class BedrockGlyphAtlas {
      * glyphs win) are skipped; migrate reserved literals with '/voxelcore admin pack glyphs'.
      */
     static int appendAuthored(Path contentRoot, Map<String, byte[]> javaAssets, Map<Integer, BufferedImage> sheets,
-                              Map<String, byte[]> bedrockAssets, java.util.List<String> skipped) throws IOException {
+                              Map<String, byte[]> bedrockAssets, java.util.List<String> skipped,
+                              Map<Integer, int[]> tiles) throws IOException {
         int count = 0;
         for (org.voxelhorizons.content.pack.ContentPack pack : new org.voxelhorizons.content.pack.ContentPackDiscovery().discover(contentRoot)) {
             Path font = pack.root().resolve("assets/minecraft/font/default.json");
@@ -129,7 +143,11 @@ final class BedrockGlyphAtlas {
                                     + " (" + file + "): " + unfit);
                             continue;
                         }
-                        if (place(sheets, bedrockAssets, codePoint, icon)) count++;
+                        if (place(sheets, bedrockAssets, codePoint, icon)) {
+                            tile(sheets, bedrockAssets, codePoint, icon, tiles, skipped,
+                                    "font glyph U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT));
+                            count++;
+                        }
                     }
                 }
             }
@@ -142,10 +160,6 @@ final class BedrockGlyphAtlas {
      * square icons are fine (scaled into the cell); very wide tags and fullscreen art are not.
      */
     static String unfit(BufferedImage icon) {
-        double aspect = Math.max((double) icon.getWidth() / icon.getHeight(), (double) icon.getHeight() / icon.getWidth());
-        if (aspect > MAX_ASPECT)
-            return icon.getWidth() + "x" + icon.getHeight() + " px is wider than " + (int) MAX_ASPECT
-                    + ":1 and would be unreadable in one Bedrock glyph cell";
         if (icon.getWidth() > 1024 || icon.getHeight() > 1024)
             return icon.getWidth() + "x" + icon.getHeight() + " px is fullscreen art, not an inline glyph";
         return null;
@@ -163,10 +177,56 @@ final class BedrockGlyphAtlas {
         return cell.getSubimage(minX, minY, maxX - minX + 1, maxY - minY + 1);
     }
 
-    /** Draw an icon into its Bedrock glyph cell; false when the cell is already occupied. */
-    private static boolean place(Map<Integer, BufferedImage> sheets, Map<String, byte[]> bedrockAssets,
-                                 int codePoint, BufferedImage icon) throws IOException {
-        int page = codePoint >>> 8;
+    /**
+     * Cut a wide glyph into square tiles (side = its height) at the next free Bedrock-only
+     * codepoints. Tiles are drawn at an integer scale where possible so pixel art stays sharp.
+     */
+    private static void tile(Map<Integer, BufferedImage> sheets, Map<String, byte[]> bedrockAssets, int codePoint,
+                             BufferedImage icon, Map<Integer, int[]> tiles, java.util.List<String> skipped,
+                             String label) throws IOException {
+        if ((double) icon.getWidth() / icon.getHeight() <= TILE_ASPECT) return;
+        int side = icon.getHeight(), count = (icon.getWidth() + side - 1) / side;
+        int next = FIRST_TILE;
+        for (int[] used : tiles.values()) for (int tile : used) next = Math.max(next, tile + 1);
+        if (next + count - 1 > LAST_TILE) {
+            skipped.add(label + ": no Bedrock tile codepoints left; shown squeezed into one cell");
+            return;
+        }
+        int[] sequence = new int[count];
+        for (int i = 0; i < count; i++) {
+            int width = Math.min(side, icon.getWidth() - i * side);
+            BufferedImage part = new BufferedImage(side, side, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D graphics = part.createGraphics();
+            try { graphics.drawImage(icon.getSubimage(i * side, 0, width, side), 0, 0, null); }
+            finally { graphics.dispose(); }
+            if (!placeTile(sheets, bedrockAssets, next + i, part, width))
+                throw new IOException("Bedrock tile cell U+" + Integer.toHexString(next + i) + " is already occupied");
+            sequence[i] = next + i;
+        }
+        tiles.put(Integer.valueOf(codePoint), sequence);
+    }
+
+    /** Like {@link #place} for a tile: left/top aligned (no centring) so neighbours line up. */
+    private static boolean placeTile(Map<Integer, BufferedImage> sheets, Map<String, byte[]> bedrockAssets,
+                                     int codePoint, BufferedImage tile, int contentWidth) throws IOException {
+        BufferedImage sheet = sheet(sheets, bedrockAssets, codePoint >>> 8);
+        int cell = sheet.getWidth() / 16;
+        int slot = codePoint & 255, x = (slot % 16) * cell, y = (slot / 16) * cell;
+        for (int yy=y; yy<y+cell; yy++) for(int xx=x;xx<x+cell;xx++)
+            if ((sheet.getRGB(xx, yy) >>> 24) != 0) return false;
+        int side = tile.getHeight();
+        double scale = side <= cell ? Math.floor((double) cell / side) : (double) cell / side;
+        int drawn = (int) Math.round(side * scale);
+        Graphics2D graphics = sheet.createGraphics();
+        try {
+            graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+            graphics.drawImage(tile, x, y + (cell - drawn) / 2, drawn, drawn, null);
+        } finally { graphics.dispose(); }
+        return true;
+    }
+
+    private static BufferedImage sheet(Map<Integer, BufferedImage> sheets, Map<String, byte[]> bedrockAssets,
+                                       int page) throws IOException {
         String name = String.format(java.util.Locale.ROOT, "font/glyph_%02X.png", page);
         BufferedImage sheet = sheets.get(page);
         if (sheet == null) {
@@ -179,6 +239,13 @@ final class BedrockGlyphAtlas {
             } else sheet = new BufferedImage(SHEET_SIZE, SHEET_SIZE, BufferedImage.TYPE_INT_ARGB);
             sheets.put(page, sheet);
         }
+        return sheet;
+    }
+
+    /** Draw an icon into its Bedrock glyph cell; false when the cell is already occupied. */
+    private static boolean place(Map<Integer, BufferedImage> sheets, Map<String, byte[]> bedrockAssets,
+                                 int codePoint, BufferedImage icon) throws IOException {
+        BufferedImage sheet = sheet(sheets, bedrockAssets, codePoint >>> 8);
         int cell = sheet.getWidth() / 16;
         int slot = codePoint & 255, x = (slot % 16) * cell, y = (slot / 16) * cell;
         for (int yy=y; yy<y+cell; yy++) for(int xx=x;xx<x+cell;xx++)

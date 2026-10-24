@@ -297,13 +297,28 @@ public class BedrockPackCompilerTest {
         Path allocations = temp.newFolder("glyph-hires").toPath().resolve("glyph-allocations.yml");
         new UiGlyphLoader().load(root, allocations, true);
         BedrockPackCompiler.Result result = new BedrockPackCompiler().compile(root,out,allocations);
-        assertEquals("64px icons were skipped before; now scaled into the cell", 1, result.mappedGlyphs);
-        String unsupported = new String(Files.readAllBytes(result.directory.resolve("unsupported-items.txt")), StandardCharsets.UTF_8);
-        assertTrue(unsupported, unsupported.contains("banner_tag") && unsupported.contains("100x10"));
+        assertEquals("64px icons were skipped before; now scaled into the cell", 2, result.mappedGlyphs);
+        // The 100x10 tag is cut into ten 10x10 tiles at Bedrock-only codepoints.
+        JsonObject tiles = JsonParser.parseString(new String(Files.readAllBytes(
+                result.directory.resolve(BedrockPackCompiler.GLYPH_TILES)), StandardCharsets.UTF_8))
+                .getAsJsonObject().getAsJsonObject("tiles");
+        assertEquals(1, tiles.size());
+        JsonArray sequence = tiles.entrySet().iterator().next().getValue().getAsJsonArray();
+        assertEquals(10, sequence.size());
+        assertEquals("F400", sequence.get(0).getAsString());
+        assertArrayEquals("Stable copy for the plugin", Files.readAllBytes(result.directory.resolve(BedrockPackCompiler.GLYPH_TILES)),
+                Files.readAllBytes(out.resolve(BedrockPackCompiler.GLYPH_TILES)));
         try (ZipFile zip = new ZipFile(result.directory.resolve("voxelcore.mcpack").toFile())) {
             try (java.io.InputStream image = zip.getInputStream(zip.getEntry("font/glyph_E2.png"))) {
                 java.awt.image.BufferedImage atlas = javax.imageio.ImageIO.read(image);
                 assertEquals(BedrockGlyphAtlas.SHEET_SIZE, atlas.getWidth());
+            }
+            try (java.io.InputStream image = zip.getInputStream(zip.getEntry("font/glyph_F4.png"))) {
+                java.awt.image.BufferedImage atlas = javax.imageio.ImageIO.read(image);
+                // 10px tile at integer scale 3 in a 32px cell: opaque at the cell's left edge, row 15.
+                assertEquals(0xffffffff, atlas.getRGB(0, 15));
+                assertEquals(0xffffffff, atlas.getRGB(29, 15));
+                assertEquals("Tile area beyond 30px stays empty", 0, atlas.getRGB(31, 15) >>> 24);
             }
         }
     }

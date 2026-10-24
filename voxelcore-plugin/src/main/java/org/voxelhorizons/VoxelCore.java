@@ -226,6 +226,7 @@ public final class VoxelCore extends JavaPlugin {
         if (packManager.currentTarget().supportsUiFonts()) {
             getServer().getPluginManager().registerEvents(new ChatPlaceholderListener(textPlaceholderService), this);
             PaperChatPlaceholderBridge.registerIfAvailable(this, textPlaceholderService);
+            loadBedrockGlyphTiles();
             inventoryTitlePlaceholderListener = new InventoryTitlePlaceholderListener(
                     this,
                     textPlaceholderService,
@@ -438,5 +439,17 @@ public final class VoxelCore extends JavaPlugin {
 
     private int getDefaultConfigVersion() {
         return YamlConfiguration.loadConfiguration(new InputStreamReader(getResource("config.yml"), StandardCharsets.UTF_8)).getInt("version", -1);
+    }
+
+    /** Wide-glyph tile map from the last Bedrock build (see BedrockGlyphTiles); safe to call any time. */
+    public void loadBedrockGlyphTiles() {
+        java.nio.file.Path file = packManager == null ? null
+                : packManager.outputRoot().resolve("bedrock").resolve(org.voxelhorizons.pack.BedrockPackCompiler.GLYPH_TILES);
+        try {
+            int tiled = org.voxelhorizons.pack.BedrockGlyphTiles.load(file);
+            if (tiled > 0) getLogger().info("Bedrock chat: " + tiled + " wide glyphs are sent to Bedrock players as tiles.");
+        } catch (java.io.IOException invalid) {
+            getLogger().warning("Bedrock glyph tiles not loaded: " + invalid.getMessage());
+        }
     }
 }

@@ -141,15 +141,35 @@ public final class PaperChatPlaceholderBridge {
             }
             if (rendered == null) return null;
 
+            Object result;
             try {
                 String full = (String) serialize.invoke(legacySerializer, rendered);
                 String message = args != null && args.length >= 3 && args[2] != null
                         ? (String) serialize.invoke(legacySerializer, args[2]) : null;
                 String resolved = resolveServerFormatSafely(full, message, player);
-                return resolved.equals(full) ? rendered : deserialize.invoke(legacySerializer, resolved);
+                result = resolved.equals(full) ? rendered : deserialize.invoke(legacySerializer, resolved);
             } catch (ReflectiveOperationException | RuntimeException exception) {
                 warnOnce("Unable to resolve placeholders in rendered Paper chat format", exception);
-                return rendered;
+                result = rendered;
+            }
+            return forViewer(result, args != null && args.length >= 4 ? args[3] : null);
+        }
+
+        /**
+         * Bedrock viewers get wide glyphs (rank tags) as their square tile sequence; Java
+         * viewers keep the original component untouched. Hover/click are dropped only for
+         * Bedrock lines that contain a tiled glyph (Bedrock cannot show them anyway).
+         */
+        private Object forViewer(Object component, Object viewer) {
+            if (component == null || !(viewer instanceof Player)
+                    || !org.voxelhorizons.pack.BedrockPlayers.isBedrock(((Player) viewer).getUniqueId())) return component;
+            try {
+                String legacy = (String) serialize.invoke(legacySerializer, component);
+                if (!org.voxelhorizons.pack.BedrockGlyphTiles.affects(legacy)) return component;
+                return deserialize.invoke(legacySerializer, org.voxelhorizons.pack.BedrockGlyphTiles.apply(legacy));
+            } catch (ReflectiveOperationException | RuntimeException exception) {
+                warnOnce("Unable to apply Bedrock glyph tiles to chat", exception);
+                return component;
             }
         }
     }
