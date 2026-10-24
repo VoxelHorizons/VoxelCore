@@ -18,6 +18,10 @@ public final class BedrockPackCompiler {
     private static final Gson JSON = new GsonBuilder().setPrettyPrinting().create();
 
     public Result compile(Path contentRoot, Path outputRoot) throws IOException {
+        return compile(contentRoot, outputRoot, null);
+    }
+
+    public Result compile(Path contentRoot, Path outputRoot, Path glyphAllocationManifest) throws IOException {
         Map<String, byte[]> assets = new TreeMap<String, byte[]>();
         List<ContentPack> packs = new ContentPackDiscovery().discover(contentRoot);
         for (ContentPack pack : packs) {
@@ -82,6 +86,8 @@ public final class BedrockPackCompiler {
             }
         }
         for (String ambiguous : ambiguousAssets) javaAssets.remove(ambiguous);
+        int mappedGlyphs = glyphAllocationManifest == null ? 0
+                : BedrockGlyphAtlas.append(contentRoot, glyphAllocationManifest, javaAssets, assets);
         BedrockIconRenderer renderer = new BedrockIconRenderer(javaAssets);
         Map<String, byte[]> rendered = new HashMap<String, byte[]>();
         int count = 0;
@@ -223,7 +229,7 @@ public final class BedrockPackCompiler {
             Files.write(staging.resolve("unsupported-items.txt"), unsupported, StandardCharsets.UTF_8);
             Path destination = outputRoot.resolve(revision);
             if (!Files.exists(destination)) Files.move(staging, destination);
-            return new Result(destination, count, unsupported.size(), revision, reasonSummary);
+            return new Result(destination, count, unsupported.size(), revision, reasonSummary, mappedGlyphs);
         } finally {
             if (Files.exists(staging)) try (Stream<Path> paths = Files.walk(staging)) {
                 for (Path path : (Iterable<Path>) paths.sorted(Comparator.reverseOrder())::iterator) Files.delete(path);
@@ -291,9 +297,11 @@ public final class BedrockPackCompiler {
     public static final class Result {
         public final Path directory; public final int mappedItems; public final int unsupportedItems; public final String revision;
         public final String unsupportedReasonSummary;
-        Result(Path directory, int mappedItems, int unsupportedItems, String revision, String unsupportedReasonSummary) {
+        public final int mappedGlyphs;
+        Result(Path directory, int mappedItems, int unsupportedItems, String revision, String unsupportedReasonSummary, int mappedGlyphs) {
             this.directory = directory; this.mappedItems = mappedItems; this.unsupportedItems = unsupportedItems; this.revision = revision;
             this.unsupportedReasonSummary = unsupportedReasonSummary;
+            this.mappedGlyphs = mappedGlyphs;
         }
     }
 }
