@@ -71,9 +71,9 @@ public class BedrockPackCompilerTest {
                 "furniture_stripped_dark_oak_log_wall_shelf_single_extended"
         };
         for (int i = 0; i < names.length; i++) {
-            prefix += "  " + names[i] + ":\\n    material: minecraft:paper\\n"
-                    + "    render:\\n      model: demo:item/model" + i + "\\n"
-                    + "    properties:\\n      bedrock:\\n        texture: demo:item/token\\n";
+            prefix += "  " + names[i] + ":\n    material: minecraft:paper\n"
+                    + "    render:\n      model: demo:item/model" + i + "\n"
+                    + "    properties:\n      bedrock:\n        texture: demo:item/token\n";
         }
         write(definitions, prefix);
         BedrockPackCompiler.Result built = new BedrockPackCompiler().compile(root, out);
@@ -114,7 +114,7 @@ public class BedrockPackCompilerTest {
     }
     @Test public void rejectsLongAuthoredBedrockPathsRatherThanSilentlyBreakingReferences() throws Exception {
         Path root = fixture();
-        String longName = new String(new char[75]).replace('\\0', 'x');
+        String longName = new String(new char[75]).replace('\0', 'x');
         String path = "ui/" + longName + ".json";
         write(root.resolve("demo/bedrock/resource_pack/" + path), "{}");
         try {
