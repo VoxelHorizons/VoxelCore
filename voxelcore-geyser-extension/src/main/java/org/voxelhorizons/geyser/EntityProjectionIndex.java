@@ -34,19 +34,24 @@ public final class EntityProjectionIndex {
     public static final class Projection {
         private final String entityType;
         private final Float scale;
-        private Projection(String entityType,Float scale) {
+        private final Integer dye;
+        private Projection(String entityType,Float scale,Integer dye) {
             this.entityType=entityType;
             this.scale=scale;
+            this.dye=dye;
         }
         public String entityType() { return entityType; }
         public Float scale() { return scale; }
+        /** voxelcore:dye value: 0 = undyed, 1..16 = Java DyeColor order; null = not reported. */
+        public Integer dye() { return dye; }
         /** Package-private so reconciler tests can build states without JSON. */
-        static Projection of(String entityType,Float scale) { return new Projection(entityType,scale); }
+        static Projection of(String entityType,Float scale) { return new Projection(entityType,scale,null); }
+        static Projection of(String entityType,Float scale,Integer dye) { return new Projection(entityType,scale,dye); }
         @Override public boolean equals(Object other) {
             return other instanceof Projection && entityType.equals(((Projection)other).entityType)
-                    && Objects.equals(scale,((Projection)other).scale);
+                    && Objects.equals(scale,((Projection)other).scale) && Objects.equals(dye,((Projection)other).dye);
         }
-        @Override public int hashCode() { return Objects.hash(entityType,scale); }
+        @Override public int hashCode() { return Objects.hash(entityType,scale,dye); }
     }
 
     private final Path folder;
@@ -150,7 +155,7 @@ public final class EntityProjectionIndex {
                 JsonObject links=row.getAsJsonObject("entity_links");
                 if(links==null)continue;
                 if("furniture".equals(kind)) {
-                    add(links.get("display_entity_uuid"),bedrockId,scale(row.get("scale")),destination);
+                    add(links.get("display_entity_uuid"),bedrockId,scale(row.get("scale")),dye(row.get("dye_rgb")),destination);
                     JsonArray parts=links.getAsJsonArray("parts");
                     if(parts!=null)for(JsonElement partElement:parts) {
                         JsonObject part=partElement.getAsJsonObject();
@@ -160,10 +165,10 @@ public final class EntityProjectionIndex {
                         String partType=modelEntities.get(modelRef.getAsString());
                         if(partType==null)missing.add(modelRef.getAsString());
                         else add(part.get("java_entity_uuid"),partType,
-                                scale(part.get("scale")),destination);
+                                scale(part.get("scale")),null,destination);
                     }
                 } else {
-                    add(links.get("visual"),bedrockId,scale(row.get("scale")),destination);
+                    add(links.get("visual"),bedrockId,scale(row.get("scale")),dye(row.get("dye_rgb")),destination);
                     // A chest accessory uses a distinct model; do not overwrite
                     // it with the root vehicle geometry by guessing its identity.
                 }
@@ -191,15 +196,33 @@ public final class EntityProjectionIndex {
                 ? Float.valueOf(amount) : null;
     }
 
-    private static void add(JsonElement raw,String model,Float scale,
+    /** Java DyeColor#getColor() RGB, DyeColor order; mirrors the pack's baked dye textures. */
+    static final int[] JAVA_DYE_RGB = {0xF9FFFE, 0xF9801D, 0xC74EBD, 0x3AB3DA, 0xFED83D, 0x80C71F, 0xF38BAA,
+            0x474F52, 0x9D9D97, 0x169C9C, 0x8932B8, 0x3C44AA, 0x835432, 0x5E7C16, 0xB02E26, 0x1D1D21};
+
+    /** Paper dyes with a single DyeColor, so matches are exact; other colours take the nearest. */
+    static Integer dye(JsonElement value) {
+        if(value==null||value.isJsonNull())return Integer.valueOf(0);
+        int rgb=value.getAsInt()&0xFFFFFF, best=0;
+        long bestDistance=Long.MAX_VALUE;
+        for(int i=0;i<JAVA_DYE_RGB.length;i++) {
+            int other=JAVA_DYE_RGB[i];
+            long dr=((rgb>>16)&255)-((other>>16)&255), dg=((rgb>>8)&255)-((other>>8)&255), db=(rgb&255)-(other&255);
+            long distance=dr*dr+dg*dg+db*db;
+            if(distance<bestDistance){bestDistance=distance;best=i;}
+        }
+        return Integer.valueOf(best+1);
+    }
+
+    private static void add(JsonElement raw,String model,Float scale,Integer dye,
                             Map<UUID,Projection> result)throws IOException {
         if(raw==null||raw.isJsonNull())return;
         UUID id;
         try { id=UUID.fromString(raw.getAsString()); }
         catch(IllegalArgumentException invalid){throw new IOException("Invalid Paper display UUID in projection",invalid);}
-        Projection projection=new Projection(model,scale);
+        Projection projection=new Projection(model,scale,dye);
         Projection prior=result.putIfAbsent(id,projection);
-        if(prior!=null && (!prior.entityType().equals(model) || !Objects.equals(prior.scale(),scale)))
+        if(prior!=null && !prior.equals(projection))
             throw new IOException("Conflicting Paper entity UUID mapped to multiple visual states: "+id);
     }
 }

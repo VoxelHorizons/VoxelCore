@@ -25,6 +25,8 @@ final class ProjectionReconciler {
         String definitionId();
         /** Override Geyser SCALE; null restores Geyser's own value. */
         void scale(Float scale);
+        /** Set the voxelcore:dye entity property (ignored for entities without it). */
+        default void dye(int dye) { }
     }
 
     static final class Result {
@@ -52,6 +54,7 @@ final class ProjectionReconciler {
             for(Target target:targets) {
                 if(now.entityType().equals(target.definitionId())) {
                     target.scale(now.scale());
+                    if(now.dye()!=null)target.dye(now.dye().intValue());
                     scaled++;
                 } else {
                     needsRespawn++;
