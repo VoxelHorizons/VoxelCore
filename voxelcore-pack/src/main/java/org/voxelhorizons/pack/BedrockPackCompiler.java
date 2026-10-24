@@ -90,16 +90,22 @@ public final class BedrockPackCompiler {
             // 'abstract' prohibits normal giving, not client-side rendering.
             if (item.render() == null || item.render().model() == null) continue;
             Object raw = item.properties().get("bedrock");
+            if (raw != null && !(raw instanceof Map))
+                throw new IOException("properties.bedrock must be a map: " + item.id());
+            Map<?, ?> options = raw == null ? Collections.emptyMap() : (Map<?, ?>) raw;
+            Object textureOverride = options.get("texture");
+            double[] cameraOverride = guiRotation(options.get("gui_rotation"), item.id().toString());
             byte[] png = null;
-            if (raw == null) {
+            if (textureOverride == null) {
                 try {
                     if (!item.render().rule().isEmpty()) throw new IOException("Conditional model requires explicit texture");
                     String modelKey = item.render().model();
-                    png = rendered.get(modelKey);
+                    String cacheKey = modelKey + "|" + Arrays.toString(cameraOverride);
+                    png = rendered.get(cacheKey);
                     if (png == null) {
                         MessageDigest cacheDigest;
                         try { cacheDigest = MessageDigest.getInstance("SHA-256"); } catch (Exception e) { throw new IllegalStateException(e); }
-                        cacheDigest.update(("renderer-v2-fit-gui:" + modelKey).getBytes(StandardCharsets.UTF_8));
+                        cacheDigest.update(("renderer-v3-camera:" + cacheKey).getBytes(StandardCharsets.UTF_8));
                         for (Map.Entry<String, byte[]> asset : javaAssets.entrySet()) {
                             cacheDigest.update(asset.getKey().getBytes(StandardCharsets.UTF_8));
                             cacheDigest.update((byte) 0); cacheDigest.update(asset.getValue());
@@ -107,17 +113,16 @@ public final class BedrockPackCompiler {
                         Path cache = outputRoot.resolve("icon-cache").resolve(hex(cacheDigest.digest()) + ".png");
                         if (Files.isRegularFile(cache)) png = Files.readAllBytes(cache);
                         else {
-                            png = renderer.render(modelKey); Files.createDirectories(cache.getParent());
+                            png = renderer.render(modelKey, cameraOverride); Files.createDirectories(cache.getParent());
                             Files.write(cache, png);
                         }
-                        rendered.put(modelKey, png);
+                        rendered.put(cacheKey, png);
                     }
                 } catch (IOException | RuntimeException failure) {
                     unsupported.add(item.id() + ": " + failure.getMessage()); continue;
                 }
             } else {
-            if (!(raw instanceof Map)) throw new IOException("properties.bedrock must be a map: " + item.id());
-            Object texture = ((Map<?, ?>) raw).get("texture");
+            Object texture = textureOverride;
             if (!(texture instanceof String) || !((String) texture).matches("[a-z0-9_.-]+:[a-z0-9_./-]+")
                     || ((String) texture).contains(".."))
                 throw new IOException("Expected namespaced PNG texture without extension for " + item.id());
@@ -225,6 +230,22 @@ public final class BedrockPackCompiler {
             }
         }
     }
+    private static double[] guiRotation(Object raw, String id) throws IOException {
+        if (raw == null) return null;
+        if (!(raw instanceof List) || ((List<?>) raw).size() != 3)
+            throw new IOException("properties.bedrock.gui_rotation requires [x, y, z] for " + id);
+        double[] values = new double[3];
+        for (int i=0;i<3;i++) {
+            Object number = ((List<?>) raw).get(i);
+            if (!(number instanceof Number))
+                throw new IOException("properties.bedrock.gui_rotation values must be numbers for " + id);
+            values[i] = ((Number) number).doubleValue();
+            if (!Double.isFinite(values[i]) || values[i] < -360 || values[i] > 360)
+                throw new IOException("properties.bedrock.gui_rotation values must be -360..360 for " + id);
+        }
+        return values;
+    }
+
     private static String summarizeUnsupported(List<String> failures) {
         Map<String, Integer> groups = new TreeMap<String, Integer>();
         for (String failure : failures) {
