@@ -17,9 +17,40 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# rcon runs inside $(...) subshells, so the fallback state is a file, not a variable.
+RCON_DEAD_MARKER="$PWD/.smoke/rcon-dead-${MC_VERSION}"
+rm -f "$RCON_DEAD_MARKER"
+
+# Fallback for KI-01: legacy vanilla RCON listener threads can exit silently after
+# startup (thread dump shows no "RCON Listener"). Send the same command through
+# the itzg console pipe and return the server log lines it produced, so every
+# assertion still runs against real command output.
+console_command() {
+  local command="$1"
+  local before after output
+  before="$(docker logs "$NAME" 2>&1 | wc -l)"
+  docker exec "$NAME" mc-send-to-console "$command" >&2
+  output=""
+  for _ in $(seq 1 15); do
+    sleep 1
+    after="$(docker logs "$NAME" 2>&1 | wc -l)"
+    if (( after > before )); then
+      # Allow multi-line replies to finish before reading them.
+      sleep 2
+      output="$(docker logs "$NAME" 2>&1 | tail -n +"$((before + 1))")"
+      break
+    fi
+  done
+  printf '%s\n' "$output"
+}
+
 rcon() {
   local command="$1"
   local output
+  if [[ -f "$RCON_DEAD_MARKER" ]]; then
+    console_command "$command"
+    return 0
+  fi
   for _ in $(seq 1 30); do
     if output="$(docker exec "$NAME" rcon-cli --host 127.0.0.1 --password voxelcore-smoke "$command" 2>&1)"; then
       printf '%s\n' "$output"
@@ -49,7 +80,23 @@ rcon() {
   ' >&2 || true
   echo "===== SERVER OUTPUT / THREAD DUMP =====" >&2
   docker logs "$NAME" --tail 260 >&2 || true
+  if docker inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null | grep -q true; then
+    echo "::warning title=KI-01 RCON listener lost on Minecraft $MC_VERSION::Falling back to console pipe for remaining smoke commands" >&2
+    mkdir -p "$(dirname "$RCON_DEAD_MARKER")"
+    touch "$RCON_DEAD_MARKER"
+    console_command "$command"
+    return 0
+  fi
   return 1
+}
+
+# Non-fatal single attempt used by polling loops.
+try_command() {
+  if [[ -f "$RCON_DEAD_MARKER" ]]; then
+    console_command "$1"
+  else
+    docker exec "$NAME" rcon-cli --host 127.0.0.1 --password voxelcore-smoke "$1" 2>&1 || true
+  fi
 }
 
 rm -rf "$DATA_DIR"
@@ -77,6 +124,7 @@ docker run -d --name "$NAME" \
   -e VERSION="$MC_VERSION" \
   -e ONLINE_MODE=FALSE \
   -e ENABLE_RCON=TRUE \
+  -e CREATE_CONSOLE_IN_PIPE=true \
   -e RCON_PASSWORD=voxelcore-smoke \
   -e MEMORY="$MEMORY_ALLOCATION" \
   -v "$DATA_DIR:/data" \
@@ -123,8 +171,7 @@ PACK_ZIP="$DATA_DIR/plugins/VoxelCore/build/resource-packs/$PACK_TARGET.zip"
 PACK_BUILD_COMPLETE=0
 PACK_BUILD_INFO=""
 for _ in $(seq 1 120); do
-  PACK_BUILD_INFO="$(docker exec "$NAME" rcon-cli --host 127.0.0.1 --password voxelcore-smoke \
-      'voxelcore admin content info' 2>&1 || true)"
+  PACK_BUILD_INFO="$(try_command 'voxelcore admin content info')"
   if [[ -f "$PACK_ZIP" ]] && grep -q 'content revision 2: 4 items' <<<"$PACK_BUILD_INFO"; then
     PACK_BUILD_COMPLETE=1
     break
