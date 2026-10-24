@@ -75,6 +75,13 @@ The current Bedrock output is a **resource pack plus Geyser v2 item mappings**, 
 
 **Acceptance is visual and functional, not just “pack sent”:** the same source content must show correct items and furniture when held, browsed and placed on Bedrock, with no missing textures, text glyphs, or inaccessible interaction targets. Store paired Java/Bedrock screenshots and actual Bedrock/Geyser version with every acceptance record.
 
+### 26.3 regression: excessive texture path lengths and browser command crash
+
+- Generated icon names now use a deterministic SHA-256-derived 128-bit identifier (`voxelcore:i_<32-hex>`) instead of hex-encoding the *entire* Java content ID. The mapping `bedrock_identifier`, item atlas `icon`, texture entry and file path are all generated from the same short ID. Hash collisions are rejected. Generated texture paths remain below Geyser's 80-character warning threshold, even for very long furniture variant names. **This changes the Bedrock resource pack revision and mapping identifiers**, so always publish the two files as a pair before restarting Geyser/reconnecting.
+- Native authored assets are not silently renamed because other native Bedrock JSON/UI resources may reference them. A path of 80 or more UTF-8 bytes fails the build with an actionable filename instead of uploading a known non-portable pack.
+- `/vc admin item ui` and `/vc admin block ui` previously failed on **both Java and Bedrock** with `NoClassDefFoundError: ContentBrowser$1`. The anonymous Java comparator responsible for that class is now a Java 8 method-reference comparator, removing the runtime dependency on the missing class. CI also checks for the actual browser and nested holder/type classes inside every shaded distribution JAR.
+- Acceptance: no `textures/voxelcore/... meets or exceeds 80 characters` warnings on Geyser 2.12; the two inventory browser commands open, page and close on **both clients**. Inspect the **real compiled JAR** and restart Paper, rather than hot-replacing it.
+
 ### Local Geyser publication smoke test
 
 1. Confirm Geyser-Spigot is loaded on the *same* Paper server, or set `bedrock.geyser_data_directory` explicitly to a mounted proxy/standalone Geyser data directory.
