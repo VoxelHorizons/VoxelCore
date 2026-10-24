@@ -19,6 +19,7 @@ import org.voxelhorizons.VoxelCore;
 import org.voxelhorizons.content.ContentID;
 import org.voxelhorizons.content.block.BlockDefinition;
 import org.voxelhorizons.content.item.ItemDefinition;
+import org.voxelhorizons.pack.BedrockPlayers;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -76,9 +77,13 @@ public final class ContentBrowser implements Listener {
         long revision = plugin.getContentRuntime().current().revision();
 
         BrowserHolder holder = new BrowserHolder(type, ids, page, revision);
-        Inventory inventory = Bukkit.createInventory(holder, INVENTORY_SIZE,
-                configuredTitle(plugin.getConfig(), type, page, pages, ids.size(),
-                        text -> plugin.getTextPlaceholderService().resolve(text, true, true)));
+        // Java inventory titles may contain full-screen bitmap glyphs and negative offsets.
+        // Those are Java font assets, not Bedrock GUI elements; keep Bedrock titles readable.
+        String title = BedrockPlayers.isBedrock(player.getUniqueId())
+                ? configuredBedrockTitle(plugin.getConfig(), type, page, pages, ids.size())
+                : configuredTitle(plugin.getConfig(), type, page, pages, ids.size(),
+                        text -> plugin.getTextPlaceholderService().resolve(text, true, true));
+        Inventory inventory = Bukkit.createInventory(holder, INVENTORY_SIZE, title);
         holder.inventory = inventory;
 
         int start = page * CONTENT_SLOTS;
@@ -129,6 +134,21 @@ public final class ContentBrowser implements Listener {
                 : config.getString("ui.browser.titles." + type.configKey(),
                         "VC " + type.title() + " {page}/{pages}");
         return formatTitle(template, type, page, pages, totalItems, resolveGlyphs);
+    }
+
+    /**
+     * Bedrock clients cannot interpret Java bitmap-font inventory-title glyph overlays.
+     * These templates are deliberately independent from the Java page-title overrides.
+     */
+    static String configuredBedrockTitle(Configuration config, Type type, int page, int pages, int totalItems) {
+        if (page < 0 || pages < 1 || page >= pages)
+            throw new IllegalArgumentException("Invalid browser page " + page + "/" + pages);
+        String override = config.getString("ui.browser.bedrock_page_titles."
+                + type.configKey() + "." + (page + 1), null);
+        String template = override != null ? override
+                : config.getString("ui.browser.bedrock_titles." + type.configKey(),
+                        "VC " + type.title() + " {page}/{pages}");
+        return formatTitle(template, type, page, pages, totalItems, Function.identity());
     }
 
     static String formatTitle(String template, Type type, int page, int pages,
