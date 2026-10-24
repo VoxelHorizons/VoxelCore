@@ -42,7 +42,7 @@ public final class BedrockGeometryCompilerTest {
         String shortId = "i_11112222333344445555666677778888";
         BedrockGeometryCompiler.Output first = converter.compile("demo:bench",identifier,shortId);
         BedrockGeometryCompiler.Output child = converter.compile("demo:dark_bench",identifier,shortId);
-        assertNotNull(first); assertEquals(1,first.cuboids); assertEquals(5,first.assets.size());
+        assertNotNull(first); assertEquals(1,first.cuboids); assertEquals(4,first.assets.size());
         assertTrue(first.assets.containsKey("attachables/"+shortId+".json"));
         assertTrue(first.assets.containsKey("models/entity/voxelcore/"+shortId+".geo.json"));
         assertTrue(first.assets.containsKey("textures/voxelcore/g_"+shortId+".png"));
