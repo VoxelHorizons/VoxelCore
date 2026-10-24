@@ -59,6 +59,8 @@ public final class BedrockPackCompiler {
         JsonObject textures = new JsonObject();
         Map<String, byte[]> selectors = new HashMap<String, byte[]>();
         List<String> unsupported = new ArrayList<String>();
+        List<String> unsupportedGeometry = new ArrayList<String>();
+        int nativeGeometryCount = 0;
         Set<String> ambiguousAssets = new HashSet<String>();
         // Reject collisions even though a 128-bit SHA-256 prefix is astronomically unlikely to collide.
         Map<String, String> generatedIds = new HashMap<String, String>();
@@ -89,6 +91,7 @@ public final class BedrockPackCompiler {
         int mappedGlyphs = glyphAllocationManifest == null ? 0
                 : BedrockGlyphAtlas.append(contentRoot, glyphAllocationManifest, javaAssets, assets);
         BedrockIconRenderer renderer = new BedrockIconRenderer(javaAssets);
+        BedrockGeometryCompiler geometry = new BedrockGeometryCompiler(javaAssets);
         Map<String, byte[]> rendered = new HashMap<String, byte[]>();
         int count = 0;
         for (ItemDefinition item : new ContentLoader().load(contentRoot).entries().values()) {
@@ -165,6 +168,16 @@ public final class BedrockPackCompiler {
             String identifier = "voxelcore:" + shortId;
             String icon = "voxelcore." + shortId;
             String path = "textures/voxelcore/" + shortId;
+            try {
+                BedrockGeometryCompiler.Output threeDimensional = geometry.compile(model, identifier, shortId);
+                if (threeDimensional != null) {
+                    for (Map.Entry<String, byte[]> generated : threeDimensional.assets.entrySet())
+                        put(assets, generated.getKey(), generated.getValue());
+                    nativeGeometryCount++;
+                }
+            } catch (IOException unsupported3D) {
+                unsupportedGeometry.add(item.id() + ": " + unsupported3D.getMessage());
+            }
             put(assets, path + ".png", png);
             JsonObject tex = new JsonObject(); tex.addProperty("textures", path); textures.add(icon, tex);
             JsonObject definition = new JsonObject();
@@ -190,8 +203,10 @@ public final class BedrockPackCompiler {
             digest.update(entry.getValue());
         }
         Collections.sort(unsupported);
+        Collections.sort(unsupportedGeometry);
         String reasonSummary = summarizeUnsupported(unsupported);
         digest.update(unsupported.toString().getBytes(StandardCharsets.UTF_8));
+        digest.update(unsupportedGeometry.toString().getBytes(StandardCharsets.UTF_8));
         digest.update(mappingBytes);
         byte[] hash = digest.digest(); String revision = hex(hash);
         JsonArray version = new JsonArray();
@@ -227,9 +242,11 @@ public final class BedrockPackCompiler {
             }
             Files.write(staging.resolve("voxelcore-items.json"), mappingBytes);
             Files.write(staging.resolve("unsupported-items.txt"), unsupported, StandardCharsets.UTF_8);
+            Files.write(staging.resolve("unsupported-geometry.txt"), unsupportedGeometry, StandardCharsets.UTF_8);
             Path destination = outputRoot.resolve(revision);
             if (!Files.exists(destination)) Files.move(staging, destination);
-            return new Result(destination, count, unsupported.size(), revision, reasonSummary, mappedGlyphs);
+            return new Result(destination, count, unsupported.size(), revision, reasonSummary, mappedGlyphs,
+                    nativeGeometryCount, unsupportedGeometry.size());
         } finally {
             if (Files.exists(staging)) try (Stream<Path> paths = Files.walk(staging)) {
                 for (Path path : (Iterable<Path>) paths.sorted(Comparator.reverseOrder())::iterator) Files.delete(path);
@@ -298,10 +315,15 @@ public final class BedrockPackCompiler {
         public final Path directory; public final int mappedItems; public final int unsupportedItems; public final String revision;
         public final String unsupportedReasonSummary;
         public final int mappedGlyphs;
-        Result(Path directory, int mappedItems, int unsupportedItems, String revision, String unsupportedReasonSummary, int mappedGlyphs) {
+        public final int nativeGeometryCount;
+        public final int unsupportedGeometryCount;
+        Result(Path directory, int mappedItems, int unsupportedItems, String revision, String unsupportedReasonSummary, int mappedGlyphs,
+               int nativeGeometryCount, int unsupportedGeometryCount) {
             this.directory = directory; this.mappedItems = mappedItems; this.unsupportedItems = unsupportedItems; this.revision = revision;
             this.unsupportedReasonSummary = unsupportedReasonSummary;
             this.mappedGlyphs = mappedGlyphs;
+            this.nativeGeometryCount = nativeGeometryCount;
+            this.unsupportedGeometryCount = unsupportedGeometryCount;
         }
     }
 }
