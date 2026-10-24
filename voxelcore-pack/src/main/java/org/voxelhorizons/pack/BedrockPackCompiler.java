@@ -76,6 +76,7 @@ public final class BedrockPackCompiler {
         JsonObject items = new JsonObject();
         JsonObject textures = new JsonObject();
         JsonObject entityModels = new JsonObject();
+        JsonArray dyeableEntities = new JsonArray();
         Map<String, byte[]> selectors = new HashMap<String, byte[]>();
         List<String> unsupported = new ArrayList<String>();
         List<String> unsupportedGeometry = new ArrayList<String>();
@@ -126,6 +127,13 @@ public final class BedrockPackCompiler {
             Object textureOverride = bedrockSettings.get("texture");
             double[] cameraOverride = guiRotation(bedrockSettings.get("gui_rotation"), item.id().toString());
             Map<Integer, Integer> tints = BedrockTints.parse(bedrockSettings.get("tints"), item.id().toString());
+            // Dyeable items (properties.dyeable): icons show the undyed default colour; placed
+            // entities get one baked atlas per Java dye colour selected by an entity property.
+            Integer dyeDefault;
+            try { dyeDefault = dyeDefault(item.properties().get("dyeable"), item.id().toString()); }
+            catch (IOException invalidDye) { unsupported.add(item.id() + ": " + invalidDye.getMessage()); continue; }
+            Map<Integer, Integer> iconTints = dyeDefault == null ? tints
+                    : BedrockGeometryCompiler.withDye(tints, dyeDefault.intValue());
             List<Variant> variants;
             Integer legacyModelData = null;
             try {
@@ -149,7 +157,7 @@ public final class BedrockPackCompiler {
             if (textureOverride == null) {
                 try {
                     String modelKey = variant.renderModel;
-                    String cacheKey = modelKey + "|" + Arrays.toString(cameraOverride) + "|" + tints;
+                    String cacheKey = modelKey + "|" + Arrays.toString(cameraOverride) + "|" + iconTints;
                     png = rendered.get(cacheKey);
                     if (png == null) {
                         MessageDigest cacheDigest;
@@ -162,7 +170,7 @@ public final class BedrockPackCompiler {
                         Path cache = outputRoot.resolve("icon-cache").resolve(hex(cacheDigest.digest()) + ".png");
                         if (Files.isRegularFile(cache)) png = Files.readAllBytes(cache);
                         else {
-                            png = renderer.render(modelKey, cameraOverride, tints); Files.createDirectories(cache.getParent());
+                            png = renderer.render(modelKey, cameraOverride, iconTints); Files.createDirectories(cache.getParent());
                             Files.write(cache, png);
                         }
                         rendered.put(cacheKey, png);
@@ -210,14 +218,19 @@ public final class BedrockPackCompiler {
             String icon = "voxelcore." + shortId;
             String path = "textures/voxelcore/" + shortId;
             try {
-                BedrockGeometryCompiler.Output threeDimensional = geometry.compile(variant.renderModel, identifier, shortId, tints);
+                BedrockGeometryCompiler.Output threeDimensional = dyeDefault == null
+                        ? geometry.compile(variant.renderModel, identifier, shortId, tints)
+                        : geometry.compileDyeable(variant.renderModel, identifier, shortId, tints, dyeDefault.intValue());
                 if (threeDimensional != null) {
                     for (Map.Entry<String, byte[]> generated : threeDimensional.assets.entrySet())
                         put(assets, generated.getKey(), generated.getValue());
                     // Placed displays carry no custom_model_data in the projection feed: use the
                     // rule's lowest-priority (default) leaf as the item's entity model.
-                    if (variant.entityDefault)
+                    if (variant.entityDefault) {
                         entityModels.addProperty(item.id().toString(), "voxelcore:entity_" + shortId);
+                        if (threeDimensional.assets.containsKey(BedrockGeometryCompiler.DYE_CONTROLLER_PATH))
+                            dyeableEntities.add("voxelcore:entity_" + shortId);
+                    }
                     nativeGeometryCount++;
                 }
             } catch (IOException unsupported3D) {
@@ -249,6 +262,8 @@ public final class BedrockPackCompiler {
         JsonObject entityIndex = new JsonObject();
         entityIndex.addProperty("schema", 1);
         entityIndex.add("content_models", entityModels);
+        // Geyser extension registers the voxelcore:dye property only for these entities.
+        entityIndex.add("dyeable_entities", dyeableEntities);
         put(assets, "voxelcore/entity_index.json", bytes(entityIndex));
         JsonObject atlas = new JsonObject();
         atlas.addProperty("resource_pack_name", "VoxelCore"); atlas.addProperty("texture_name", "atlas.items");
@@ -312,6 +327,17 @@ public final class BedrockPackCompiler {
             }
         }
     }
+    /** Undyed colour of a dyeable item (ItemManager semantics: properties.dyeable.color, default white). */
+    static Integer dyeDefault(Object raw, String itemId) throws IOException {
+        if (!(raw instanceof Map)) return null;
+        Object color = ((Map<?, ?>) raw).get("color");
+        if (color == null) return Integer.valueOf(0xFFFFFF);
+        String text = String.valueOf(color).trim();
+        if (text.startsWith("#")) text = text.substring(1);
+        if (!text.matches("[0-9a-fA-F]{6}")) throw new IOException("properties.dyeable.color must be #RRGGBB for " + itemId);
+        return Integer.valueOf(Integer.parseInt(text, 16));
+    }
+
     /** One Bedrock mapping for an item: the plain model, or one leaf of its render.rule. */
     private static final class Variant {
         final String renderModel, suffix;

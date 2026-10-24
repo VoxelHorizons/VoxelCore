@@ -192,3 +192,15 @@ Bedrock mappings follow the backend's Java item identity: 1.21.4+ maps by `item_
 "custom_model_data": N}` definitions using the stable number from `render-allocations.yml`
 (build the Java pack first). 1.12/1.13 damage-based identities have no Geyser predicate and
 are rejected with a clear message.
+
+### Dyed furniture and vehicles (B10)
+
+Dyeable items (`properties.dyeable`) whose Java model has tinted faces get 17 baked entity
+atlases: the item's undyed `dyeable.color` (default white) and the 16 Java `DyeColor` colours.
+A shared render controller (`controller.render.voxelcore.dyeable`) selects
+`Array.dye[query.property('voxelcore:dye')]`, the same Molang texture-array pattern vanilla
+uses for variants. The Geyser extension registers `voxelcore:dye` (0..16) for exactly the
+entities listed in `entity_index.json` `dyeable_entities`, sets it before spawn from the
+projection feed's `dye_rgb` and updates it live. Paper dyes furniture with one dye item at a
+time, so feed colours match the palette exactly; any other RGB uses the nearest dye. Item icons
+show the undyed colour. Not yet seen on a real client.

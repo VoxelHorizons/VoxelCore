@@ -78,6 +78,14 @@ public final class EntityProjectionIndexTest {
         assertEquals("Other backends keep projecting",mapped,index.entityType(lobby));
     }
 
+    @Test public void mapsJavaDyeColoursToPaletteIndices() {
+        assertEquals(Integer.valueOf(0), EntityProjectionIndex.dye(com.google.gson.JsonNull.INSTANCE));
+        assertEquals(Integer.valueOf(15), EntityProjectionIndex.dye(new com.google.gson.JsonPrimitive(0xB02E26)));
+        assertEquals(Integer.valueOf(1), EntityProjectionIndex.dye(new com.google.gson.JsonPrimitive(0xFFFFFF)));
+        assertEquals("Nearest dye for a non-palette colour", Integer.valueOf(16),
+                EntityProjectionIndex.dye(new com.google.gson.JsonPrimitive(0x000000)));
+    }
+
     @Test public void stalePaperFileDoesNotReplaceNewDisplaysAndExpiresCachedMappings() throws Exception {
         Path root=temp.newFolder().toPath(),dir=root.resolve("voxelcore-projection");
         Files.createDirectories(dir);

@@ -146,6 +146,34 @@ public final class BedrockGeometryCompilerTest {
         assertEquals(0xff552211, atlas.getRGB(0,0));
     }
 
+    @Test public void dyeableTintedModelGetsDefaultPlusSixteenDyeAtlasesAndController() throws Exception {
+        Map<String,byte[]> assets = modelAssets();
+        String parent = new String(assets.get("assets/demo/models/bench.json"),StandardCharsets.UTF_8);
+        parent = parent.replace("\"texture\":\"#wood\"","\"texture\":\"#wood\",\"tintindex\":0");
+        assets.put("assets/demo/models/bench.json",parent.getBytes(StandardCharsets.UTF_8));
+        String shortId = "i_11112222333344445555666677778888";
+        BedrockGeometryCompiler.Output output = new BedrockGeometryCompiler(assets).compileDyeable("demo:bench",
+                "voxelcore:"+shortId, shortId, java.util.Collections.<Integer,Integer>emptyMap(), 0xFFFFFF);
+        assertTrue(output.tinted);
+        JsonObject description = JsonParser.parseString(new String(output.assets.get(
+                "entity/voxelcore/"+shortId+".entity.json"),StandardCharsets.UTF_8)).getAsJsonObject()
+                .getAsJsonObject("minecraft:client_entity").getAsJsonObject("description");
+        assertEquals(BedrockGeometryCompiler.DYE_CONTROLLER, description.getAsJsonArray("render_controllers").get(0).getAsString());
+        assertEquals(17, description.getAsJsonObject("textures").size());
+        // Default colour white keeps the texture; red dye (0xB02E26) multiplies it.
+        BufferedImage undyed = ImageIO.read(new ByteArrayInputStream(output.assets.get("textures/voxelcore/g_"+shortId+".png")));
+        BufferedImage red = ImageIO.read(new ByteArrayInputStream(output.assets.get("textures/voxelcore/g_"+shortId+"_d15.png")));
+        assertEquals(0xffaa4422, undyed.getRGB(0,0));
+        assertEquals(0xff750c05, red.getRGB(0,0));
+        String controller = new String(output.assets.get(BedrockGeometryCompiler.DYE_CONTROLLER_PATH), StandardCharsets.UTF_8);
+        assertTrue(controller.contains("Array.dye[query.property('voxelcore:dye')]"));
+        assertTrue(controller.contains("Texture.dye_16"));
+
+        BedrockGeometryCompiler.Output untinted = new BedrockGeometryCompiler(modelAssets()).compileDyeable("demo:bench",
+                "voxelcore:"+shortId, shortId, java.util.Collections.<Integer,Integer>emptyMap(), 0xFFFFFF);
+        assertFalse("Untinted models stay single-texture", untinted.assets.containsKey(BedrockGeometryCompiler.DYE_CONTROLLER_PATH));
+    }
+
     @Test public void rescaleFactorIsOneWithoutRescaleFlag() {
         JsonObject rotation = JsonParser.parseString("{\"axis\":\"x\",\"angle\":22.5}").getAsJsonObject();
         assertEquals(1.0, BedrockIconRenderer.rescaleFactor(rotation), 0);

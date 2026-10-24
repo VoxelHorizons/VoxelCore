@@ -74,6 +74,34 @@ public final class EntityDefinitionCatalog {
         }
     }
 
+    /**
+     * Entities whose pack declares the dye texture array (entity_index "dyeable_entities");
+     * only these get the voxelcore:dye property. Unknown/unsafe entries are rejected.
+     */
+    public static Set<String> loadDyeable(Path geyserRoot) throws IOException {
+        Path path = geyserRoot.resolve("packs/voxelcore.mcpack");
+        if (!Files.isRegularFile(path) || Files.isSymbolicLink(path)) return Collections.emptySet();
+        try (ZipFile zip = new ZipFile(path.toFile())) {
+            ZipEntry index = zip.getEntry("voxelcore/entity_index.json");
+            if (index == null) return Collections.emptySet();
+            JsonObject file = JsonParser.parseString(read(zip,index)).getAsJsonObject();
+            if (!file.has("dyeable_entities")) return Collections.emptySet();
+            Set<String> out = new TreeSet<String>();
+            for (JsonElement entry : file.getAsJsonArray("dyeable_entities")) {
+                String identifier = entry.getAsString();
+                if (!identifier.matches("voxelcore:entity_i_[0-9a-f]{32}"))
+                    throw new IOException("Unsafe dyeable entity identifier: " + identifier);
+                JsonObject textures = resource(zip,"entity/voxelcore/"+identifier.substring("voxelcore:entity_".length())
+                        +".entity.json","minecraft:client_entity").getAsJsonObject("textures");
+                if (!textures.has("dye_16")) throw new IOException("Dyeable entity lacks dye textures: " + identifier);
+                out.add(identifier);
+            }
+            return Collections.unmodifiableSet(out);
+        } catch (RuntimeException malformed) {
+            throw new IOException("Invalid VoxelCore dyeable entity list", malformed);
+        }
+    }
+
     private static JsonObject resource(ZipFile zip,String path,String member) throws IOException {
         ZipEntry entry=zip.getEntry(path);
         if (entry==null)throw new IOException("Missing Bedrock entity resource "+path);

@@ -31,10 +31,84 @@ final class BedrockGeometryCompiler {
     static final class Output {
         final Map<String, byte[]> assets;
         final int cuboids;
-        Output(Map<String, byte[]> assets, int cuboids) {
+        /** True when at least one face had a tintindex (only then do dye variants differ). */
+        final boolean tinted;
+        Output(Map<String, byte[]> assets, int cuboids, boolean tinted) {
             this.assets = Collections.unmodifiableMap(new TreeMap<String,byte[]>(assets));
             this.cuboids = cuboids;
+            this.tinted = tinted;
         }
+    }
+
+    /** Java DyeColor#getColor() RGB in DyeColor order (WHITE..BLACK); dye property values 1..16. */
+    static final int[] JAVA_DYE_RGB = {0xF9FFFE, 0xF9801D, 0xC74EBD, 0x3AB3DA, 0xFED83D, 0x80C71F, 0xF38BAA,
+            0x474F52, 0x9D9D97, 0x169C9C, 0x8932B8, 0x3C44AA, 0x835432, 0x5E7C16, 0xB02E26, 0x1D1D21};
+    static final String DYE_PROPERTY = "voxelcore:dye";
+    static final String DYE_CONTROLLER = "controller.render.voxelcore.dyeable";
+    static final String DYE_CONTROLLER_PATH = "render_controllers/voxelcore_dyeable.render_controllers.json";
+
+    /**
+     * Shared render controller selecting one of 17 baked atlases with the Geyser entity
+     * property {@code voxelcore:dye} (0 = item default colour, 1..16 = Java dye colours),
+     * the same Array[...] texture-selection pattern vanilla uses for variants.
+     */
+    static byte[] dyeRenderController() {
+        JsonArray textures = new JsonArray();
+        textures.add("Texture.default");
+        for (int i = 1; i <= JAVA_DYE_RGB.length; i++) textures.add("Texture.dye_" + i);
+        JsonObject arrays = new JsonObject(), textureArrays = new JsonObject();
+        textureArrays.add("Array.dye", textures);
+        arrays.add("textures", textureArrays);
+        JsonObject controller = new JsonObject();
+        controller.add("arrays", arrays);
+        controller.addProperty("geometry", "Geometry.default");
+        JsonArray materials = new JsonArray();
+        JsonObject all = new JsonObject(); all.addProperty("*", "Material.default"); materials.add(all);
+        controller.add("materials", materials);
+        JsonArray selected = new JsonArray();
+        selected.add("Array.dye[query.property('" + DYE_PROPERTY + "')]");
+        controller.add("textures", selected);
+        JsonObject controllers = new JsonObject(); controllers.add(DYE_CONTROLLER, controller);
+        JsonObject root = new JsonObject();
+        root.addProperty("format_version", "1.8.0");
+        root.add("render_controllers", controllers);
+        // Keep Molang quotes literal (Gson would otherwise emit \u0027).
+        return new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(root)
+                .getBytes(StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Dyeable variant: bakes every tinted face with the item's default colour (texture 0)
+     * and each Java dye colour (textures dye_1..dye_16) and switches the client entity to
+     * the shared dye render controller. Untinted models are returned unchanged.
+     */
+    Output compileDyeable(String javaModel, String bedrockIdentifier, String shortId,
+                          Map<Integer, Integer> tints, int defaultRgb) throws IOException {
+        Output base = compile(javaModel, bedrockIdentifier, shortId, withDye(tints, defaultRgb));
+        if (base == null || !base.tinted) return base;
+        Map<String, byte[]> assets = new TreeMap<String, byte[]>(base.assets);
+        String entityPath = "entity/voxelcore/" + shortId + ".entity.json";
+        JsonObject entity = JsonParser.parseString(new String(assets.get(entityPath), StandardCharsets.UTF_8)).getAsJsonObject();
+        JsonObject description = entity.getAsJsonObject("minecraft:client_entity").getAsJsonObject("description");
+        for (int i = 0; i < JAVA_DYE_RGB.length; i++) {
+            Output variant = compile(javaModel, bedrockIdentifier, shortId, withDye(tints, JAVA_DYE_RGB[i]));
+            String texture = "textures/voxelcore/g_" + shortId + "_d" + (i + 1);
+            assets.put(texture + ".png", variant.assets.get("textures/voxelcore/g_" + shortId + ".png"));
+            description.getAsJsonObject("textures").addProperty("dye_" + (i + 1), texture);
+        }
+        JsonArray controllers = new JsonArray(); controllers.add(DYE_CONTROLLER);
+        description.add("render_controllers", controllers);
+        assets.put(entityPath, JSON.toJson(entity).getBytes(StandardCharsets.UTF_8));
+        assets.put(DYE_CONTROLLER_PATH, dyeRenderController());
+        return new Output(assets, base.cuboids, true);
+    }
+
+    /** Author-configured constant tints win; every other tint index takes the dye colour. */
+    static Map<Integer, Integer> withDye(Map<Integer, Integer> tints, int rgb) {
+        Map<Integer, Integer> out = new TreeMap<Integer, Integer>();
+        for (int index = 0; index < 32; index++) out.put(Integer.valueOf(index), Integer.valueOf(rgb));
+        out.putAll(tints);
+        return out;
     }
 
     /**
@@ -54,6 +128,7 @@ final class BedrockGeometryCompiler {
             throw new IOException("Bedrock cuboid limit exceeded for " + javaModel + ": " + elements.size());
         JsonObject textures = model.has("textures") ? model.getAsJsonObject("textures") : new JsonObject();
 
+        boolean tinted = false;
         JsonArray cubes = new JsonArray();
         List<BufferedImage> painted = new ArrayList<BufferedImage>();
         double minX = Double.POSITIVE_INFINITY, minY = Double.POSITIVE_INFINITY, minZ = Double.POSITIVE_INFINITY;
@@ -119,7 +194,10 @@ final class BedrockGeometryCompiler {
                 String textureRef = face.get("texture").getAsString();
                 BufferedImage image = ImageIO.read(new ByteArrayInputStream(resolver.textureFor(textures,textureRef)));
                 if (image==null) throw new IOException("Unreadable model texture "+textureRef);
-                if (face.has("tintindex")) image = BedrockTints.face(image, face.get("tintindex").getAsInt(), tints, javaModel);
+                if (face.has("tintindex")) {
+                    image = BedrockTints.face(image, face.get("tintindex").getAsInt(), tints, javaModel);
+                    tinted = true;
+                }
                 double[] uv = face.has("uv") ? vector(face,"uv") : BedrockIconRenderer.uv(direction,from,to);
                 if (uv.length!=4) throw new IOException("Expected four Java UV coordinates for " + javaModel);
                 // Resample the Java face UV into one full Bedrock atlas cell.
@@ -247,7 +325,7 @@ final class BedrockGeometryCompiler {
         assets.put("entity/voxelcore/"+shortId+".entity.json",
                 JSON.toJson(clientEntityRoot).getBytes(StandardCharsets.UTF_8));
         assets.put("textures/voxelcore/g_"+shortId+".png",png.toByteArray());
-        return new Output(assets,cubes.size());
+        return new Output(assets,cubes.size(),tinted);
     }
 
     private static JsonArray xyz(double a,double b,double c) {

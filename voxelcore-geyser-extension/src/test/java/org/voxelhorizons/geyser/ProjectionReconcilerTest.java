@@ -18,9 +18,11 @@ public final class ProjectionReconcilerTest {
     private static final class FakeEntity implements ProjectionReconciler.Target {
         final String definition;
         final List<Float> scales=new ArrayList<Float>();
+        final List<Integer> dyes=new ArrayList<Integer>();
         FakeEntity(String definition) { this.definition=definition; }
         @Override public String definitionId() { return definition; }
         @Override public void scale(Float scale) { scales.add(scale); }
+        @Override public void dye(int dye) { dyes.add(dye); }
     }
 
     private static Map<UUID,EntityProjectionIndex.Projection> state(UUID id,String type,Float scale) {
@@ -50,6 +52,19 @@ public final class ProjectionReconcilerTest {
         reconciler.reconcile(state(id,BENCH,null),u->live);
         assertEquals("Dropping a scale restores Geyser's own value",
                 java.util.Arrays.asList(2f,0.5f,null),first.scales);
+    }
+
+    @Test public void pushesDyeChangesToMatchingEntities() {
+        UUID id=UUID.randomUUID();
+        FakeEntity entity=new FakeEntity(BENCH);
+        ProjectionReconciler reconciler=new ProjectionReconciler();
+        Map<UUID,EntityProjectionIndex.Projection> undyed=new HashMap<UUID,EntityProjectionIndex.Projection>();
+        undyed.put(id,EntityProjectionIndex.Projection.of(BENCH,null,0));
+        reconciler.reconcile(undyed,u->List.of(entity));
+        Map<UUID,EntityProjectionIndex.Projection> red=new HashMap<UUID,EntityProjectionIndex.Projection>();
+        red.put(id,EntityProjectionIndex.Projection.of(BENCH,null,15));
+        assertEquals(1,reconciler.reconcile(red,u->List.of(entity)).changed);
+        assertEquals(List.of(0,15),entity.dyes);
     }
 
     @Test public void modelChangeOnSpawnedEntityIsReportedNotForced() {

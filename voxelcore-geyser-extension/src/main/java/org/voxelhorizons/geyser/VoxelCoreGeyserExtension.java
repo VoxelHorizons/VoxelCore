@@ -4,6 +4,8 @@ import org.geysermc.event.subscribe.Subscribe;
 import org.geysermc.geyser.api.entity.custom.CustomEntityDefinition;
 import org.geysermc.geyser.api.entity.data.GeyserEntityDataTypes;
 import org.geysermc.geyser.api.event.lifecycle.GeyserDefineEntitiesEvent;
+import org.geysermc.geyser.api.event.lifecycle.GeyserDefineEntityPropertiesEvent;
+import org.geysermc.geyser.api.entity.property.type.GeyserIntEntityProperty;
 import org.geysermc.geyser.api.event.java.ServerSpawnEntityEvent;
 import org.geysermc.geyser.api.util.Identifier;
 import java.util.Map;
@@ -101,6 +103,8 @@ public final class VoxelCoreGeyserExtension implements Extension {
     }
 
     private volatile Map<String,String> nativeEntityIdentifiers = java.util.Collections.emptyMap();
+    /** Bedrock entity identifier -> registered voxelcore:dye property (dyeable entities only). */
+    private volatile Map<String,GeyserIntEntityProperty> dyeProperties = java.util.Collections.emptyMap();
     private volatile EntityProjectionIndex projectionIndex;
     private final ProjectionReconciler reconciler = new ProjectionReconciler();
     private volatile ScheduledExecutorService reconcileLoop;
@@ -129,8 +133,14 @@ public final class VoxelCoreGeyserExtension implements Extension {
         try {
             event.definition(CustomEntityDefinition.of(Identifier.of(projection.entityType())));
             final Float visualScale=projection.scale();
-            if(visualScale!=null) {
-                event.preSpawnConsumer(entity -> entity.override(GeyserEntityDataTypes.SCALE,visualScale));
+            final GeyserIntEntityProperty dyeProperty=dyeProperties.get(projection.entityType());
+            final Integer dye=projection.dye();
+            if(visualScale!=null || (dyeProperty!=null && dye!=null)) {
+                event.preSpawnConsumer(entity -> {
+                    if(visualScale!=null) entity.override(GeyserEntityDataTypes.SCALE,visualScale);
+                    // Set before spawn so the AddEntity packet already selects the dye texture.
+                    if(dyeProperty!=null && dye!=null) entity.updateProperty(dyeProperty,dye);
+                });
             }
         } catch (RuntimeException invalid) {
             logger().warning("VoxelCore custom entity replacement rejected for "
@@ -204,7 +214,7 @@ public final class VoxelCoreGeyserExtension implements Extension {
         }
     }
 
-    private static List<ProjectionReconciler.Target> liveTargets(List<? extends GeyserConnection> connections, UUID uuid) {
+    private List<ProjectionReconciler.Target> liveTargets(List<? extends GeyserConnection> connections, UUID uuid) {
         List<ProjectionReconciler.Target> targets = new ArrayList<ProjectionReconciler.Target>();
         for (GeyserConnection connection : connections) {
             GeyserEntity entity = connection.entities().byUuid(uuid);
@@ -217,6 +227,10 @@ public final class VoxelCoreGeyserExtension implements Extension {
                 @Override public void scale(Float scale) {
                     entity.override(GeyserEntityDataTypes.SCALE, scale);
                 }
+                @Override public void dye(int dye) {
+                    GeyserIntEntityProperty property = dyeProperties.get(definitionId());
+                    if (property != null) entity.updatePropertiesBatched(update -> update.update(property, dye), true);
+                }
             });
         }
         return targets;
@@ -228,6 +242,35 @@ public final class VoxelCoreGeyserExtension implements Extension {
             reconcileLoop.shutdownNow();
             reconcileLoop = null;
         }
+    }
+
+    /**
+     * Fired by Geyser right after GeyserDefineEntitiesEvent. Registers the int property
+     * voxelcore:dye (0 = undyed, 1..16 = Java dye colours) that the pack's shared dye render
+     * controller reads with query.property, for entities the pack declares dyeable.
+     */
+    @Subscribe
+    public void onDefineEntityProperties(GeyserDefineEntityPropertiesEvent event) {
+        if (nativeEntityIdentifiers.isEmpty()) return;
+        java.util.Set<String> dyeable;
+        try {
+            dyeable = EntityDefinitionCatalog.loadDyeable(geyserApi().configDirectory());
+        } catch (IOException invalid) {
+            logger().warning("VoxelCore dye properties not registered: " + invalid.getMessage());
+            return;
+        }
+        Map<String,GeyserIntEntityProperty> registered = new java.util.HashMap<String,GeyserIntEntityProperty>();
+        for (String identifier : dyeable) {
+            if (!nativeEntityIdentifiers.containsValue(identifier)) continue;
+            try {
+                registered.put(identifier, event.registerIntegerProperty(Identifier.of(identifier),
+                        Identifier.of("voxelcore:dye"), 0, 16, 0));
+            } catch (RuntimeException incompatible) {
+                logger().warning("Could not register dye property for " + identifier + ": " + incompatible.getMessage());
+            }
+        }
+        dyeProperties = java.util.Collections.unmodifiableMap(registered);
+        if (!registered.isEmpty()) logger().info("Registered voxelcore:dye on " + registered.size() + " dyeable entities.");
     }
 
     @Subscribe
