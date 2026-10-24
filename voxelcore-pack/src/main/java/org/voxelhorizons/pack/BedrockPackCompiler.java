@@ -98,9 +98,9 @@ public final class BedrockPackCompiler {
             Object raw = item.properties().get("bedrock");
             if (raw != null && !(raw instanceof Map))
                 throw new IOException("properties.bedrock must be a map: " + item.id());
-            Map<?, ?> options = raw == null ? Collections.emptyMap() : (Map<?, ?>) raw;
-            Object textureOverride = options.get("texture");
-            double[] cameraOverride = guiRotation(options.get("gui_rotation"), item.id().toString());
+            Map<?, ?> bedrockSettings = raw == null ? Collections.emptyMap() : (Map<?, ?>) raw;
+            Object textureOverride = bedrockSettings.get("texture");
+            double[] cameraOverride = guiRotation(bedrockSettings.get("gui_rotation"), item.id().toString());
             byte[] png = null;
             if (textureOverride == null) {
                 try {
