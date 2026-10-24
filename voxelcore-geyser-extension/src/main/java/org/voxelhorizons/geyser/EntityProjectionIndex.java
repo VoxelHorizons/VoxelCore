@@ -14,6 +14,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 /**
@@ -50,6 +52,7 @@ public final class EntityProjectionIndex {
     private final Path folder;
     private final Map<String,String> modelEntities;
     private Map<UUID,Projection> current = Collections.emptyMap();
+    private Set<String> unmapped = Collections.emptySet();
     private long furnitureSize=-1,vehiclesSize=-1;
     private long furnitureTime=-1,vehiclesTime=-1;
     private boolean furnitureFresh,vehiclesFresh;
@@ -77,6 +80,12 @@ public final class EntityProjectionIndex {
         return current;
     }
 
+    /** Addon model ids present in fresh Paper feeds with no registered Bedrock entity (B08 coverage). */
+    public synchronized Set<String> unmappedModels() throws IOException {
+        refresh();
+        return unmapped;
+    }
+
     public synchronized int size() throws IOException {
         refresh();
         return current.size();
@@ -95,9 +104,11 @@ public final class EntityProjectionIndex {
                 && fFresh==furnitureFresh && vFresh==vehiclesFresh)
             return;
         Map<UUID,Projection> updated=new HashMap<UUID,Projection>();
-        if(fFresh)load(furniture,"furniture",updated);
-        if(vFresh)load(vehicles,"vehicles",updated);
+        Set<String> missing=new TreeSet<String>();
+        if(fFresh)load(furniture,"furniture",updated,missing);
+        if(vFresh)load(vehicles,"vehicles",updated,missing);
         current=Collections.unmodifiableMap(updated);
+        unmapped=Collections.unmodifiableSet(missing);
         furnitureSize=fSize;vehiclesSize=vSize;
         furnitureTime=fTime;vehiclesTime=vTime;
         furnitureFresh=fFresh;vehiclesFresh=vFresh;
@@ -113,7 +124,8 @@ public final class EntityProjectionIndex {
                 ? Files.getLastModifiedTime(path,LinkOption.NOFOLLOW_LINKS).toMillis():-1;
     }
 
-    private void load(Path file, String kind, Map<UUID,Projection> destination) throws IOException {
+    private void load(Path file, String kind, Map<UUID,Projection> destination,
+                      Set<String> missing) throws IOException {
         if(!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS))return;
         JsonObject root;
         try {
@@ -127,7 +139,7 @@ public final class EntityProjectionIndex {
                 JsonObject row=item.getAsJsonObject();
                 String model=row.get("model_item").getAsString();
                 String bedrockId=modelEntities.get(model);
-                if(bedrockId==null)continue; // Never invent registrations.
+                if(bedrockId==null){missing.add(model);continue;} // Never invent registrations.
                 JsonObject links=row.getAsJsonObject("entity_links");
                 if(links==null)continue;
                 if("furniture".equals(kind)) {
@@ -139,7 +151,8 @@ public final class EntityProjectionIndex {
                         JsonElement modelRef=part.get("model_item");
                         if(modelRef==null||modelRef.isJsonNull())continue;
                         String partType=modelEntities.get(modelRef.getAsString());
-                        if(partType!=null)add(part.get("java_entity_uuid"),partType,
+                        if(partType==null)missing.add(modelRef.getAsString());
+                        else add(part.get("java_entity_uuid"),partType,
                                 scale(part.get("scale")),destination);
                     }
                 } else {

@@ -1,13 +1,30 @@
 # Bedrock recovery handoff — 24 October 2026 (Australia/Melbourne)
 
-## Latest checkpoint — B10 live scale reconcile (supersedes the section below)
+## Latest checkpoint — 24 October 2026, session 3 (supersedes everything below)
 
-- Parent of this commit: Core `7c14c06ee4f039307c18afb64a85081b493f320d`. Fetch live HEAD; this file is not a ref.
-- **Added:** `voxelcore-geyser-extension/.../ProjectionReconciler.java` (pure, Geyser-free) + `ProjectionReconcilerTest` (3 tests); `EntityProjectionIndex#snapshot()` and `Projection` equality; `VoxelCoreGeyserExtension` runs a 1 s daemon reconcile loop (started after entity registration, stopped on `GeyserShutdownEvent`) that pushes changed uniform SCALE to already-spawned custom entities in every session via `GeyserApi#onlineConnections` → `GeyserConnection#entities().byUuid()` → `GeyserEntity#override(SCALE, …)` (override is event-loop safe in Geyser core). Model change on a live entity is only logged; removed/expired feeds leave the last visual (fail closed).
-- **API evidence:** `EntityData#byUuid` was added in Geyser "Custom Entity API (#6010)" 2026-07-05, before `2.11.2-SNAPSHOT` (2026-08-20) — same API family already used for spawn substitution. No despawn/chunk events exist in the API; Geyser translates Java remove/move packets itself and re-raises `ServerSpawnEntityEvent` on chunk reload and reconnect, which already re-reads the index.
-- **Tests:** locally `javac` + JUnit 4 on `ProjectionReconcilerTest` + `EntityProjectionIndexTest`: OK (10 tests). The extension class itself was **not compiled locally** (repo.opencollab.dev blocked by this sandbox's proxy) — CI on this commit is the first compile check. Status: IMPLEMENTED; TESTED only after CI passes; NOT VERIFIED live.
-- **Remaining B10:** (1) companion Paper publishers must re-send an entity to Bedrock viewers when its `model_item` changes (e.g. `Player#hideEntity`/`showEntity` for Floodgate players) — then the spawn event applies the new definition; (2) dye/colour/animation need schema fields plus a Bedrock geometry consumer (`GeyserEntityDataTypes.COLOR`/`VARIANT` exist); (3) non-uniform scale is impossible with Geyser SCALE — keep rejecting; (4) live client acceptance (B19, BLOCKED).
-- **Next actions:** check CI for this commit and fix any compile error in `VoxelCoreGeyserExtension`; then item (1) above in VoxelFurniture PR #47 / VoxelVehicles PR #21; then B08 or B14 per older section.
+Fetch live HEADs first; this file is not a ref. No PR merged, no force push.
+
+| Repo / PR | Last code commit this session | CI |
+| --- | --- | --- |
+| VoxelCore [PR #84](https://github.com/VoxelHorizons/VoxelCore/pull/84) | `041708b` live scale reconcile; `950a8bb` B14 glyph migration; next commit: B08 unmapped-model status + this handoff | `041708b`: [build](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40079604473) + [smoke 8/8](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40079604461) SUCCESS. Later commits: re-query |
+| VoxelFurniture [PR #47](https://github.com/VoxelHorizons/VoxelFurniture/pull/47) | `b1b7585` re-send on model change | [build SUCCESS](https://github.com/VoxelHorizons/VoxelFurniture/actions/runs/40079728359) |
+| VoxelVehicles [PR #21](https://github.com/VoxelHorizons/VoxelVehicles/pull/21) | `09a0abb` re-send on model change | [build SUCCESS](https://github.com/VoxelHorizons/VoxelVehicles/actions/runs/40079763805) |
+
+**Done this session**
+- **B10** `ProjectionReconciler` + 1 s loop in `VoxelCoreGeyserExtension`: pushes changed uniform SCALE to spawned entities via `GeyserConnection#entities().byUuid()` → `GeyserEntity#override` (Geyser API: `byUuid` added in Custom Entity API #6010, 2026-07, before 2.11.2). Despawn/move/rotation = Geyser's own Java packet translation; chunk reload/reconnect = new `ServerSpawnEntityEvent` reading the current index. No despawn/chunk events exist in the API.
+- **B10 companions:** `ProjectionModelChanges` + `BedrockEntityResender` in both plugins: when a display's `model_item` changes, after the feed is on disk, hide/show (1.18+ reflection, plugin-keyed) for Bedrock viewers (`GeyserApi#isBedrockPlayer` via reflection; all viewers if absent). Config `bedrock.projection.resend-on-model-change`.
+- **B14** `voxelcore-pack/.../GlyphLiteralMigration.java` + `/voxelcore admin pack glyphs <scan|migrate confirm>` (perm `voxelcore.admin.pack.glyphs`, config `bedrock.glyph_migration_roots`, default `DeluxeMenus`). Report `glyph-literal-migration.txt`, backups+plan in `plugins/VoxelCore/glyph-literal-backup/`.
+- **B08** `EntityProjectionIndex#unmappedModels()` shown by Geyser `voxelcore status`.
+
+**Local test evidence:** javac+JUnit only (Maven repos opencollab/spigot blocked by this sandbox proxy): Geyser extension pure tests 11/11, `GlyphLiteralMigrationTest` 5/5, furniture/vehicle `ProjectionModelChangesTest` 2/2 + 1/1. Bukkit/Geyser glue compiled only in CI. All of the above: IMPLEMENTED; TESTED once the listed CI is green; none VERIFIED live.
+
+**Remaining / next actions (in order)**
+1. Confirm CI for `950a8bb` and the following commit (glyph command compiles against Spigot 1.12.2 API; extension against Geyser 2.11.2). Fix any failure first.
+2. B10: dye/colour + animation (schema-v1 already has `dye_rgb`, `use_animation_active`; needs Bedrock geometry/material that consumes `COLOR`/`VARIANT` or entity properties — design before coding); non-uniform scale stays rejected (Geyser SCALE is uniform).
+3. B08: audit VoxelFurnitureShop items; decide on a versioned registry export only if a model source outside VoxelCore content is found.
+4. B05/B06/B07 compiler work needs the live `unsupported-items.txt`/`unsupported-geometry.txt` corpus (KI-04).
+5. B15/B16 DeluxeMenus Bedrock forms frontend — large; start with a design doc in `docs/bedrock/`.
+6. B19 BLOCKED: real Bedrock client + VoxelHorizons Geyser server.
 
 ---
 
