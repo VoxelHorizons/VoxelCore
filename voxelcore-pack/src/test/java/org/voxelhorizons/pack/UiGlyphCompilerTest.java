@@ -149,7 +149,7 @@ public class UiGlyphCompilerTest {
         writePng(texture, 16, 16);
         write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
         write(new File(pack, "content/ui.yml"),
-                "ui:\n  rank:\n    path: ui/icon.png\n    symbol: '\\uE025'\n");
+                "ui:\n  rank:\n    path: ui/icon.png\n    symbol: '" + Character.toString((char) 0xE025) + "'\n");
         Path allocations = temporaryFolder.newFolder("migration-output").toPath().resolve("glyph-allocations.yml");
         String original = "schema: 1\nglyphs:\n  'voxel:rank': 57381\ninactive:\n  'voxel:retired': 57344\n";
         write(allocations.toFile(), original);
