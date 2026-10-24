@@ -280,6 +280,37 @@ public class BedrockPackCompilerTest {
         assertNotEquals(red.get("bedrock_identifier"), fallback.get("bedrock_identifier"));
     }
 
+    @Test public void legacyBackendsMapByStableCustomModelDataNumber() throws Exception {
+        Path root = fixture(), out = temp.newFolder().toPath(), data = temp.newFolder().toPath();
+        try {
+            new BedrockPackCompiler().compile(root, out, data.resolve("glyph-allocations.yml"), JavaPackMode.NUMERIC_CUSTOM_MODEL_DATA);
+            fail("Legacy mapping without allocations must not guess numbers");
+        } catch (java.io.IOException expected) {
+            assertTrue(expected.getMessage().contains("No Bedrock assets or mapped items"));
+        }
+        org.voxelhorizons.content.render.RenderAllocationRegistry allocations =
+                org.voxelhorizons.content.render.RenderAllocationRegistry.reconcile(
+                        new org.voxelhorizons.content.load.ContentLoader().load(root),
+                        org.voxelhorizons.content.render.RenderAllocationRegistry.empty());
+        new org.voxelhorizons.content.render.RenderAllocationStore(data.resolve("render-allocations.yml")).save(allocations);
+        BedrockPackCompiler.Result result = new BedrockPackCompiler().compile(root, out, data.resolve("glyph-allocations.yml"),
+                JavaPackMode.NUMERIC_CUSTOM_MODEL_DATA);
+        assertEquals(1, result.mappedItems);
+        com.google.gson.JsonObject definition = com.google.gson.JsonParser.parseString(new String(Files.readAllBytes(
+                result.directory.resolve("voxelcore-items.json")), StandardCharsets.UTF_8)).getAsJsonObject()
+                .getAsJsonObject("items").getAsJsonArray("minecraft:paper").get(0).getAsJsonObject();
+        assertEquals("legacy", definition.get("type").getAsString());
+        assertFalse(definition.has("model"));
+        assertEquals(allocations.get(org.voxelhorizons.content.ContentID.parse("demo:token", "demo")).get().customModelData(),
+                definition.get("custom_model_data").getAsInt());
+        try {
+            new BedrockPackCompiler().compile(root, out, null, JavaPackMode.LEGACY_DAMAGE_UNBREAKABLE);
+            fail("damage-based backends have no Geyser predicate");
+        } catch (java.io.IOException expected) {
+            assertTrue(expected.getMessage().contains("custom_model_data"));
+        }
+    }
+
     @Test public void mergesDisjointNativeBedrockJsonAssets() throws Exception {
         Path root = fixture(), out = temp.newFolder().toPath();
         write(root.resolve("other/pack.yml"), "schema: 1\nnamespace: other\n");

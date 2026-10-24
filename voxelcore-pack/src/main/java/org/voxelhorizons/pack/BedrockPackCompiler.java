@@ -27,6 +27,19 @@ public final class BedrockPackCompiler {
     }
 
     public Result compile(Path contentRoot, Path outputRoot, Path glyphAllocationManifest) throws IOException {
+        return compile(contentRoot, outputRoot, glyphAllocationManifest, JavaPackMode.ITEM_MODEL_1_21_4_PLUS);
+    }
+
+    /**
+     * @param mode the backend's Java item identity scheme. 1.21.4+ maps by item_model (plus
+     *             rule predicates); 1.14–1.21.3 numeric custom_model_data maps with Geyser v2
+     *             {@code legacy} definitions keyed on the stable allocation number.
+     */
+    public Result compile(Path contentRoot, Path outputRoot, Path glyphAllocationManifest, JavaPackMode mode)
+            throws IOException {
+        if (mode == JavaPackMode.LEGACY_DAMAGE_UNBREAKABLE)
+            throw new IOException("Bedrock mappings need custom_model_data (1.14+) or item_model (1.21.4+) backends");
+        final boolean legacy = mode == JavaPackMode.NUMERIC_CUSTOM_MODEL_DATA;
         Map<String, byte[]> assets = new TreeMap<String, byte[]>();
         List<ContentPack> packs = new ContentPackDiscovery().discover(contentRoot);
         for (ContentPack pack : packs) {
@@ -114,7 +127,17 @@ public final class BedrockPackCompiler {
             double[] cameraOverride = guiRotation(bedrockSettings.get("gui_rotation"), item.id().toString());
             Map<Integer, Integer> tints = BedrockTints.parse(bedrockSettings.get("tints"), item.id().toString());
             List<Variant> variants;
+            Integer legacyModelData = null;
             try {
+                if (legacy) {
+                    if (!item.render().rule().isEmpty())
+                        throw new IOException("render.rule requires a 1.21.4+ backend");
+                    RenderAllocation allocation = renderAllocations == null ? null
+                            : renderAllocations.get(item.id()).orElse(null);
+                    if (allocation == null)
+                        throw new IOException("Legacy custom_model_data mapping needs render allocations (build the Java pack first)");
+                    legacyModelData = Integer.valueOf(allocation.customModelData());
+                }
                 variants = variants(item, renderAllocations);
             } catch (IOException unsupportedRule) {
                 unsupported.add(item.id() + ": " + unsupportedRule.getMessage()); continue;
@@ -169,7 +192,8 @@ public final class BedrockPackCompiler {
             String material = item.material().toLowerCase(Locale.ROOT);
             if (!material.contains(":")) material = "minecraft:" + material;
             String model = item.render().model();
-            byte[] existingIcon = selectors.put(material + "|" + model + variant.suffix, png);
+            byte[] existingIcon = selectors.put(material + "|" + (legacy ? "cmd:" + legacyModelData : model)
+                    + variant.suffix, png);
             if (existingIcon != null) {
                 if (Arrays.equals(existingIcon, png)) continue; // Same Java representation shares one mapping.
                 throw new IOException("Ambiguous Bedrock mapping for " + material + " / " + model);
@@ -202,8 +226,13 @@ public final class BedrockPackCompiler {
             put(assets, path + ".png", png);
             JsonObject tex = new JsonObject(); tex.addProperty("textures", path); textures.add(icon, tex);
             JsonObject definition = new JsonObject();
-            definition.addProperty("type", "definition");
-            definition.addProperty("model", model);
+            if (legacy) {
+                definition.addProperty("type", "legacy");
+                definition.addProperty("custom_model_data", legacyModelData.intValue());
+            } else {
+                definition.addProperty("type", "definition");
+                definition.addProperty("model", model);
+            }
             definition.addProperty("bedrock_identifier", identifier);
             JsonObject options = new JsonObject(); options.addProperty("icon", icon);
             definition.add("bedrock_options", options);
