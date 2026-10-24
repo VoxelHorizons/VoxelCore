@@ -89,8 +89,11 @@ final class BedrockIconRenderer {
     private JsonObject resolve(String id, Set<String> visiting) throws IOException {
         if(!visiting.add(id))throw new IOException("Model parent cycle: "+id);
         byte[] bytes=assets.get(path(id,"models",".json"));
-        if(bytes==null)throw new IOException("Missing or conflicting model "+id);
-        JsonObject own=JsonParser.parseString(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+        JsonObject own;
+        if (bytes == null) {
+            own = builtInParent(id);
+            if (own == null) throw new IOException("Missing or conflicting model "+id);
+        } else own=JsonParser.parseString(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
         JsonObject result=new JsonObject();
         if(own.has("parent")) {
             String parent=own.get("parent").getAsString();
@@ -112,6 +115,32 @@ final class BedrockIconRenderer {
             } else result.add(e.getKey(),e.getValue());
         }
         visiting.remove(id); return result;
+    }
+    /**
+     * Vanilla model templates are not stored in authored content packs, but Java
+     * models frequently inherit their cube geometry. Resolve those primitives
+     * rather than misclassifying every texture-only child as unsupported.
+     */
+    private static JsonObject builtInParent(String id) {
+        String key=id.startsWith("minecraft:")?id.substring("minecraft:".length()):id;
+        String faces;
+        switch(key) {
+            case "block/block": return new JsonObject();
+            case "block/cube_all":
+                faces="{\"north\":{\"texture\":\"#all\"},\"south\":{\"texture\":\"#all\"},\"east\":{\"texture\":\"#all\"},\"west\":{\"texture\":\"#all\"},\"up\":{\"texture\":\"#all\"},\"down\":{\"texture\":\"#all\"}}";
+                break;
+            case "block/cube_column":
+                faces="{\"north\":{\"texture\":\"#side\"},\"south\":{\"texture\":\"#side\"},\"east\":{\"texture\":\"#side\"},\"west\":{\"texture\":\"#side\"},\"up\":{\"texture\":\"#end\"},\"down\":{\"texture\":\"#end\"}}";
+                break;
+            case "block/cube_bottom_top":
+                faces="{\"north\":{\"texture\":\"#side\"},\"south\":{\"texture\":\"#side\"},\"east\":{\"texture\":\"#side\"},\"west\":{\"texture\":\"#side\"},\"up\":{\"texture\":\"#top\"},\"down\":{\"texture\":\"#bottom\"}}";
+                break;
+            case "block/cube":
+                faces="{\"north\":{\"texture\":\"#north\"},\"south\":{\"texture\":\"#south\"},\"east\":{\"texture\":\"#east\"},\"west\":{\"texture\":\"#west\"},\"up\":{\"texture\":\"#up\"},\"down\":{\"texture\":\"#down\"}}";
+                break;
+            default:return null;
+        }
+        return JsonParser.parseString("{\"elements\":[{\"from\":[0,0,0],\"to\":[16,16,16],\"faces\":"+faces+"}]}").getAsJsonObject();
     }
     private byte[] texture(JsonObject textures,String key)throws IOException {
         Set<String> seen=new HashSet<String>();
