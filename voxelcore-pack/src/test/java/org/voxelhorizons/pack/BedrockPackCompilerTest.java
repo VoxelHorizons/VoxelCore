@@ -103,6 +103,27 @@ public class BedrockPackCompilerTest {
         try (java.util.stream.Stream<Path> files = Files.list(out.resolve("icon-cache"))) { assertEquals(1,files.count()); }
         assertEquals(result.revision,new BedrockPackCompiler().compile(root,out).revision);
     }
+    @Test public void mapsRenderableAbstractUiItems() throws Exception {
+        Path root = fixture(), out = temp.newFolder().toPath();
+        Path items = root.resolve("demo/content/items.yml");
+        String content = new String(Files.readAllBytes(items), StandardCharsets.UTF_8);
+        content += "  menu_icon:\n    abstract: true\n    material: minecraft:paper\n"
+                + "    render:\n      model: demo:ui/menu_icon\n"
+                + "    properties:\n      bedrock:\n        texture: demo:item/token\n";
+        write(items, content);
+        BedrockPackCompiler.Result built = new BedrockPackCompiler().compile(root, out);
+        assertEquals(2, built.mappedItems);
+        JsonObject mappings = JsonParser.parseString(new String(
+                Files.readAllBytes(built.directory.resolve("voxelcore-items.json")), StandardCharsets.UTF_8)).getAsJsonObject();
+        JsonArray paper = mappings.getAsJsonObject("items").getAsJsonArray("minecraft:paper");
+        assertEquals(2, paper.size());
+        boolean abstractMapped = false;
+        for (JsonElement entry : paper) {
+            if ("demo:ui/menu_icon".equals(entry.getAsJsonObject().get("model").getAsString()))
+                abstractMapped = true;
+        }
+        assertTrue("Abstract GUI items must be mapped for Bedrock inventory rendering", abstractMapped);
+    }
     @Test public void ignoresUnrelatedJavaAssetCollisions() throws Exception {
         Path root = fixture(), out = temp.newFolder().toPath();
         write(root.resolve("other/pack.yml"), "schema: 1\nnamespace: other\n");
