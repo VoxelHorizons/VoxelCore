@@ -46,7 +46,8 @@ public final class BedrockPackCompiler {
                                     + " across content packs: " + conflict.getMessage(), conflict);
                         }
                     }
-                    put(assets, name, next);
+                    if (previous == null) put(assets, name, next);
+                    else assets.put(name, next);
                 }
             }
         }
