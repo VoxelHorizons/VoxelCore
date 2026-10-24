@@ -4,8 +4,32 @@
 
 Fetch live HEADs first; this file is not a ref. No PR merged, no force push.
 
-| Repo | Branch / PR | Latest code this session | CI |
+| Repo | Branch / PR | Code commits this session (oldest→newest) | CI |
 | --- | --- | --- | --- |
+| VoxelCore | `feat/bedrock-pack-publishing`, [PR #84](https://github.com/VoxelHorizons/VoxelCore/pull/84) | `d0ec247` rescale+flat planes; `d0b847b` render.rule→Geyser predicates; `9448ec2` constant tints; `a9511d6` B17 signed remote sync; `f811217` Bedrock tooltip; `991c7b0` legacy CMD mappings | build SUCCESS on every commit through `a9511d6`; smoke 8/8 on `d0ec247`, `d0b847b`, `9448ec2`; later runs: re-query. KI-01 = non-blocking |
+| DeluxeMenus | `feat/bedrock-forms` (no PR; CI via `workflow_dispatch` on build.yml) | `557bac4` form frontend; `6b8d858` `bedrock_image` | both [SUCCESS](https://github.com/VoxelHorizons/DeluxeMenus/actions/runs/40082176306) |
+| VoxelFurniture | PR #47 | `b1b7585` | SUCCESS |
+| VoxelVehicles | PR #21 | `09a0abb` | SUCCESS |
+
+**CI policy:** TESTING.md "CI policy" — build + changed-code tests + 26.3 smoke are blocking; KI-01 legacy smoke is recorded, not chased.
+
+**Status (IMPLEMENTED; TESTED where CI green; nothing VERIFIED live):**
+- B05 rule predicates; B06 rescale/planes; B07 constant tints; B08 shop audit done (no addon models); B10 live scale + model re-send; B14 glyph migration; B15 DeluxeMenus forms; B16 forms stats/avatars + tooltip text; B17 signed pack/mappings sync; B18 legacy CMD mappings.
+
+**Local test method (no Maven repo access here):** `javac` against `~/.m2` gson/junit/snakeyaml with `-sourcepath voxelcore-common/src/main/java:voxelcore-pack/src/main/java`; 48 pack tests, 17 extension tests, 5 DeluxeMenus text tests pass. Bukkit/Geyser/Paper glue compiles only in CI.
+
+**Findings to reuse**
+- Geyser API: no plugin-messaging hook; `SEAT_OFFSET` is rider-side with a Geyser-computed baseline (do B11 seats only with live client); custom-item definitions sharing a Java model are ordered by `priority` desc, then predicate count, then range thresholds; range = `value >= threshold`; `legacy` definitions take `custom_model_data`.
+- Cumulus via reflection: resolve methods on public interfaces only.
+
+**Next actions (in order)**
+1. Re-query CI for `a9511d6`…`991c7b0` (build + 26.3 blocking only).
+2. B17 projection feeds for proxies: multiple backends collide on `furniture.json`/`vehicles.json` — needs per-backend feed names in `EntityProjectionIndex` before a network transport.
+3. B10 dye/animation: register Geyser entity properties (`GeyserDefineEntityPropertiesEvent`) and generate render controllers reading `query.property` — needs design + live client.
+4. B20: shared schema-v1 projection fixture tests across companions.
+5. B19 BLOCKED (real Bedrock client + VoxelHorizons Geyser server).
+
+--- | --- | --- | --- |
 | VoxelCore | `feat/bedrock-pack-publishing`, [PR #84](https://github.com/VoxelHorizons/VoxelCore/pull/84) | this commit: exact Java `rescale` + flat planes (B05/B06), CI policy docs | `d0b84cb`: [build SUCCESS](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40081056409); [smoke](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40081056462) 7/8, 26.3 + 26.2 green, 1.14.4 = **KI-01, non-blocking** |
 | DeluxeMenus | `feat/bedrock-forms` (no PR yet; CI via `workflow_dispatch`) | `557bac4` Bedrock form frontend, `6b8d858` `bedrock_image` | `557bac4` [build SUCCESS](https://github.com/VoxelHorizons/DeluxeMenus/actions/runs/40082105372); `6b8d858` dispatched, re-check |
 | VoxelFurniture | `feat/bedrock-state-projection`, [PR #47](https://github.com/VoxelHorizons/VoxelFurniture/pull/47) | `b1b7585` | SUCCESS |
