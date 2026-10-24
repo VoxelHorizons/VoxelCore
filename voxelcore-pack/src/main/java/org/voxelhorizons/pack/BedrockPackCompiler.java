@@ -22,6 +22,13 @@ import java.util.zip.*;
 public final class BedrockPackCompiler {
     private static final Gson JSON = new GsonBuilder().setPrettyPrinting().create();
     private Path vanillaAssets;
+    private BuildProgress progress = BuildProgress.NONE;
+
+    /** Stage and percentage messages for server admins (thread-safe sink). */
+    public BedrockPackCompiler withProgress(BuildProgress progress) {
+        this.progress = progress == null ? BuildProgress.NONE : progress;
+        return this;
+    }
 
     /** Vanilla client jar or assets folder supplying minecraft: models/textures (content packs win). */
     public BedrockPackCompiler withVanillaAssets(Path source) {
@@ -115,11 +122,13 @@ public final class BedrockPackCompiler {
             }
         }
         for (String ambiguous : ambiguousAssets) javaAssets.remove(ambiguous);
+        progress.report("Bedrock: read " + javaAssets.size() + " Java models/textures from " + packs.size() + " content pack(s)");
         if (vanillaAssets != null)
-            for (Map.Entry<String, byte[]> vanilla : VanillaAssets.load(vanillaAssets).entrySet())
+            for (Map.Entry<String, byte[]> vanilla : VanillaAssets.load(vanillaAssets, progress).entrySet())
                 if (!javaAssets.containsKey(vanilla.getKey())) javaAssets.put(vanilla.getKey(), vanilla.getValue());
         int mappedGlyphs = glyphAllocationManifest == null ? 0
                 : BedrockGlyphAtlas.append(contentRoot, glyphAllocationManifest, javaAssets, assets);
+        progress.report("Bedrock: " + mappedGlyphs + " font glyphs placed");
         BedrockIconRenderer renderer = new BedrockIconRenderer(javaAssets);
         // Hashed once: with vanilla assets the map holds thousands of files.
         byte[] assetsDigest;
@@ -136,7 +145,10 @@ public final class BedrockPackCompiler {
         int count = 0;
         ItemDefinitionRegistry itemRegistry = new ContentLoader().load(contentRoot);
         RenderAllocationRegistry renderAllocations = renderAllocations(itemRegistry, glyphAllocationManifest);
+        BuildProgress.Step itemStep = progress.step("Bedrock: converting items (icons + 3D models)",
+                itemRegistry.entries().size());
         for (ItemDefinition item : itemRegistry.entries().values()) {
+            itemStep.advance(1);
             try {
             // Abstract items may be GUI-only, but their rendered ItemStacks still need Geyser mappings.
             // 'abstract' prohibits normal giving, not client-side rendering.
@@ -286,6 +298,7 @@ public final class BedrockPackCompiler {
                 unsupported.add(item.id() + ": " + perItem.getMessage());
             }
         }
+        itemStep.finish(count + " mapped, " + nativeGeometryCount + " 3D, " + unsupported.size() + " unsupported");
         if (count == 0 && assets.isEmpty()) throw new IOException("No Bedrock assets or mapped items; add properties.bedrock.texture or bedrock/resource_pack assets");
         JsonObject entityIndex = new JsonObject();
         entityIndex.addProperty("schema", 1);
@@ -336,12 +349,15 @@ public final class BedrockPackCompiler {
         Files.createDirectories(outputRoot);
         Path staging = Files.createTempDirectory(outputRoot, ".bedrock-");
         try {
+            BuildProgress.Step zipStep = progress.step("Bedrock: writing voxelcore.mcpack", assets.size());
             try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(staging.resolve("voxelcore.mcpack")))) {
                 for (Map.Entry<String, byte[]> entry : assets.entrySet()) {
                     ZipEntry ze = new ZipEntry(entry.getKey()); ze.setTime(0); zip.putNextEntry(ze);
                     zip.write(entry.getValue()); zip.closeEntry();
+                    zipStep.advance(1);
                 }
             }
+            zipStep.finish(assets.size() + " files, revision " + revision.substring(0, Math.min(12, revision.length())));
             Files.write(staging.resolve("voxelcore-items.json"), mappingBytes);
             Files.write(staging.resolve("unsupported-items.txt"), unsupported, StandardCharsets.UTF_8);
             Files.write(staging.resolve("unsupported-geometry.txt"), unsupportedGeometry, StandardCharsets.UTF_8);
