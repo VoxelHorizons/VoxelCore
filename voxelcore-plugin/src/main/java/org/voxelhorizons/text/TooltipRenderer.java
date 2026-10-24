@@ -71,6 +71,11 @@ public final class TooltipRenderer {
                     + "'. Available: " + variants());
         }
 
+        if (org.voxelhorizons.pack.BedrockPlayers.isBedrock(player.getUniqueId())) {
+            // Bedrock cannot draw the Java glyph frame; show the same text readably.
+            player.sendTitle("", BedrockTooltipText.subtitle(prepare(line1), prepare(line2), prepare(line3)), 0, ticks, 0);
+            return;
+        }
         String defaults = "ui.tooltips.default.";
         String left = config.getString(path + ".left", config.getString(defaults + "left", "voxel:tooltip_left"));
         String center = config.getString(path + ".center", config.getString(defaults + "center", "voxel:tooltip_center"));
