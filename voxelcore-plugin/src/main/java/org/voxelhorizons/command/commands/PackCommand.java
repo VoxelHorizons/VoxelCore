@@ -442,13 +442,13 @@ public final class PackCommand implements SubCommand {
                     String bedrockStatus = "";
                     if (currentServerTarget && bedrockEnabled) {
                         try {
-                            if (target.mode() != org.voxelhorizons.pack.JavaPackMode.ITEM_MODEL_1_21_4_PLUS)
-                                throw new IllegalArgumentException("Bedrock item-model mappings require a 1.21.4+ backend");
+                            // 1.21.4+: item_model definitions; 1.14-1.21.3: Geyser legacy custom_model_data definitions.
                             org.voxelhorizons.pack.BedrockPackCompiler.Result bedrock =
                                     new org.voxelhorizons.pack.BedrockPackCompiler().compile(
                                             plugin.getPackManager().contentRoot(),
                                             plugin.getPackManager().outputRoot().resolve("bedrock"),
-                                            plugin.getPackManager().glyphAllocationManifest());
+                                            plugin.getPackManager().glyphAllocationManifest(),
+                                            target.mode());
                             bedrockStatus = "Bedrock built: " + bedrock.directory + "; " + bedrock.mappedItems
                                     + " mapped items; " + bedrock.mappedGlyphs + " Bedrock inline glyphs; "
                                     + bedrock.nativeGeometryCount + " native 3D attachables; "

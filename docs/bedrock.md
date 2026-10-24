@@ -168,3 +168,11 @@ issue time, checks the digests, refuses a bundle older than the last one it inst
 `voxelcore-publication.json` receipt atomically with rollback. Any failure keeps the previous
 verified publication. Activation still requires a Geyser restart, as for local publishing.
 Projection feeds (furniture/vehicles) remain local/mounted only.
+
+### Older backends (B18)
+
+Bedrock mappings follow the backend's Java item identity: 1.21.4+ maps by `item_model` (and
+`render.rule` predicates); 1.14–1.21.3 maps with Geyser v2 `{"type": "legacy",
+"custom_model_data": N}` definitions using the stable number from `render-allocations.yml`
+(build the Java pack first). 1.12/1.13 damage-based identities have no Geyser predicate and
+are rejected with a clear message.
