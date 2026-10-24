@@ -86,6 +86,19 @@ public final class EntityProjectionIndexTest {
                 EntityProjectionIndex.dye(new com.google.gson.JsonPrimitive(0x000000)));
     }
 
+    @Test public void derivesVehicleAndNonUniformFurnitureTransforms() {
+        com.google.gson.JsonObject vehicle=com.google.gson.JsonParser.parseString(
+                "{\"seat_offset\":[0.5,1,-2],\"pitch\":10,\"roll\":-5}").getAsJsonObject();
+        assertArrayEquals(new float[]{-0.5f,-1f,2f,10f,-5f,1,1,1},EntityProjectionIndex.vehicleTransform(vehicle),0f);
+        assertNull("Identity vehicle transform is omitted",EntityProjectionIndex.vehicleTransform(
+                com.google.gson.JsonParser.parseString("{\"seat_offset\":[0,0,0]}").getAsJsonObject()));
+        assertNull(EntityProjectionIndex.furnitureTransform(com.google.gson.JsonParser.parseString("[2,2,2]")));
+        assertArrayEquals(new float[]{0,0,0,0,0,1,2,3},
+                EntityProjectionIndex.furnitureTransform(com.google.gson.JsonParser.parseString("[1,2,3]")),0f);
+        assertNull("Invalid scales are not trusted",
+                EntityProjectionIndex.furnitureTransform(com.google.gson.JsonParser.parseString("[1,0,3]")));
+    }
+
     @Test public void stalePaperFileDoesNotReplaceNewDisplaysAndExpiresCachedMappings() throws Exception {
         Path root=temp.newFolder().toPath(),dir=root.resolve("voxelcore-projection");
         Files.createDirectories(dir);

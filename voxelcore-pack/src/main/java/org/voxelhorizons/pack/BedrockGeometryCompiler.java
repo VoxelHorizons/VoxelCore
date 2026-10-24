@@ -44,6 +44,47 @@ final class BedrockGeometryCompiler {
     static final int[] JAVA_DYE_RGB = {0xF9FFFE, 0xF9801D, 0xC74EBD, 0x3AB3DA, 0xFED83D, 0x80C71F, 0xF38BAA,
             0x474F52, 0x9D9D97, 0x169C9C, 0x8932B8, 0x3C44AA, 0x835432, 0x5E7C16, 0xB02E26, 0x1D1D21};
     static final String DYE_PROPERTY = "voxelcore:dye";
+    static final String TRANSFORM_ANIMATION = "animation.voxelcore.transform";
+    static final String TRANSFORM_ANIMATION_PATH = "animations/voxelcore_transform.animation.json";
+
+    /**
+     * Shared looping client animation applying the Java display transformation that Geyser
+     * cannot: local translation (blocks), pitch/roll (degrees) and per-axis scale, read from
+     * entity properties set by the VoxelCore Geyser extension. Every channel falls back to
+     * identity when the property is absent, so an older extension never hides a model.
+     * Axis signs follow the geometry compiler's unmirrored Java coordinates and Java's
+     * rotateX(-pitch)/rotateZ(roll) order; they are not yet confirmed on a Bedrock client.
+     */
+    static byte[] transformAnimation() {
+        JsonObject root = new JsonObject();
+        root.add("position", channels(new String[]{"voxelcore:tx", "voxelcore:ty", "voxelcore:tz"}, "0", " * 16"));
+        JsonArray rotation = new JsonArray();
+        rotation.add("-" + guarded("voxelcore:pitch", "0"));
+        rotation.add(0);
+        rotation.add(guarded("voxelcore:roll", "0"));
+        root.add("rotation", rotation);
+        root.add("scale", channels(new String[]{"voxelcore:sx", "voxelcore:sy", "voxelcore:sz"}, "1", ""));
+        JsonObject bones = new JsonObject(); bones.add("root", root);
+        JsonObject animation = new JsonObject();
+        animation.addProperty("loop", true);
+        animation.add("bones", bones);
+        JsonObject animations = new JsonObject(); animations.add(TRANSFORM_ANIMATION, animation);
+        JsonObject file = new JsonObject();
+        file.addProperty("format_version", "1.8.0");
+        file.add("animations", animations);
+        return new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(file)
+                .getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static JsonArray channels(String[] properties, String identity, String suffix) {
+        JsonArray out = new JsonArray();
+        for (String property : properties) out.add(guarded(property, identity) + suffix);
+        return out;
+    }
+
+    private static String guarded(String property, String identity) {
+        return "(query.has_property('" + property + "') ? query.property('" + property + "') : " + identity + ")";
+    }
     static final String DYE_CONTROLLER = "controller.render.voxelcore.dyeable";
     static final String DYE_CONTROLLER_PATH = "render_controllers/voxelcore_dyeable.render_controllers.json";
 
@@ -311,6 +352,13 @@ final class BedrockGeometryCompiler {
         JsonArray entityControllers = new JsonArray();
         entityControllers.add("controller.render.default");
         entityDescription.add("render_controllers", entityControllers);
+        JsonObject entityAnimations = new JsonObject();
+        entityAnimations.addProperty("voxelcore_transform", TRANSFORM_ANIMATION);
+        entityDescription.add("animations", entityAnimations);
+        JsonObject scripts = new JsonObject();
+        JsonArray animate = new JsonArray(); animate.add("voxelcore_transform");
+        scripts.add("animate", animate);
+        entityDescription.add("scripts", scripts);
         JsonObject clientEntity = new JsonObject();
         clientEntity.add("description", entityDescription);
         JsonObject clientEntityRoot = new JsonObject();
@@ -325,6 +373,7 @@ final class BedrockGeometryCompiler {
         assets.put("entity/voxelcore/"+shortId+".entity.json",
                 JSON.toJson(clientEntityRoot).getBytes(StandardCharsets.UTF_8));
         assets.put("textures/voxelcore/g_"+shortId+".png",png.toByteArray());
+        assets.put(TRANSFORM_ANIMATION_PATH, transformAnimation());
         return new Output(assets,cubes.size(),tinted);
     }
 

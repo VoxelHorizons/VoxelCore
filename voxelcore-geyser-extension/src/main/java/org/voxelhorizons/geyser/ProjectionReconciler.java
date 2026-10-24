@@ -27,6 +27,8 @@ final class ProjectionReconciler {
         void scale(Float scale);
         /** Set the voxelcore:dye entity property (ignored for entities without it). */
         default void dye(int dye) { }
+        /** Set the transform-animation properties; null restores identity. */
+        default void transform(float[] transform) { }
     }
 
     static final class Result {
@@ -55,6 +57,7 @@ final class ProjectionReconciler {
                 if(now.entityType().equals(target.definitionId())) {
                     target.scale(now.scale());
                     if(now.dye()!=null)target.dye(now.dye().intValue());
+                    target.transform(now.transform());
                     scaled++;
                 } else {
                     needsRespawn++;

@@ -204,3 +204,22 @@ entities listed in `entity_index.json` `dyeable_entities`, sets it before spawn 
 projection feed's `dye_rgb` and updates it live. Paper dyes furniture with one dye item at a
 time, so feed colours match the palette exactly; any other RGB uses the nearest dye. Item icons
 show the undyed colour. Not yet seen on a real client.
+
+### Transforms Geyser cannot apply (B10/B11)
+
+Java item displays carry a transformation matrix; Geyser only offers a uniform `SCALE` for
+custom entities. Every VoxelCore entity therefore plays a shared looping client animation
+(`animation.voxelcore.transform`) whose root-bone position, rotation and scale read the float
+properties `voxelcore:tx/ty/tz` (blocks), `voxelcore:pitch/roll` (degrees) and
+`voxelcore:sx/sy/sz`, each guarded by `query.has_property` so packs never collapse a model
+when the extension is older. The extension registers them in `GeyserDefineEntityPropertiesEvent`
+and sets them before spawn and on feed changes:
+
+- vehicles: translation `-seat_offset` plus `pitch`/`roll` (VoxelVehicles' display matrix);
+- furniture: non-uniform `scale` (uniform scale still uses Geyser `SCALE`).
+
+Axis signs mirror the Java matrix in the geometry compiler's coordinates and need confirming
+on a client. Idle bob/spin are server-side teleports that Geyser already translates, and
+`animation.use` is a model swap handled by the companions' re-send. New displays (placement,
+model swaps that respawn entities) are re-sent to Bedrock viewers once the feed lists them;
+set `bedrock.projection.resend-delay-ticks` (~40) when feeds travel over the network.
