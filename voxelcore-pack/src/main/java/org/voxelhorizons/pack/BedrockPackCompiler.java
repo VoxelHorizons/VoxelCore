@@ -56,6 +56,8 @@ public final class BedrockPackCompiler {
         Map<String, byte[]> selectors = new HashMap<String, byte[]>();
         List<String> unsupported = new ArrayList<String>();
         Set<String> ambiguousAssets = new HashSet<String>();
+        // Reject collisions even though a 128-bit SHA-256 prefix is astronomically unlikely to collide.
+        Map<String, String> generatedIds = new HashMap<String, String>();
         Map<String, byte[]> javaAssets = new TreeMap<String, byte[]>();
         for (ContentPack pack : packs) {
             Path root = pack.root().resolve("assets");
@@ -141,10 +143,17 @@ public final class BedrockPackCompiler {
                 if (Arrays.equals(existingIcon, png)) continue; // Same Java representation shares one mapping.
                 throw new IOException("Ambiguous Bedrock mapping for " + material + " / " + model);
             }
-            // Hex-encoded ID preserves uniqueness even for slash/underscore combinations.
-            String identifier = "voxelcore:i_" + hex(item.id().toString().getBytes(StandardCharsets.UTF_8));
-            String icon = identifier.replace(':', '.');
-            String path = "textures/voxelcore/" + identifier.substring(identifier.indexOf(':') + 1);
+            // A fixed-length 128-bit SHA-256 prefix avoids the Bedrock <80-character path
+            // compatibility limit, regardless of the Java item's original ID length.
+            // Stable across builds, and never based on iteration/order-dependent indices.
+            String shortId = "i_" + hex(sha256(item.id().toString())).substring(0, 32);
+            String previousOwner = generatedIds.putIfAbsent(shortId, item.id().toString());
+            if (previousOwner != null && !previousOwner.equals(item.id().toString()))
+                throw new IOException("Bedrock item identifier hash collision between "
+                        + previousOwner + " and " + item.id());
+            String identifier = "voxelcore:" + shortId;
+            String icon = "voxelcore." + shortId;
+            String path = "textures/voxelcore/" + shortId;
             put(assets, path + ".png", png);
             JsonObject tex = new JsonObject(); tex.addProperty("textures", path); textures.add(icon, tex);
             JsonObject definition = new JsonObject();
@@ -185,6 +194,15 @@ public final class BedrockPackCompiler {
         module.addProperty("uuid", UUID.nameUUIDFromBytes("VoxelCore:bedrock:resources".getBytes(StandardCharsets.UTF_8)).toString());
         module.add("version", version); JsonArray modules = new JsonArray(); modules.add(module); manifest.add("modules", modules);
         put(assets, "manifest.json", bytes(manifest));
+        // Geyser warns at 80+ characters; reject such paths before writing a pack that
+        // may fail on consoles/mobile. Authored files require reference-aware renaming
+        // by their owner rather than silent renaming that breaks UI/texture references.
+        for (String assetPath : assets.keySet()) {
+            int utf8Length = assetPath.getBytes(StandardCharsets.UTF_8).length;
+            if (utf8Length >= 80)
+                throw new IOException("Bedrock pack path is " + utf8Length + " bytes (maximum 79): "
+                        + assetPath + ". Shorten the authored path and its references.");
+        }
         // Immutable revision directory is the publish unit; incomplete builds never become results.
         Files.createDirectories(outputRoot);
         Path staging = Files.createTempDirectory(outputRoot, ".bedrock-");
@@ -211,6 +229,13 @@ public final class BedrockPackCompiler {
         if (previous != null && !Arrays.equals(previous, value)) throw new IOException("Bedrock asset collision: " + name);
     }
     private static byte[] bytes(JsonObject value) { return JSON.toJson(value).getBytes(StandardCharsets.UTF_8); }
+    private static byte[] sha256(String text) {
+        try {
+            return MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("SHA-256 unavailable", impossible);
+        }
+    }
     private static String hex(byte[] bytes) {
         StringBuilder out = new StringBuilder(); for (byte b : bytes) out.append(String.format(Locale.ROOT, "%02x", b & 255)); return out.toString();
     }
