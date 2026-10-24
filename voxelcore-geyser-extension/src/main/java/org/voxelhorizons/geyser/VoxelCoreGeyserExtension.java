@@ -116,8 +116,11 @@ public final class VoxelCoreGeyserExtension implements Extension {
     private volatile ScheduledExecutorService reconcileLoop;
     private final List<RemoteProjectionFeeds> remoteFeeds = new java.util.concurrent.CopyOnWriteArrayList<RemoteProjectionFeeds>();
 
-    /** Projection files are polled once per second; unchanged files cost two stat calls. */
-    static final long RECONCILE_PERIOD_MILLIS = 1_000L;
+    /** Matches the companions' 5-tick feed cadence (vehicle pitch/roll); unchanged feeds cost a directory stat. */
+    static final long RECONCILE_PERIOD_MILLIS = 250L;
+    /** Remote backends are polled over HTTP every fourth reconcile (once per second). */
+    static final int REMOTE_POLL_EVERY = 4;
+    private int reconcileTicks;
 
     /**
      * Keep server Paper UUID identity intact. Only known display entities from
@@ -206,7 +209,8 @@ public final class VoxelCoreGeyserExtension implements Extension {
         EntityProjectionIndex current = projectionIndex;
         if (current == null) return;
         long now = System.currentTimeMillis();
-        for (RemoteProjectionFeeds feeds : remoteFeeds) feeds.poll(now);
+        if (reconcileTicks++ % REMOTE_POLL_EVERY == 0)
+            for (RemoteProjectionFeeds feeds : remoteFeeds) feeds.poll(now);
         try {
             List<? extends GeyserConnection> connections = geyserApi().onlineConnections();
             ProjectionReconciler.Result result = reconciler.reconcile(current.snapshot(),
