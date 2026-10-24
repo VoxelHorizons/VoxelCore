@@ -120,6 +120,11 @@ bedrock:
   # Proxy/standalone Geyser needs a mounted path to its REAL data directory.
   # Example local override: 'plugins/Geyser-Spigot'
   geyser_data_directory: ''
+  # Vanilla textures/models for Bedrock icons and 3D: furniture models often use
+  # minecraft:block/... textures that content packs do not ship. 'auto' downloads the official
+  # client jar for this server version once from Mojang (SHA-1 verified, cached in
+  # plugins/VoxelCore/cache/vanilla); 'off' disables; or give a client jar / assets folder path.
+  vanilla_assets: auto
   # Extra folders (relative to plugins/) scanned by '/voxelcore admin pack glyphs'
   # for literal glyphs in Bedrock's reserved U+E000..U+E1FF controller range.
   # VoxelCore content is always included. Migration rewrites fonts and references together.

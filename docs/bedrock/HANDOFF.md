@@ -1,5 +1,13 @@
 # Bedrock recovery handoff — 24 October 2026 (Australia/Melbourne)
 
+## Live-test fixes — 24 October 2026, session 6 (read first)
+
+The user's live tests (Paper 26.3 + Geyser) found: an ambiguous selector aborted the whole build; authored font icons were missing; held 3D models rendered at the player's feet; the dye controller had unguarded Molang; and many bench icons were missing.
+Fixes: `05c625d` (report the conflict and continue), `e947d39` (authored default-font glyphs), `8ce0731` (hand-bound held geometry with Java display poses, and a guarded dye controller), then a vanilla assets fallback (`bedrock.vanilla_assets: auto` downloads the SHA-1-verified client jar for the server version into `plugins/VoxelCore/cache/vanilla`; you can also give a path or `off`) so models using `minecraft:block/...` textures can render.
+**Still open, needs the user's logs:**
+- Rank glyphs show as boxes: likely reserved U+E0xx/E1xx codepoints, so run `/voxelcore admin pack glyphs scan`.
+- Placed vehicle invisible: check Geyser `voxelcore status` and `unsupported-*.txt`.
+
 ## Latest checkpoint — 24 October 2026, session 5 (supersedes everything below)
 
 Fetch live HEADs first; this file is not a ref. No PR merged, no force push.

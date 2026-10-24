@@ -38,6 +38,32 @@ public class BedrockPackCompilerTest {
         assertArrayEquals(Files.readAllBytes(first.directory.resolve("voxelcore.mcpack")),Files.readAllBytes(geyser.resolve("packs/voxelcore.mcpack")));
         assertTrue(Files.exists(geyser.resolve("packs/other.mcpack")));
     }
+    @Test public void vanillaTexturesFromClientJarRenderFurnitureIcons() throws Exception {
+        Path root = temp.newFolder().toPath(), out = temp.newFolder().toPath();
+        write(root.resolve("demo/pack.yml"), "schema: 1\nnamespace: demo\n");
+        write(root.resolve("demo/content/items.yml"), "items:\n  bench:\n    material: minecraft:paper\n    render:\n      model: demo:item/bench\n");
+        write(root.resolve("demo/assets/demo/models/item/bench.json"), "{\"textures\":{\"all\":\"minecraft:block/oak_planks\"},"
+                + "\"elements\":[{\"from\":[0,0,0],\"to\":[16,8,16],\"faces\":{\"north\":{\"texture\":\"#all\"},\"up\":{\"texture\":\"#all\"}}}]}");
+        BedrockPackCompiler.Result without = null;
+        try { without = new BedrockPackCompiler().compile(root, out); } catch (java.io.IOException nothingMapped) { }
+        assertTrue("A vanilla texture is not in the content pack", without == null || without.mappedItems == 0);
+        Path jar = temp.newFile("client.jar").toPath();
+        java.io.ByteArrayOutputStream png = new java.io.ByteArrayOutputStream();
+        java.awt.image.BufferedImage planks = new java.awt.image.BufferedImage(16,16,2);
+        for (int x = 0; x < 16; x++) for (int y = 0; y < 16; y++) planks.setRGB(x, y, 0xffa0784a);
+        javax.imageio.ImageIO.write(planks, "png", png);
+        try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(Files.newOutputStream(jar))) {
+            zip.putNextEntry(new java.util.zip.ZipEntry("assets/minecraft/textures/block/oak_planks.png")); zip.write(png.toByteArray());
+            zip.putNextEntry(new java.util.zip.ZipEntry("net/minecraft/client/Main.class")); zip.write(new byte[]{1});
+            zip.putNextEntry(new java.util.zip.ZipEntry("assets/minecraft/lang/en_us.json")); zip.write("{}".getBytes(StandardCharsets.UTF_8));
+        }
+        assertEquals("Only models and textures are kept", 1, VanillaAssets.load(jar).size());
+        BedrockPackCompiler.Result with = new BedrockPackCompiler().withVanillaAssets(jar).compile(root, out);
+        assertEquals(1, with.mappedItems);
+        try (ZipFile pack = new ZipFile(with.directory.resolve("voxelcore.mcpack").toFile())) {
+            assertNull("Vanilla files are inputs, not shipped", pack.getEntry("textures/block/oak_planks.png"));
+        }
+    }
     @Test public void missingTextureDoesNotReplacePreviousRevision() throws Exception {
         Path root = fixture(), out = temp.newFolder().toPath();
         BedrockPackCompiler compiler = new BedrockPackCompiler();

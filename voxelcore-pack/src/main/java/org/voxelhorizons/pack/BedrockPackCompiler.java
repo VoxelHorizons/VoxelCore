@@ -21,6 +21,13 @@ import java.util.zip.*;
 /** Bedrock resource pack and Geyser v2 mappings. Gameplay remains on the Java server. */
 public final class BedrockPackCompiler {
     private static final Gson JSON = new GsonBuilder().setPrettyPrinting().create();
+    private Path vanillaAssets;
+
+    /** Vanilla client jar or assets folder supplying minecraft: models/textures (content packs win). */
+    public BedrockPackCompiler withVanillaAssets(Path source) {
+        this.vanillaAssets = source;
+        return this;
+    }
 
     public Result compile(Path contentRoot, Path outputRoot) throws IOException {
         return compile(contentRoot, outputRoot, null);
@@ -108,9 +115,22 @@ public final class BedrockPackCompiler {
             }
         }
         for (String ambiguous : ambiguousAssets) javaAssets.remove(ambiguous);
+        if (vanillaAssets != null)
+            for (Map.Entry<String, byte[]> vanilla : VanillaAssets.load(vanillaAssets).entrySet())
+                if (!javaAssets.containsKey(vanilla.getKey())) javaAssets.put(vanilla.getKey(), vanilla.getValue());
         int mappedGlyphs = glyphAllocationManifest == null ? 0
                 : BedrockGlyphAtlas.append(contentRoot, glyphAllocationManifest, javaAssets, assets);
         BedrockIconRenderer renderer = new BedrockIconRenderer(javaAssets);
+        // Hashed once: with vanilla assets the map holds thousands of files.
+        byte[] assetsDigest;
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            for (Map.Entry<String, byte[]> asset : javaAssets.entrySet()) {
+                digest.update(asset.getKey().getBytes(StandardCharsets.UTF_8));
+                digest.update((byte) 0); digest.update(asset.getValue());
+            }
+            assetsDigest = digest.digest();
+        } catch (Exception e) { throw new IllegalStateException(e); }
         BedrockGeometryCompiler geometry = new BedrockGeometryCompiler(javaAssets);
         Map<String, byte[]> rendered = new HashMap<String, byte[]>();
         int count = 0;
@@ -164,10 +184,7 @@ public final class BedrockPackCompiler {
                         MessageDigest cacheDigest;
                         try { cacheDigest = MessageDigest.getInstance("SHA-256"); } catch (Exception e) { throw new IllegalStateException(e); }
                         cacheDigest.update(("renderer-v3-camera:" + cacheKey).getBytes(StandardCharsets.UTF_8));
-                        for (Map.Entry<String, byte[]> asset : javaAssets.entrySet()) {
-                            cacheDigest.update(asset.getKey().getBytes(StandardCharsets.UTF_8));
-                            cacheDigest.update((byte) 0); cacheDigest.update(asset.getValue());
-                        }
+                        cacheDigest.update(assetsDigest);
                         Path cache = outputRoot.resolve("icon-cache").resolve(hex(cacheDigest.digest()) + ".png");
                         if (Files.isRegularFile(cache)) png = Files.readAllBytes(cache);
                         else {
