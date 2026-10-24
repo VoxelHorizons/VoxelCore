@@ -12,6 +12,9 @@ final class BedrockIconRenderer {
     private final Map<String, byte[]> assets;
     BedrockIconRenderer(Map<String, byte[]> assets) { this.assets = assets; }
     byte[] render(String model) throws IOException {
+        return render(model, null);
+    }
+    byte[] render(String model, double[] guiRotationOverride) throws IOException {
         JsonObject resolved = resolve(model, new HashSet<String>());
         JsonObject textures = resolved.has("textures") ? resolved.getAsJsonObject("textures") : new JsonObject();
         if (!resolved.has("elements")) {
@@ -22,7 +25,8 @@ final class BedrockIconRenderer {
         double[] depth = new double[4096]; Arrays.fill(depth, -Double.MAX_VALUE);
         JsonObject gui = new JsonObject();
         if (resolved.has("display") && resolved.getAsJsonObject("display").has("gui")) gui = resolved.getAsJsonObject("display").getAsJsonObject("gui");
-        double[] rotation = vector(gui,"rotation",new double[]{30,225,0});
+        double[] rotation = guiRotationOverride != null ? guiRotationOverride
+                : vector(gui,"rotation",new double[]{30,225,0});
         double[] scale = vector(gui,"scale",new double[]{0.625,0.625,0.625});
         double[] translation = vector(gui,"translation",new double[]{0,0,0});
         // Render after collecting every face so long furniture models can be centered
