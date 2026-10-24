@@ -30,6 +30,9 @@ public final class UiGlyphLoader {
     public UiGlyphRegistry load(Path contentRoot, Path allocationFile, boolean persist) {
         List<ContentPack> packs = new ContentPackDiscovery().discover(contentRoot);
         Set<Integer> authoredSymbols = AuthoredFontSupport.reservedCodePoints(packs);
+        Set<Integer> authoredBedrockSymbols = new java.util.TreeSet<Integer>();
+        for (Integer symbol : authoredSymbols)
+            if (isBedrockReserved(symbol.intValue())) authoredBedrockSymbols.add(symbol);
         for (Integer spacing : UiSpacingGlyphs.advances().keySet()) {
             if (authoredSymbols.contains(spacing)) {
                 throw new ContentLoadException("Authored font symbol " + codePoint(spacing.intValue())
@@ -143,7 +146,8 @@ public final class UiGlyphLoader {
         if (persist) {
             if (!migrated.isEmpty()) backupLegacyAllocations(allocationFile);
             writeAllocations(allocationFile, active, inactive);
-            if (!migrated.isEmpty()) writeMigrationReport(allocationFile, migrated, active, inactive);
+            if (!migrated.isEmpty() || !authoredBedrockSymbols.isEmpty())
+                writeMigrationReport(allocationFile, migrated, active, inactive, authoredBedrockSymbols);
         }
         return new UiGlyphRegistry(resolved);
     }
@@ -291,7 +295,8 @@ public final class UiGlyphLoader {
     }
 
     private static void writeMigrationReport(Path file, Map<ContentID, Integer> old,
-                                             Map<ContentID, Integer> active, Map<ContentID, Integer> inactive) {
+                                             Map<ContentID, Integer> active, Map<ContentID, Integer> inactive,
+                                             Set<Integer> authoredBedrockSymbols) {
         StringBuilder report = new StringBuilder("Bedrock PUA migration (U+E000..U+E1FF)\n");
         report.append("Update literal glyph characters in external DeluxeMenus/config files separately.\n");
         List<ContentID> ids = new ArrayList<ContentID>(old.keySet());
@@ -300,6 +305,13 @@ public final class UiGlyphLoader {
             Integer now = active.containsKey(id) ? active.get(id) : inactive.get(id);
             report.append(id).append(": ").append(codePoint(old.get(id).intValue()))
                     .append(" -> ").append(codePoint(now.intValue())).append('\n');
+        }
+        if (!authoredBedrockSymbols.isEmpty()) {
+            report.append("Unmanaged authored Java font codepoints are still inside Bedrock's controller range:\n");
+            for (Integer symbol : authoredBedrockSymbols) report.append("  ").append(codePoint(symbol.intValue())).append('\n');
+            report.append("These are defined in content-pack font JSON, not glyph-allocations.yml.\n");
+            report.append("Do not rewrite them automatically: their literal references in other plugin menus,\n");
+            report.append("lore and placeholders must migrate together, or use a Bedrock-specific UI.\n");
         }
         try {
             Files.write(file.resolveSibling("glyph-bedrock-migration.txt"),
