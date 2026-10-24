@@ -6,6 +6,8 @@ VoxelCore keeps gameplay authoritative on Paper. Geyser supplies Bedrock resourc
 
 Use a modern backend (1.21.4+, including 26.3) and a Geyser release with v2 custom item mappings (API 2.9.3 / build 1062 or newer). Older Java adapters use a different item representation and are not supported by this Bedrock compiler yet.
 
+On the **Geyser** side, ensure `gameplay.enable-custom-content: true` in the Geyser configuration, then restart Geyser after changing it. Otherwise its custom item/block/skull mapping systems are disabled. Confirm `voxelcore.mcpack` is in Geyser's `packs/` directory, `voxelcore-items.json` is in `custom_mappings/`, and inspect the actual `unsupported-items.txt` revision report. If Geyser runs on a proxy/another machine, these files must be on that Geyser instance; exporting to a Paper-only directory is not enough.
+
 ```yaml
 game:
   bedrock_support: true
