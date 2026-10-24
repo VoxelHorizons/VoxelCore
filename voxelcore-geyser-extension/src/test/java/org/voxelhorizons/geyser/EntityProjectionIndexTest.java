@@ -66,8 +66,17 @@ public final class EntityProjectionIndexTest {
         UUID furniture=UUID.randomUUID(), vehicle=UUID.randomUUID();
         Path furnitureFile=dir.resolve("furniture.json"),vehicleFile=dir.resolve("vehicles.json");
         Files.writeString(furnitureFile,fixture(furniture.toString(),"voxel:oak_bench"));
-        Files.writeString(vehicleFile,"{\\"schema\\":1,\\"vehicles\\":[{\\"model_item\\":\\"voxel:tractor\\","
-                +"\\"entity_links\\":{\\"visual\\":\\""+vehicle+"\\"}}]}");
+        com.google.gson.JsonObject vehicleLink=new com.google.gson.JsonObject();
+        vehicleLink.addProperty("visual",vehicle.toString());
+        com.google.gson.JsonObject vehicleRow=new com.google.gson.JsonObject();
+        vehicleRow.addProperty("model_item","voxel:tractor");
+        vehicleRow.add("entity_links",vehicleLink);
+        com.google.gson.JsonArray vehicleRows=new com.google.gson.JsonArray();
+        vehicleRows.add(vehicleRow);
+        com.google.gson.JsonObject vehicleFeed=new com.google.gson.JsonObject();
+        vehicleFeed.addProperty("schema",1);
+        vehicleFeed.add("vehicles",vehicleRows);
+        Files.writeString(vehicleFile,vehicleFeed.toString());
         Files.setLastModifiedTime(furnitureFile,FileTime.fromMillis(System.currentTimeMillis()-120_000L));
         EntityProjectionIndex index=new EntityProjectionIndex(root,Map.of(
                 "voxel:oak_bench","voxelcore:entity_bench",
