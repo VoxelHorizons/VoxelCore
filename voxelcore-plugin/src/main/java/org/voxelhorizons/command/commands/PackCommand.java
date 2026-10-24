@@ -344,7 +344,9 @@ public final class PackCommand implements SubCommand {
                                             plugin.getPackManager().contentRoot(),
                                             plugin.getPackManager().outputRoot().resolve("bedrock"));
                             bedrockStatus = "Bedrock built: " + bedrock.directory + "; " + bedrock.mappedItems
-                                    + " mapped items; " + bedrock.unsupportedItems + " unsupported (see unsupported-items.txt).";
+                                    + " mapped items; " + bedrock.unsupportedItems + " unsupported (see unsupported-items.txt)."
+                                    + (bedrock.unsupportedReasonSummary.isEmpty() ? ""
+                                    : " Reasons: " + bedrock.unsupportedReasonSummary + ".");
                             if (geyserDestination.root != null) {
                                 new org.voxelhorizons.pack.GeyserPackPublisher().publish(bedrock, geyserDestination.root);
                                 java.nio.file.Path pack = geyserDestination.root.resolve("packs/voxelcore.mcpack");
