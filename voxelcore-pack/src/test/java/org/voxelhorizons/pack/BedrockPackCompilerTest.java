@@ -185,6 +185,18 @@ public class BedrockPackCompilerTest {
             assertNull(zip.getEntry("texts/en_US.lang"));
         }
     }
+    @Test public void supportsGuiRotationWithoutExplicitTextureOverride() throws Exception {
+        Path root = fixture(), out = temp.newFolder().toPath();
+        Path items = root.resolve("demo/content/items.yml");
+        String content = new String(Files.readAllBytes(items), StandardCharsets.UTF_8);
+        content = content.replace("        texture: demo:item/token", "        gui_rotation: [20, 45, 0]");
+        write(items, content);
+        write(root.resolve("demo/assets/demo/models/item/token.json"),
+                "{\"parent\":\"minecraft:item/generated\",\"textures\":{\"layer0\":\"demo:item/token\"}}");
+        BedrockPackCompiler.Result built = new BedrockPackCompiler().compile(root,out);
+        assertEquals(1,built.mappedItems);
+    }
+
     @Test public void automaticallyMapsGeneratedModelAndCachesIcon() throws Exception {
         Path root = fixture(), out = temp.newFolder().toPath();
         Path items = root.resolve("demo/content/items.yml");
