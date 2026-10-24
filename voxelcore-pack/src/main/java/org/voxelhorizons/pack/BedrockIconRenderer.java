@@ -59,7 +59,7 @@ final class BedrockIconRenderer {
     private JsonObject resolve(String id, Set<String> visiting) throws IOException {
         if(!visiting.add(id))throw new IOException("Model parent cycle: "+id);
         byte[] bytes=assets.get(path(id,"models",".json"));
-        if(bytes==null)throw new IOException("Missing model "+id);
+        if(bytes==null)throw new IOException("Missing or conflicting model "+id);
         JsonObject own=JsonParser.parseString(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
         JsonObject result=new JsonObject();
         if(own.has("parent")) {
@@ -76,7 +76,7 @@ final class BedrockIconRenderer {
     private byte[] texture(JsonObject textures,String key)throws IOException {
         Set<String> seen=new HashSet<String>();
         while(key.startsWith("#")) { if(!seen.add(key)||!textures.has(key.substring(1)))throw new IOException("Unresolved texture "+key); key=textures.get(key.substring(1)).getAsString(); }
-        byte[] value=assets.get(path(key,"textures",".png")); if(value==null)throw new IOException("Missing texture "+key); return value;
+        byte[] value=assets.get(path(key,"textures",".png")); if(value==null)throw new IOException("Missing or conflicting texture "+key); return value;
     }
     private static String path(String id,String kind,String suffix) { String[] parts=(id.contains(":")?id:"minecraft:"+id).split(":",2); return "assets/"+parts[0]+"/"+kind+"/"+parts[1]+suffix; }
     private static double[] vector(JsonObject o,String key,double[] fallback) { if(!o.has(key))return fallback; JsonArray a=o.getAsJsonArray(key); double[] v=new double[a.size()];for(int i=0;i<v.length;i++)v[i]=a.get(i).getAsDouble();return v; }

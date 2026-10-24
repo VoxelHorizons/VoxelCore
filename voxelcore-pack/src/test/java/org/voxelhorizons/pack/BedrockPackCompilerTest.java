@@ -67,14 +67,13 @@ public class BedrockPackCompilerTest {
         try { new GeyserPackPublisher().publish(result,temp.getRoot().toPath().resolve("missing")); fail(); }
         catch(java.io.IOException expected) { assertTrue(expected.getMessage().contains("does not exist")); }
     }
-    @Test public void rejectsAmbiguousSelectors() throws Exception {
+    @Test public void sharesIdenticalSelectors() throws Exception {
         Path root = fixture();
         Path items = root.resolve("demo/content/items.yml");
         String content = new String(Files.readAllBytes(items), StandardCharsets.UTF_8);
         content += "  duplicate:\n    extends: token\n";
         Files.write(items, content.getBytes(StandardCharsets.UTF_8));
-        try { new BedrockPackCompiler().compile(root,temp.newFolder().toPath()); fail(); }
-        catch(java.io.IOException expected) { assertTrue(expected.getMessage().contains("Ambiguous")); }
+        assertEquals(1,new BedrockPackCompiler().compile(root,temp.newFolder().toPath()).mappedItems);
     }
     @Test public void authoredAssetsAreIncludedAndRemovedOnRebuild() throws Exception {
         Path root = fixture(), out = temp.newFolder().toPath();
@@ -103,6 +102,22 @@ public class BedrockPackCompilerTest {
         assertEquals(1,result.mappedItems);
         try (java.util.stream.Stream<Path> files = Files.list(out.resolve("icon-cache"))) { assertEquals(1,files.count()); }
         assertEquals(result.revision,new BedrockPackCompiler().compile(root,out).revision);
+    }
+    @Test public void ignoresUnrelatedJavaAssetCollisions() throws Exception {
+        Path root = fixture(), out = temp.newFolder().toPath();
+        write(root.resolve("other/pack.yml"), "schema: 1\nnamespace: other\n");
+        for (String path : new String[]{"font/default.json", "lang/en_us.json", "atlases/items.json", "blockstates/stone.json"}) {
+            write(root.resolve("demo/assets/minecraft/" + path), "{\"a\":1}");
+            write(root.resolve("other/assets/minecraft/" + path), "{\"b\":2}");
+        }
+        assertEquals(1, new BedrockPackCompiler().compile(root,out).mappedItems);
+    }
+    @Test public void unrelatedConflictingModelsDoNotAbortBuild() throws Exception {
+        Path root = fixture();
+        write(root.resolve("other/pack.yml"), "schema: 1\nnamespace: other\n");
+        write(root.resolve("demo/assets/minecraft/models/item/test.json"), "{\"parent\":\"demo:a\"}");
+        write(root.resolve("other/assets/minecraft/models/item/test.json"), "{\"parent\":\"demo:b\"}");
+        assertEquals(1, new BedrockPackCompiler().compile(root,temp.newFolder().toPath()).mappedItems);
     }
     private static void write(Path path, String text) throws Exception {
         Files.createDirectories(path.getParent()); Files.write(path,text.getBytes(StandardCharsets.UTF_8));

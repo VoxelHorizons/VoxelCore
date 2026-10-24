@@ -36,16 +36,33 @@ public final class BedrockPackCompiler {
         }
         JsonObject items = new JsonObject();
         JsonObject textures = new JsonObject();
-        Set<String> selectors = new HashSet<String>();
+        Map<String, byte[]> selectors = new HashMap<String, byte[]>();
         List<String> unsupported = new ArrayList<String>();
+        Set<String> ambiguousAssets = new HashSet<String>();
         Map<String, byte[]> javaAssets = new TreeMap<String, byte[]>();
         for (ContentPack pack : packs) {
             Path root = pack.root().resolve("assets");
             if (Files.exists(root)) try (Stream<Path> paths = Files.walk(root)) {
-                for (Path file : (Iterable<Path>) paths.filter(Files::isRegularFile).sorted()::iterator)
-                    put(javaAssets, "assets/" + root.relativize(file).toString().replace('\\', '/'), Files.readAllBytes(file));
+                for (Path file : (Iterable<Path>) paths.filter(Files::isRegularFile).sorted()::iterator) {
+                    String relative = root.relativize(file).toString().replace('\\', '/');
+                    // Preview rendering only consumes model JSON and PNG textures. Java fonts,
+                    // languages, atlases and blockstates have their own Java merge semantics.
+                    if (relative.matches("[^/]+/models/.+\\.json") || relative.matches("[^/]+/textures/.+\\.png"))
+                        {
+                        String key = "assets/" + relative;
+                        byte[] bytes = Files.readAllBytes(file), previous = javaAssets.get(key);
+                        try {
+                            if (previous != null && relative.endsWith(".json"))
+                                javaAssets.put(key, JsonAssetCompatibility.merge(previous, bytes, key));
+                            else put(javaAssets, key, bytes);
+                        } catch (JavaPackCompileException | IOException conflict) {
+                            ambiguousAssets.add(key);
+                        }
+                    }
+                }
             }
         }
+        for (String ambiguous : ambiguousAssets) javaAssets.remove(ambiguous);
         BedrockIconRenderer renderer = new BedrockIconRenderer(javaAssets);
         Map<String, byte[]> rendered = new HashMap<String, byte[]>();
         int count = 0;
@@ -100,8 +117,11 @@ public final class BedrockPackCompiler {
             String material = item.material().toLowerCase(Locale.ROOT);
             if (!material.contains(":")) material = "minecraft:" + material;
             String model = item.render().model();
-            if (!selectors.add(material + "|" + model))
+            byte[] existingIcon = selectors.put(material + "|" + model, png);
+            if (existingIcon != null) {
+                if (Arrays.equals(existingIcon, png)) continue; // Same Java representation shares one mapping.
                 throw new IOException("Ambiguous Bedrock mapping for " + material + " / " + model);
+            }
             // Hex-encoded ID preserves uniqueness even for slash/underscore combinations.
             String identifier = "voxelcore:i_" + hex(item.id().toString().getBytes(StandardCharsets.UTF_8));
             String icon = identifier.replace(':', '.');
