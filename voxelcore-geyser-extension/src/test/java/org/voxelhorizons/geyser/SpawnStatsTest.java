@@ -15,6 +15,8 @@ public final class SpawnStatsTest {
         assertEquals("1 substituted, 3 item_display not in a projection feed, 0 rejected by Geyser; "
                 + "fed models whose Bedrock entity is not registered (restart Geyser after a pack build): 1 "
                 + "[voxelcore:entity_i_a x2]; fed UUIDs spawned as other entity types (not substituted): "
-                + "[minecraft:armor_stand x1]", stats.describe());
+                + "[minecraft:armor_stand x1]; spawn events from Geyser: 0", stats.describe());
+        stats.seen("minecraft:pig");
+        assertEquals(true, stats.describe().endsWith("spawn events from Geyser: 1 [minecraft:pig x1]"));
     }
 }

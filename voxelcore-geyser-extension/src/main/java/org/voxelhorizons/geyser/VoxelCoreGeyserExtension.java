@@ -129,6 +129,7 @@ public final class VoxelCoreGeyserExtension implements Extension {
      */
     @Subscribe
     public void onServerEntitySpawn(ServerSpawnEntityEvent event) {
+        spawnStats.seen(String.valueOf(event.entityType()));
         EntityProjectionIndex current = projectionIndex;
         if (current==null) return;
         boolean itemDisplay=event.entityType().is(Identifier.of("minecraft:item_display"));

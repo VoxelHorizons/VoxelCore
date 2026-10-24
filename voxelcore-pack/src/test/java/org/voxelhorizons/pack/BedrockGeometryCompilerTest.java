@@ -240,9 +240,18 @@ public final class BedrockGeometryCompilerTest {
         assertEquals("held", held.getAsJsonArray("bones").get(1).getAsJsonObject().get("parent").getAsString());
         JsonObject pose = JsonParser.parseString(new String(output.assets.get("animations/voxelcore_held_"+shortId+".animation.json"),
                 StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("animations")
-                .getAsJsonObject("animation.voxelcore."+shortId+".held.third_person").getAsJsonObject("bones").getAsJsonObject("model");
-        assertEquals(0.5, pose.getAsJsonArray("scale").get(0).getAsDouble(), 0);
-        assertEquals(30, pose.getAsJsonArray("rotation").get(2).getAsDouble(), 0);
+                .getAsJsonObject("animation.voxelcore."+shortId+".held.third_person").getAsJsonObject("bones");
+        assertEquals("[90.0,0.0,0.0]", pose.getAsJsonObject("held").get("rotation").toString());
+        assertEquals("[0.0,13.0,-3.0]", pose.getAsJsonObject("held").get("position").toString());
+        assertEquals(0.5, pose.getAsJsonObject("held_x").getAsJsonArray("scale").get(0).getAsDouble(), 0);
+        assertEquals(-10, pose.getAsJsonObject("held_x").getAsJsonArray("rotation").get(0).getAsDouble(), 0);
+        assertEquals(-20, pose.getAsJsonObject("held_y").getAsJsonArray("rotation").get(1).getAsDouble(), 0);
+        assertEquals(30, pose.getAsJsonObject("held_z").getAsJsonArray("rotation").get(2).getAsDouble(), 0);
+        JsonArray heldBones = held.getAsJsonArray("bones");
+        JsonObject model = heldBones.get(4).getAsJsonObject();
+        assertEquals("model", model.get("name").getAsString());
+        assertEquals("Cubes in Java item space (y raised by 8)", 0.0,
+                model.getAsJsonArray("cubes").get(0).getAsJsonObject().getAsJsonArray("origin").get(1).getAsDouble(), 0);
         assertEquals("Placed entities keep the unbound geometry", "geometry.voxelcore."+shortId,
                 geometries.get(0).getAsJsonObject().getAsJsonObject("description").get("identifier").getAsString());
     }

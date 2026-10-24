@@ -12,6 +12,10 @@ import java.util.concurrent.atomic.AtomicLong;
 final class SpawnStats {
     final AtomicLong substituted = new AtomicLong(), notInFeed = new AtomicLong(), rejected = new AtomicLong();
     private final Map<String, Long> unregistered = new TreeMap<String, Long>(), otherTypes = new TreeMap<String, Long>();
+    private final Map<String, Long> seen = new TreeMap<String, Long>();
+
+    /** Every Java spawn Geyser reported to extensions, by type (proves whether item_display arrives at all). */
+    synchronized void seen(String javaType) { seen.merge(javaType, 1L, Long::sum); }
 
     synchronized void unregistered(String entityType) { unregistered.merge(entityType, 1L, Long::sum); }
 
@@ -27,14 +31,20 @@ final class SpawnStats {
                     .append(unregistered.size()).append(' ').append(limit(unregistered));
         if (!otherTypes.isEmpty())
             out.append("; fed UUIDs spawned as other entity types (not substituted): ").append(limit(otherTypes));
+        long total = 0;
+        for (long count : seen.values()) total += count;
+        out.append("; spawn events from Geyser: ").append(total);
+        if (!seen.isEmpty()) out.append(' ').append(limit(seen, 12));
         return out.toString();
     }
 
-    private static String limit(Map<String, Long> counts) {
+    private static String limit(Map<String, Long> counts) { return limit(counts, 6); }
+
+    private static String limit(Map<String, Long> counts, int max) {
         StringBuilder text = new StringBuilder("[");
         int shown = 0;
         for (Map.Entry<String, Long> entry : counts.entrySet()) {
-            if (shown++ == 6) { text.append(", ..."); break; }
+            if (shown++ == max) { text.append(", ..."); break; }
             if (shown > 1) text.append(", ");
             text.append(entry.getKey()).append(" x").append(entry.getValue());
         }

@@ -313,16 +313,22 @@ final class BedrockGeometryCompiler {
         String heldGeometryId = geometryId + ".held";
         JsonObject heldDescription = description.deepCopy();
         heldDescription.addProperty("identifier", heldGeometryId);
-        JsonObject handBone = new JsonObject();
-        handBone.addProperty("name","held");
-        handBone.addProperty("binding","q.item_slot_to_bone_name(c.item_slot)");
-        handBone.add("pivot",xyz(0,0,0));
-        JsonObject modelBone = new JsonObject();
-        modelBone.addProperty("name","model");
-        modelBone.addProperty("parent","held");
-        modelBone.add("pivot",xyz(0,0,0));
-        modelBone.add("cubes",cubes.deepCopy());
-        JsonArray heldBones = new JsonArray(); heldBones.add(handBone); heldBones.add(modelBone);
+        // Bone chain as in Geyser's java2bedrock converter: 'held' (hand binding + fixed base
+        // pose) -> held_x -> held_y -> held_z (Java display rotation one axis per bone, since
+        // Java and Bedrock compose rotations in different orders) -> 'model' with the cubes in
+        // Java item space (0..16, centred on the y=8 pivot).
+        JsonArray heldBones = new JsonArray();
+        String parent = null;
+        for (String name : new String[]{"held", "held_x", "held_y", "held_z", "model"}) {
+            JsonObject heldBone = new JsonObject();
+            heldBone.addProperty("name", name);
+            if (parent != null) heldBone.addProperty("parent", parent);
+            if (parent == null) heldBone.addProperty("binding", "q.item_slot_to_bone_name(c.item_slot)");
+            heldBone.add("pivot", xyz(0, 8, 0));
+            if ("model".equals(name)) heldBone.add("cubes", raised(cubes, 8));
+            heldBones.add(heldBone);
+            parent = name;
+        }
         JsonObject heldGeom = new JsonObject();
         heldGeom.add("description",heldDescription); heldGeom.add("bones",heldBones);
         JsonArray geometries = new JsonArray(); geometries.add(geom); geometries.add(heldGeom);
@@ -361,9 +367,11 @@ final class BedrockGeometryCompiler {
         attachDescription.add("scripts", attachScripts);
         JsonObject heldAnimations = new JsonObject();
         heldAnimations.add(heldAnimation + ".third_person", heldPose(display, "thirdperson_righthand",
-                new double[]{75,45,0}, new double[]{0,2.5,0}, new double[]{0.375,0.375,0.375}));
+                new double[]{75,45,0}, new double[]{0,2.5,0}, new double[]{0.375,0.375,0.375},
+                new double[]{90,0,0}, new double[]{0,13,-3}, 1.0));
         heldAnimations.add(heldAnimation + ".first_person", heldPose(display, "firstperson_righthand",
-                new double[]{0,45,0}, new double[]{0,0,0}, new double[]{0.4,0.4,0.4}));
+                new double[]{0,45,0}, new double[]{0,0,0}, new double[]{0.4,0.4,0.4},
+                new double[]{90,60,-40}, new double[]{4,10,4}, 1.5));
         JsonObject heldAnimationRoot = new JsonObject();
         heldAnimationRoot.addProperty("format_version", "1.8.0");
         heldAnimationRoot.add("animations", heldAnimations);
@@ -418,19 +426,46 @@ final class BedrockGeometryCompiler {
         return new Output(assets,cubes.size(),tinted);
     }
 
-    /** Constant looping pose for the held model bone from a Java display transform (vanilla block defaults). */
-    private static JsonObject heldPose(JsonObject display, String key, double[] rotation, double[] translation, double[] scale) {
+    /** Copy of the cubes moved up (Java item space keeps y in 0..16; the entity geometry is centred). */
+    private static JsonArray raised(JsonArray cubes, double dy) {
+        JsonArray out = cubes.deepCopy();
+        for (JsonElement element : out) {
+            JsonObject cube = element.getAsJsonObject();
+            for (String field : new String[]{"origin", "pivot"}) {
+                if (!cube.has(field)) continue;
+                JsonArray point = cube.getAsJsonArray(field);
+                point.set(1, new com.google.gson.JsonPrimitive(point.get(1).getAsDouble() + dy));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Constant looping pose from a Java display transform (vanilla block defaults when absent):
+     * the hand base pose on 'held', then Java rotation per axis (x, y negated for Bedrock),
+     * translation (x negated) and scale on held_x.
+     */
+    private static JsonObject heldPose(JsonObject display, String key, double[] rotation, double[] translation, double[] scale,
+                                       double[] baseRotation, double[] basePosition, double baseScale) {
         if (display.has(key) && display.get(key).isJsonObject()) {
             JsonObject transform = display.getAsJsonObject(key);
             rotation = triple(transform, "rotation", new double[]{0,0,0});
             translation = triple(transform, "translation", new double[]{0,0,0});
             scale = triple(transform, "scale", new double[]{1,1,1});
         }
-        JsonObject bone = new JsonObject();
-        bone.add("rotation", xyz(rotation[0], rotation[1], rotation[2]));
-        bone.add("position", xyz(translation[0], translation[1], translation[2]));
-        bone.add("scale", xyz(scale[0], scale[1], scale[2]));
-        JsonObject bones = new JsonObject(); bones.add("model", bone);
+        JsonObject bones = new JsonObject();
+        JsonObject base = new JsonObject();
+        base.add("rotation", xyz(baseRotation[0], baseRotation[1], baseRotation[2]));
+        base.add("position", xyz(basePosition[0], basePosition[1], basePosition[2]));
+        if (baseScale != 1.0) base.add("scale", xyz(baseScale, baseScale, baseScale));
+        bones.add("held", base);
+        JsonObject x = new JsonObject();
+        x.add("rotation", xyz(-rotation[0], 0, 0));
+        x.add("position", xyz(-translation[0], translation[1], translation[2]));
+        x.add("scale", xyz(scale[0], scale[1], scale[2]));
+        bones.add("held_x", x);
+        JsonObject y = new JsonObject(); y.add("rotation", xyz(0, -rotation[1], 0)); bones.add("held_y", y);
+        JsonObject z = new JsonObject(); z.add("rotation", xyz(0, 0, rotation[2])); bones.add("held_z", z);
         JsonObject animation = new JsonObject();
         animation.addProperty("loop", true);
         animation.add("bones", bones);

@@ -278,7 +278,7 @@ public class BedrockPackCompilerTest {
             assertNull("Controller pages must never be modified", zip.getEntry("font/glyph_E1.png"));
             try (java.io.InputStream image = zip.getInputStream(zip.getEntry("font/glyph_E2.png"))) {
                 java.awt.image.BufferedImage atlas = javax.imageio.ImageIO.read(image);
-                assertTrue((atlas.getRGB(8,8) >>> 24) != 0);
+                assertTrue("1px glyph at Java height 16 stays 1px, centred", (atlas.getRGB(7,7) >>> 24) != 0);
             }
         }
     }
@@ -315,10 +315,12 @@ public class BedrockPackCompilerTest {
             }
             try (java.io.InputStream image = zip.getInputStream(zip.getEntry("font/glyph_F4.png"))) {
                 java.awt.image.BufferedImage atlas = javax.imageio.ImageIO.read(image);
-                // 10px tile at integer scale 3 in a 32px cell: opaque at the cell's left edge, row 15.
-                assertEquals(0xffffffff, atlas.getRGB(0, 15));
-                assertEquals(0xffffffff, atlas.getRGB(29, 15));
-                assertEquals("Tile area beyond 30px stays empty", 0, atlas.getRGB(31, 15) >>> 24);
+                // Java height 8 -> each 10x10 source tile is drawn 8x8, left-aligned, rows 4..11 of a 16px cell.
+                assertEquals(BedrockGlyphAtlas.SHEET_SIZE, atlas.getWidth());
+                assertEquals(0xff, atlas.getRGB(0, 7) >>> 24);
+                assertEquals(0xff, atlas.getRGB(7, 7) >>> 24);
+                assertEquals("Tile is no wider than its Java height", 0, atlas.getRGB(8, 7) >>> 24);
+                assertEquals("Centred vertically", 0, atlas.getRGB(3, 2) >>> 24);
             }
         }
     }
