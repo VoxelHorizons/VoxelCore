@@ -3,6 +3,7 @@ package org.voxelhorizons.geyser;
 import org.geysermc.event.subscribe.Subscribe;
 import org.geysermc.geyser.api.entity.custom.CustomEntityDefinition;
 import org.geysermc.geyser.api.event.lifecycle.GeyserDefineEntitiesEvent;
+import org.geysermc.geyser.api.event.java.ServerSpawnEntityEvent;
 import org.geysermc.geyser.api.util.Identifier;
 import java.util.Map;
 import java.util.TreeSet;
@@ -30,6 +31,33 @@ public final class VoxelCoreGeyserExtension implements Extension {
     }
 
     private volatile Map<String,String> nativeEntityIdentifiers = java.util.Collections.emptyMap();
+    private volatile EntityProjectionIndex projectionIndex;
+
+    /**
+     * Keep server Paper UUID identity intact. Only known display entities from
+     * explicitly exported VoxelFurniture/VoxelVehicles projection files are
+     * replaced; ordinary Java displays and other entities remain unchanged.
+     */
+    @Subscribe
+    public void onServerEntitySpawn(ServerSpawnEntityEvent event) {
+        EntityProjectionIndex current = projectionIndex;
+        if (current==null || !event.entityType().is(Identifier.of("minecraft:item_display"))) return;
+        final String bedrockId;
+        try {
+            bedrockId=current.entityType(event.uuid());
+        } catch (IOException readError) {
+            logger().warning("VoxelCore projection failed: " + readError.getMessage());
+            return;
+        }
+        if (bedrockId==null || !nativeEntityIdentifiers.containsValue(bedrockId)) return;
+        try {
+            event.definition(CustomEntityDefinition.of(Identifier.of(bedrockId)));
+        } catch (RuntimeException invalid) {
+            logger().warning("VoxelCore custom entity replacement rejected for "
+                    + event.uuid() + ": " + invalid.getMessage());
+        }
+    }
+
 
     @Subscribe
     public void onDefineEntities(GeyserDefineEntitiesEvent event) {
@@ -57,6 +85,7 @@ public final class VoxelCoreGeyserExtension implements Extension {
             }
         }
         nativeEntityIdentifiers = catalog;
+        projectionIndex = new EntityProjectionIndex(geyserApi().configDirectory(), catalog);
         logger().info("Registered " + types.size() + " VoxelCore Bedrock client entity definitions from "
                 + state.revision() + " (spawn replacement/state synchronization still required).");
     }
