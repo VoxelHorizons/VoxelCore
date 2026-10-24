@@ -33,6 +33,18 @@ public class BedrockIconRendererTest {
   assertTrue("Child furniture preview is missing",c>10);
   assertNotEquals("Inherited texture override must change icon",parent.getRGB(32,32),child.getRGB(32,32));
  }
+ @Test public void resolvesVanillaCubeAllParentNotPresentInAuthoredAssets() throws Exception {
+  Map<String,byte[]> assets=new HashMap<String,byte[]>();
+  BufferedImage texture=new BufferedImage(16,16,2);
+  for(int y=0;y<16;y++)for(int x=0;x<16;x++)texture.setRGB(x,y,0xff228822);
+  ByteArrayOutputStream png=new ByteArrayOutputStream();
+  ImageIO.write(texture,"png",png);
+  assets.put("assets/demo/textures/planks.png",png.toByteArray());
+  assets.put("assets/demo/models/oak.json",
+      "{\"parent\":\"minecraft:block/cube_all\",\"textures\":{\"all\":\"demo:planks\"}}".getBytes("UTF-8"));
+  BufferedImage preview=ImageIO.read(new ByteArrayInputStream(new BedrockIconRenderer(assets).render("demo:oak")));
+  assertTrue((preview.getRGB(32,32)>>>24)!=0);
+ }
  @Test public void rejectsParentCycles() throws Exception {
   Map<String,byte[]> assets=new HashMap<String,byte[]>();assets.put("assets/demo/models/a.json","{\"parent\":\"demo:a\"}".getBytes("UTF-8"));
   try {new BedrockIconRenderer(assets).render("demo:a");fail();}catch(IOException expected){assertTrue(expected.getMessage().contains("cycle"));}
