@@ -16,10 +16,10 @@
 | --- | --- | --- | --- | --- |
 | B01 | Deterministic Bedrock manifest/resource pack and Geyser v2 custom-item mapping; stable identifier and file-path integrity | VoxelCore | TESTED | `BedrockPackCompilerTest` and GitHub build prior to audit; **live rendering unverified** |
 | B02 | Safe destination discovery; local and manually mounted Geyser exports; no surprise writes to unrelated server | VoxelCore | TESTED | Publisher tests; proxy/remote path not live-tested |
-| B03 | Pairwise pack+mappings deployment with manifest revision verification, rollback failure tests, detection of mixed versions | VoxelCore | IN PROGRESS | See PROGRESS.md |
+| B03 | Pairwise pack+mappings deployment with manifest revision verification, rollback failure tests, detection of mixed versions | VoxelCore | IMPLEMENTED | `GeyserPackPublisher` receipt + integrity inspection, preflight ZIP validation and injected rollback tests; CI verification pending on latest SHA |
 | B04 | Report mapped/unmapped item identities, error classes, actionable invalid asset failures | VoxelCore | IMPLEMENTED | Generated `unsupported-items.txt`, compiler reason summary; needs live corpus |
-| B05 | Full modern Java model resolution: inheritance, variant/submodel/item components, vanilla parents and predicates | VoxelCore | IN PROGRESS | Partial `BedrockIconRenderer`; conditional/tint/rescale paths unsupported |
-| B06 | Real native Bedrock geometry and attachables, not just flat 2D icons, plus held-item transforms and texture registration | VoxelCore | NOT STARTED | Converter/fixture and API acceptance missing |
+| B05 | Full modern Java model resolution: inheritance, variant/submodel/item components, vanilla parents and predicates | VoxelCore | IN PROGRESS | Preview renderer adds inherited multilayer sprites; conditional/tint/rescale/item predicates still unsupported |
+| B06 | Real native Bedrock geometry and attachables, not just flat 2D icons, plus held-item transforms and texture registration | VoxelCore | IN PROGRESS | `BedrockGeometryCompiler` exports supported Java cuboids, atlases and attachables; needs CI test result, held-item animations/transform verification and more model types |
 | B07 | Native block mappings/state permutations, tint, dyes and animations where supported | VoxelCore | NOT STARTED | Geyser feature version and state matrix to verify |
 | B08 | Addon item registration contract for VoxelFurniture, VoxelFurnitureShop and VoxelVehicles | Cross-repo | NOT STARTED | Static VoxelCore compilation does not capture plugin runtime items |
 | B09 | Versioned VoxelFurniture visual/state export, interaction remains Paper-authoritative | VoxelFurniture | NOT STARTED | Current Java ITEM_DISPLAY renderer only; issue #46 |
