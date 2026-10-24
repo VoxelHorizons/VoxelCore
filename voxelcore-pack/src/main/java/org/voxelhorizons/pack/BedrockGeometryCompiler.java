@@ -182,23 +182,26 @@ final class BedrockGeometryCompiler {
             // geometry accepts a 0 size there just as Java does.
             int flatAxes = 0;
             for (int a=0;a<3;a++) {
-                if (to[a] < from[a] || !Double.isFinite(from[a]) || !Double.isFinite(to[a]))
+                if (!Double.isFinite(from[a]) || !Double.isFinite(to[a]))
                     throw new IOException("Invalid Java cuboid bounds in " + javaModel);
                 if (to[a] == from[a]) flatAxes++;
             }
             if (flatAxes > 1) throw new IOException("Degenerate (line/point) Java cuboid in " + javaModel);
             // Geometry bounds; default face UVs below still use the authored from/to, as Java does.
-            double[] lo = from.clone(), hi = to.clone();
+            // Java also renders elements authored with to < from; Bedrock needs min/max.
+            double[] lo = new double[3], hi = new double[3];
+            for (int a=0;a<3;a++) { lo[a] = Math.min(from[a],to[a]); hi[a] = Math.max(from[a],to[a]); }
             if (element.has("rotation")) {
                 JsonObject rotation = element.getAsJsonObject("rotation");
                 double stretch = BedrockIconRenderer.rescaleFactor(rotation);
                 if (stretch != 1.0) {
-                    int axis = "xyz".indexOf(rotation.get("axis").getAsString());
+                    int axis = BedrockIconRenderer.singleAxis(rotation);
                     double[] origin = vector(rotation,"origin");
                     for (int a=0;a<3;a++) {
                         if (a == axis) continue;
-                        lo[a] = origin[a] + (from[a]-origin[a])*stretch;
-                        hi[a] = origin[a] + (to[a]-origin[a])*stretch;
+                        double l = lo[a], h = hi[a];
+                        lo[a] = origin[a] + (l-origin[a])*stretch;
+                        hi[a] = origin[a] + (h-origin[a])*stretch;
                     }
                 }
             }
@@ -210,14 +213,9 @@ final class BedrockGeometryCompiler {
             minZ=Math.min(minZ,lo[2]-8); maxZ=Math.max(maxZ,hi[2]-8);
             if (element.has("rotation")) {
                 JsonObject rotation = element.getAsJsonObject("rotation");
-                String axis = rotation.get("axis").getAsString();
-                if (!axis.matches("[xyz]")) throw new IOException("Unknown cuboid rotation axis " + axis);
-                double angle = rotation.get("angle").getAsDouble();
-                if (!Double.isFinite(angle) || Math.abs(angle) > 45)
-                    throw new IOException("Unsupported cuboid rotation " + angle + " in " + javaModel);
-                double[] pivot = vector(rotation,"origin");
-                double[] rot = new double[3];
-                rot["xyz".indexOf(axis)] = angle;
+                // Bedrock cubes take any x/y/z rotation; Java's legacy form is one axis.
+                double[] rot = BedrockIconRenderer.angles(rotation);
+                double[] pivot = rotation.has("origin") ? vector(rotation,"origin") : new double[]{8,8,8};
                 cube.add("rotation",xyz(rot[0],rot[1],rot[2]));
                 cube.add("pivot",xyz(pivot[0]-8,pivot[1]-8,pivot[2]-8));
             }

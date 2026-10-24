@@ -82,7 +82,7 @@ public final class PackCommand implements SubCommand {
             if (!java.nio.file.Files.exists(path)) throw new java.io.IOException("bedrock.vanilla_assets not found: " + path);
             return path;
         }
-        String version = plugin.getServer().getBukkitVersion().split("-", 2)[0];
+        String version = org.voxelhorizons.platform.MinecraftVersionDetector.detect();
         return org.voxelhorizons.pack.VanillaClientJar.resolve(
                 plugin.getDataFolder().toPath().resolve("cache").resolve("vanilla"), version);
     }
