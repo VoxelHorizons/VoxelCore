@@ -111,6 +111,12 @@ economy:
 # Geyser v2 item mappings require Geyser API 2.9.3/build 1062 or newer.
 # Packs are built on /vc admin pack build; distribution happens at Bedrock connection.
 bedrock:
-  # Empty = export only. Absolute path recommended; relative paths use the server working directory.
-  # For a proxy/standalone Geyser, this must be its mounted data directory, not a backend-local copy.
+  # Automatically publish the pack + custom_mappings to the data folder of an
+  # installed local Geyser-Spigot plugin. Does not guess paths to remote/proxy instances.
+  # Set false to keep export-only behavior when geyser_data_directory is empty.
+  auto_publish_local: true
+  # Optional override. Empty = auto-detect Geyser-Spigot when installed in this server.
+  # Absolute path recommended; relative paths use the server working directory.
+  # Proxy/standalone Geyser needs a mounted path to its REAL data directory.
+  # Example local override: 'plugins/Geyser-Spigot'
   geyser_data_directory: ''
