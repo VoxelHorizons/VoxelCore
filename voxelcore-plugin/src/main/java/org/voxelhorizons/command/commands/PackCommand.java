@@ -64,17 +64,29 @@ public final class PackCommand implements SubCommand {
     }
 
     /**
-     * Resolve only a genuinely loaded Bukkit Geyser plugin. Scanning stale folders in
-     * plugins/ would risk silently publishing into an old backend copy when the live
-     * Geyser instance actually runs on a Velocity/Bungee proxy.
-     * Call on the server thread, not from the async pack builder.
+     * Progress sink for async pack builds: always logged (console/log), and echoed to the
+     * player who started the build, on the main thread.
      */
+    private static org.voxelhorizons.pack.BuildProgress buildProgress(VoxelCore plugin, CommandSender sender) {
+        return message -> {
+            plugin.getLogger().info("[pack build] " + message);
+            if (sender instanceof org.bukkit.entity.Player) {
+                try {
+                    plugin.getServer().getScheduler().runTask(plugin, () -> sender.sendMessage("[VoxelCore] " + message));
+                } catch (RuntimeException disabled) {
+                    // Plugin disabling mid-build: the log line above is enough.
+                }
+            }
+        };
+    }
+
     /**
      * bedrock.vanilla_assets: 'auto' downloads and caches the official client jar for this
      * server's Minecraft version; 'off' disables; anything else is a client jar or extracted
      * assets folder path. Called from the async build task only.
      */
-    private static java.nio.file.Path vanillaAssets(VoxelCore plugin) throws java.io.IOException {
+    private static java.nio.file.Path vanillaAssets(VoxelCore plugin, org.voxelhorizons.pack.BuildProgress progress)
+            throws java.io.IOException {
         String setting = plugin.getConfig().getString("bedrock.vanilla_assets", "auto").trim();
         if (setting.isEmpty() || setting.equalsIgnoreCase("off")) return null;
         if (!setting.equalsIgnoreCase("auto")) {
@@ -84,9 +96,15 @@ public final class PackCommand implements SubCommand {
         }
         String version = org.voxelhorizons.platform.MinecraftVersionDetector.detect();
         return org.voxelhorizons.pack.VanillaClientJar.resolve(
-                plugin.getDataFolder().toPath().resolve("cache").resolve("vanilla"), version);
+                plugin.getDataFolder().toPath().resolve("cache").resolve("vanilla"), version, progress);
     }
 
+    /**
+     * Resolve only a genuinely loaded Bukkit Geyser plugin. Scanning stale folders in
+     * plugins/ would risk silently publishing into an old backend copy when the live
+     * Geyser instance actually runs on a Velocity/Bungee proxy.
+     * Call on the server thread, not from the async pack builder.
+     */
     private static java.nio.file.Path localGeyserDataDirectory(VoxelCore plugin) {
         for (org.bukkit.plugin.Plugin installed : plugin.getServer().getPluginManager().getPlugins()) {
             String name = installed.getName();
@@ -447,9 +465,14 @@ public final class PackCommand implements SubCommand {
                 // The compiler and candidate loader operate on disk/immutable Java data,
                 // never touch Bukkit inventories, blocks or live mutable server state.
                 plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+                    final org.voxelhorizons.pack.BuildProgress progress = buildProgress(plugin, sender);
                     final JavaPackBuildResult output;
                     try {
+                        progress.report("Java pack: compiling " + target.id());
+                        long javaStarted = System.nanoTime();
                         output = plugin.getPackManager().build(target);
+                        progress.report("Java pack: done in " + String.format(java.util.Locale.ROOT, "%.1f",
+                                (System.nanoTime() - javaStarted) / 1e9) + "s");
                     } catch (RuntimeException failure) {
                         complete(plugin, () -> sender.sendMessage("VoxelCore pack build failed for "
                                 + target.id() + ": " + failure.getMessage()));
@@ -464,14 +487,15 @@ public final class PackCommand implements SubCommand {
                             String vanillaNote = "";
                             java.nio.file.Path vanilla = null;
                             try {
-                                vanilla = vanillaAssets(plugin);
+                                vanilla = vanillaAssets(plugin, progress);
                             } catch (Exception unavailable) {
                                 vanillaNote = " Vanilla textures unavailable (" + unavailable.getMessage()
                                         + "); items using minecraft: textures may lack icons/3D.";
                                 plugin.getLogger().warning("Bedrock vanilla assets unavailable: " + unavailable.getMessage());
                             }
                             org.voxelhorizons.pack.BedrockPackCompiler.Result bedrock =
-                                    new org.voxelhorizons.pack.BedrockPackCompiler().withVanillaAssets(vanilla).compile(
+                                    new org.voxelhorizons.pack.BedrockPackCompiler().withVanillaAssets(vanilla)
+                                            .withProgress(progress).compile(
                                             plugin.getPackManager().contentRoot(),
                                             plugin.getPackManager().outputRoot().resolve("bedrock"),
                                             plugin.getPackManager().glyphAllocationManifest(),
@@ -485,6 +509,7 @@ public final class PackCommand implements SubCommand {
                                     : " Reasons: " + bedrock.unsupportedReasonSummary + ".")
                                     + vanillaNote;
                             if (geyserDestination.root != null) {
+                                progress.report("Bedrock: publishing to Geyser at " + geyserDestination.root);
                                 new org.voxelhorizons.pack.GeyserPackPublisher().publish(bedrock, geyserDestination.root);
                                 java.nio.file.Path pack = geyserDestination.root.resolve("packs/voxelcore.mcpack");
                                 java.nio.file.Path mappings = geyserDestination.root.resolve("custom_mappings/voxelcore-items.json");

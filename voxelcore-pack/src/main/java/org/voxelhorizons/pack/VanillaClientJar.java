@@ -31,13 +31,20 @@ public final class VanillaClientJar {
 
     /** Returns the cached jar, downloading it first when absent or corrupt. */
     public static Path resolve(Path cacheDir, String version) throws IOException {
+        return resolve(cacheDir, version, BuildProgress.NONE);
+    }
+
+    public static Path resolve(Path cacheDir, String version, BuildProgress progress) throws IOException {
         if (version == null || !version.matches("[A-Za-z0-9._-]{1,64}"))
             throw new IOException("Invalid Minecraft version " + version);
         Path jar = cacheDir.resolve("client-" + version + ".jar");
         Path sha = cacheDir.resolve("client-" + version + ".sha1");
         if (Files.isRegularFile(jar) && Files.isRegularFile(sha)
-                && new String(Files.readAllBytes(sha), StandardCharsets.US_ASCII).trim().equals(sha1(Files.readAllBytes(jar))))
+                && new String(Files.readAllBytes(sha), StandardCharsets.US_ASCII).trim().equals(sha1(Files.readAllBytes(jar)))) {
+            progress.report("Vanilla assets: using cached Minecraft " + version + " client jar");
             return jar;
+        }
+        progress.report("Vanilla assets: looking up Minecraft " + version + " in Mojang's version manifest");
         JsonObject manifest = json(MANIFEST);
         String versionUrl = null;
         for (JsonElement entry : manifest.getAsJsonArray("versions")) {
@@ -47,7 +54,10 @@ public final class VanillaClientJar {
         if (versionUrl == null) throw new IOException("Minecraft " + version + " is not in Mojang's version manifest");
         JsonObject client = json(versionUrl).getAsJsonObject("downloads").getAsJsonObject("client");
         String expected = client.get("sha1").getAsString().toLowerCase(Locale.ROOT);
-        byte[] bytes = download(client.get("url").getAsString(), MAX_JAR_BYTES);
+        long size = client.has("size") ? client.get("size").getAsLong() : -1;
+        BuildProgress.Step step = progress.bytes("Vanilla assets: downloading Minecraft " + version + " client jar", size);
+        byte[] bytes = download(client.get("url").getAsString(), MAX_JAR_BYTES, step);
+        step.finish(BuildProgress.megabytes(bytes.length) + ", SHA-1 verified next");
         if (!expected.equals(sha1(bytes))) throw new IOException("Client jar SHA-1 mismatch for " + version);
         Files.createDirectories(cacheDir);
         Path staging = Files.createTempFile(cacheDir, ".client-", ".tmp");
@@ -63,13 +73,13 @@ public final class VanillaClientJar {
 
     private static JsonObject json(String url) throws IOException {
         if (!url.startsWith("https://")) throw new IOException("Refusing non-HTTPS URL " + url);
-        try (Reader reader = new InputStreamReader(new java.io.ByteArrayInputStream(download(url, 20_000_000L)),
+        try (Reader reader = new InputStreamReader(new java.io.ByteArrayInputStream(download(url, 20_000_000L, null)),
                 StandardCharsets.UTF_8)) {
             return JsonParser.parseReader(reader).getAsJsonObject();
         }
     }
 
-    private static byte[] download(String url, long limit) throws IOException {
+    private static byte[] download(String url, long limit, BuildProgress.Step step) throws IOException {
         if (!url.startsWith("https://")) throw new IOException("Refusing non-HTTPS URL " + url);
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
         connection.setConnectTimeout(10_000);
@@ -83,6 +93,7 @@ public final class VanillaClientJar {
                 int read;
                 while ((read = input.read(buffer)) != -1) {
                     out.write(buffer, 0, read);
+                    if (step != null) step.advance(read);
                     if (out.size() > limit) throw new IOException("Download too large: " + url);
                 }
                 return out.toByteArray();

@@ -30,8 +30,13 @@ public final class VanillaAssets {
 
     /** @param source a client .jar/.zip, or a folder containing assets/minecraft/... */
     public static Map<String, byte[]> load(Path source) throws IOException {
+        return load(source, BuildProgress.NONE);
+    }
+
+    public static Map<String, byte[]> load(Path source, BuildProgress progress) throws IOException {
         Map<String, byte[]> out = new TreeMap<String, byte[]>();
         if (source == null) return out;
+        progress.report("Vanilla assets: reading models and textures from " + source.getFileName());
         if (Files.isDirectory(source, LinkOption.NOFOLLOW_LINKS)) {
             try (Stream<Path> files = Files.walk(source)) {
                 for (Path file : (Iterable<Path>) files.filter(Files::isRegularFile)::iterator) {
@@ -43,9 +48,11 @@ public final class VanillaAssets {
         }
         if (!Files.isRegularFile(source)) throw new IOException("Vanilla assets not found at " + source);
         try (ZipFile zip = new ZipFile(source.toFile())) {
+            BuildProgress.Step step = progress.step("Vanilla assets: scanning client jar entries", zip.size());
             Enumeration<? extends ZipEntry> entries = zip.entries();
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
+                step.advance(1);
                 if (entry.isDirectory() || !wanted(entry.getName()) || entry.getName().contains("..")) continue;
                 try (InputStream input = zip.getInputStream(entry)) {
                     ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -55,6 +62,7 @@ public final class VanillaAssets {
                     out.put(entry.getName(), bytes.toByteArray());
                 }
             }
+            step.finish(out.size() + " vanilla models/textures available");
         }
         return out;
     }
