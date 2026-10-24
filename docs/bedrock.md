@@ -223,3 +223,14 @@ on a client. Idle bob/spin are server-side teleports that Geyser already transla
 `animation.use` is a model swap handled by the companions' re-send. New displays (placement,
 model swaps that respawn entities) are re-sent to Bedrock viewers once the feed lists them;
 set `bedrock.projection.resend-delay-ticks` (~40) when feeds travel over the network.
+
+### Authored font icons on Bedrock (live fix, 24 Oct)
+
+Live testing showed rank/tag/menu icons from authored `assets/minecraft/font/default.json`
+bitmap providers as missing-glyph boxes: only managed VoxelCore UI glyphs were exported. The
+Bedrock build now also splits authored default-font bitmaps into their `chars` grid and writes
+each non-empty icon cell (trimmed, ≤64 px) to `font/glyph_XX.png`. Skipped: Bedrock's reserved
+U+E000–E1FF pages (migrate with `/voxelcore admin pack glyphs`), codepoints below U+E000,
+non-default fonts (Bedrock has one font), fullscreen backgrounds, and cells already used by
+managed glyphs. Negative-space/offset layouts still cannot be reproduced on Bedrock; menus
+use the DeluxeMenus form frontend instead.

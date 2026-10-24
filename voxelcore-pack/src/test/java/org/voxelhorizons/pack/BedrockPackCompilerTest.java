@@ -203,6 +203,36 @@ public class BedrockPackCompilerTest {
             assertNull(zip.getEntry("texts/en_US.lang"));
         }
     }
+    @Test public void exportsAuthoredDefaultFontBitmapIconsButNotReservedOrHugeOnes() throws Exception {
+        Path root = fixture(), out = temp.newFolder().toPath();
+        Path icons = root.resolve("demo/assets/demo/textures/font/ranks.png");
+        Files.createDirectories(icons.getParent());
+        java.awt.image.BufferedImage sheet = new java.awt.image.BufferedImage(24,8,2);
+        sheet.setRGB(2,3,0xffff0000);   // cell 0: U+E300
+        sheet.setRGB(10,3,0xff00ff00);  // cell 1: U+E010 (Bedrock controller page, skipped)
+        // cell 2: U+E301 left blank, skipped
+        javax.imageio.ImageIO.write(sheet,"png",icons.toFile());
+        Path huge = root.resolve("demo/assets/demo/textures/font/background.png");
+        java.awt.image.BufferedImage background = new java.awt.image.BufferedImage(176,166,2);
+        for (int y=0;y<166;y++) for (int x=0;x<176;x++) background.setRGB(x,y,0xff202020);
+        javax.imageio.ImageIO.write(background,"png",huge.toFile());
+        write(root.resolve("demo/assets/minecraft/font/default.json"), "{\"providers\":["
+                + "{\"type\":\"bitmap\",\"file\":\"demo:font/ranks.png\",\"ascent\":7,\"height\":8,\"chars\":[\"\\ue300\\ue010\\ue301\"]},"
+                + "{\"type\":\"bitmap\",\"file\":\"demo:font/background.png\",\"ascent\":13,\"height\":166,\"chars\":[\"\\uf000\"]}]}");
+        Path allocations = temp.newFolder("glyph-authored").toPath().resolve("glyph-allocations.yml");
+        BedrockPackCompiler.Result result = new BedrockPackCompiler().compile(root,out,allocations);
+        assertEquals(1,result.mappedGlyphs);
+        try (ZipFile zip = new ZipFile(result.directory.resolve("voxelcore.mcpack").toFile())) {
+            assertNull("Controller pages must never be modified", zip.getEntry("font/glyph_E0.png"));
+            assertNull("Backgrounds are not squeezed into text cells", zip.getEntry("font/glyph_F0.png"));
+            try (java.io.InputStream image = zip.getInputStream(zip.getEntry("font/glyph_E3.png"))) {
+                java.awt.image.BufferedImage atlas = javax.imageio.ImageIO.read(image);
+                assertEquals("U+E300 cell holds the red icon", 0xffff0000, atlas.getRGB(7,7));
+                assertEquals("U+E301 blank cell stays empty", 0, atlas.getRGB(16+8,8) >>> 24);
+            }
+        }
+    }
+
     @Test public void exportsManagedInlineGlyphsToSafeBedrockFontPages() throws Exception {
         Path root = fixture(), out = temp.newFolder().toPath();
         write(root.resolve("demo/content/ui.yml"),
