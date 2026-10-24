@@ -61,6 +61,8 @@ permissions:
     default: op
   voxelcore.admin.pack.build:
     default: op
+  voxelcore.admin.pack.glyphs:
+    default: op
   voxelcore.admin.ui:
     default: op
   voxelcore.admin.ui.list:

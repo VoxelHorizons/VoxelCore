@@ -31,6 +31,7 @@ public final class PackCommand implements SubCommand {
         register(new SendCommand());
         register(new ValidateCommand());
         register(new BuildCommand());
+        register(new GlyphsCommand());
     }
 
     private void register(SubCommand command) {
@@ -44,7 +45,7 @@ public final class PackCommand implements SubCommand {
     @Override public boolean playerOnly() { return false; }
     @Override public Map<String, SubCommand> getChildren() { return children; }
     @Override public void execute(CommandSender sender, String[] args) {
-        sender.sendMessage("Usage: /voxelcore admin pack <info|host|send|validate|build> [player|target]");
+        sender.sendMessage("Usage: /voxelcore admin pack <info|host|send|validate|build|glyphs> [player|target]");
     }
 
     private static JavaPackTarget target(CommandSender sender, String[] args) {
@@ -300,6 +301,97 @@ public final class PackCommand implements SubCommand {
             } catch (RuntimeException exception) {
                 sender.sendMessage("VoxelCore pack validation failed for " + target.id() + ": " + exception.getMessage());
             }
+        }
+    }
+
+    /**
+     * B14: find (and, with explicit confirmation, rewrite) unmanaged literal glyphs in
+     * Bedrock's reserved U+E000..U+E1FF range across VoxelCore content, DeluxeMenus and
+     * configured extra roots. Font definitions and references move together; originals
+     * are backed up once. File work runs off the server thread.
+     */
+    private static final class GlyphsCommand implements SubCommand {
+        private final AtomicBoolean working = new AtomicBoolean(false);
+
+        @Override public String getName() { return "glyphs"; }
+        @Override public List<String> getAliases() { return Collections.emptyList(); }
+        @Override public String getPermission() { return "voxelcore.admin.pack.glyphs"; }
+        @Override public boolean playerOnly() { return false; }
+        @Override public List<String> onTabComplete(CommandSender sender, String[] args) {
+            return args.length <= 1 ? java.util.Arrays.asList("scan", "migrate") : Collections.<String>emptyList();
+        }
+
+        @Override public void execute(CommandSender sender, String[] args) {
+            String mode = args.length == 0 ? "scan" : args[0].toLowerCase(java.util.Locale.ROOT);
+            final boolean migrate = "migrate".equals(mode);
+            if (!migrate && !"scan".equals(mode)) {
+                sender.sendMessage("Usage: /voxelcore admin pack glyphs <scan|migrate confirm>");
+                return;
+            }
+            if (migrate && (args.length < 2 || !"confirm".equalsIgnoreCase(args[1]))) {
+                sender.sendMessage("This rewrites font JSON and menu/text files in place (originals backed up once). "
+                        + "Run '/voxelcore admin pack glyphs scan' first, then 'glyphs migrate confirm'.");
+                return;
+            }
+            final VoxelCore plugin = VoxelCore.getInstance();
+            final java.nio.file.Path data = plugin.getDataFolder().toPath();
+            final java.nio.file.Path pluginsRoot = data.getParent();
+            final List<java.nio.file.Path> roots = new java.util.ArrayList<java.nio.file.Path>();
+            roots.add(plugin.getPackManager().contentRoot());
+            for (String configured : plugin.getConfig().getStringList("bedrock.glyph_migration_roots")) {
+                if (configured == null || configured.trim().isEmpty()) continue;
+                java.nio.file.Path path = java.nio.file.Paths.get(configured.trim());
+                roots.add((path.isAbsolute() ? path : pluginsRoot.resolve(path)).normalize());
+            }
+            final java.nio.file.Path manifest = plugin.getPackManager().glyphAllocationManifest();
+            if (!working.compareAndSet(false, true)) {
+                sender.sendMessage("A VoxelCore glyph scan/migration is already running.");
+                return;
+            }
+            try {
+                Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+                    String message;
+                    try {
+                        message = run(roots, manifest, data, migrate);
+                    } catch (Exception failure) {
+                        plugin.getLogger().log(Level.WARNING, "Glyph literal " + (migrate ? "migration" : "scan") + " failed", failure);
+                        message = "Glyph literal " + (migrate ? "migration" : "scan") + " FAILED: " + failure.getMessage();
+                    } finally {
+                        working.set(false);
+                    }
+                    final String result = message;
+                    try { Bukkit.getScheduler().runTask(plugin, () -> sender.sendMessage(result)); }
+                    catch (RuntimeException shuttingDown) { plugin.getLogger().info(result); }
+                });
+            } catch (RuntimeException failure) {
+                working.set(false);
+                sender.sendMessage("Unable to start glyph " + mode + ": " + failure.getMessage());
+            }
+        }
+
+        private static String run(List<java.nio.file.Path> roots, java.nio.file.Path manifest,
+                                  java.nio.file.Path data, boolean migrate) throws java.io.IOException {
+            java.nio.file.Path reportFile = data.resolve("glyph-literal-migration.txt");
+            org.voxelhorizons.pack.GlyphLiteralMigration.Result result;
+            if (migrate) {
+                result = org.voxelhorizons.pack.GlyphLiteralMigration.migrate(roots,
+                        org.voxelhorizons.pack.GlyphLiteralMigration.occupied(roots.get(0), manifest),
+                        data.resolve("glyph-literal-backup"));
+            } else {
+                List<org.voxelhorizons.pack.GlyphLiteralMigration.Finding> findings =
+                        org.voxelhorizons.pack.GlyphLiteralMigration.scan(roots);
+                result = org.voxelhorizons.pack.GlyphLiteralMigration.preview(findings,
+                        org.voxelhorizons.pack.GlyphLiteralMigration.occupied(roots.get(0), manifest),
+                        data.resolve("glyph-literal-backup"));
+            }
+            java.nio.file.Files.write(reportFile, org.voxelhorizons.pack.GlyphLiteralMigration.report(result)
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            String summary = result.findings.size() + " Bedrock-reserved glyph occurrences, "
+                    + result.plan.size() + " distinct codepoints across " + roots.size() + " roots. Report: " + reportFile;
+            return migrate
+                    ? "Glyph migration rewrote " + result.rewritten.size() + " files; " + summary
+                      + ". Rebuild the pack and reload DeluxeMenus/other plugins to apply."
+                    : "Glyph scan (no files changed): " + summary;
         }
     }
 

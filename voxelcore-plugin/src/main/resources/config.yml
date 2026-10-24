@@ -120,3 +120,8 @@ bedrock:
   # Proxy/standalone Geyser needs a mounted path to its REAL data directory.
   # Example local override: 'plugins/Geyser-Spigot'
   geyser_data_directory: ''
+  # Extra folders (relative to plugins/) scanned by '/voxelcore admin pack glyphs'
+  # for literal glyphs in Bedrock's reserved U+E000..U+E1FF controller range.
+  # VoxelCore content is always included. Migration rewrites fonts and references together.
+  glyph_migration_roots:
+    - DeluxeMenus
