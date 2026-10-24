@@ -185,6 +185,29 @@ public class BedrockPackCompilerTest {
             assertNull(zip.getEntry("texts/en_US.lang"));
         }
     }
+    @Test public void exportsManagedInlineGlyphsToSafeBedrockFontPages() throws Exception {
+        Path root = fixture(), out = temp.newFolder().toPath();
+        write(root.resolve("demo/content/ui.yml"),
+                "ui:\n  rank_icon:\n    path: ui/rank.png\n    scale_ratio: 16\n");
+        Path file = root.resolve("demo/assets/demo/textures/ui/rank.png");
+        Files.createDirectories(file.getParent());
+        java.awt.image.BufferedImage bitmap = new java.awt.image.BufferedImage(16,16,2);
+        bitmap.setRGB(8,8,0xff11cc55);
+        javax.imageio.ImageIO.write(bitmap,"png",file.toFile());
+        Path allocations = temp.newFolder("glyph-state").toPath().resolve("glyph-allocations.yml");
+        new UiGlyphLoader().load(root, allocations, true);
+        BedrockPackCompiler.Result result = new BedrockPackCompiler().compile(root,out,allocations);
+        assertEquals(1,result.mappedGlyphs);
+        try (ZipFile zip = new ZipFile(result.directory.resolve("voxelcore.mcpack").toFile())) {
+            assertNotNull(zip.getEntry("font/glyph_E2.png"));
+            assertNull("Controller pages must never be modified", zip.getEntry("font/glyph_E0.png"));
+            assertNull("Controller pages must never be modified", zip.getEntry("font/glyph_E1.png"));
+            try (java.io.InputStream image = zip.getInputStream(zip.getEntry("font/glyph_E2.png"))) {
+                java.awt.image.BufferedImage atlas = javax.imageio.ImageIO.read(image);
+                assertTrue((atlas.getRGB(8,8) >>> 24) != 0);
+            }
+        }
+    }
     @Test public void supportsGuiRotationWithoutExplicitTextureOverride() throws Exception {
         Path root = fixture(), out = temp.newFolder().toPath();
         Path items = root.resolve("demo/content/items.yml");
