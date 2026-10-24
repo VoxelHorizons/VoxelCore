@@ -8,6 +8,16 @@
 - The prior conversation recorded passing GitHub distribution build for commit `8c1f4634297fb10f241f8e8af690a0bf3f2ccfd8` and its tested predecessors. Do not transfer that result automatically to later commits.
 - User-provided paired Java/Bedrock screenshots on 2026-10-24 show missing profile visuals, built-in PlayStation controller symbols and missing furniture models. Previous log: 69 mapped, 527 unsupported before later updates. These are **failure evidence**, not acceptance.
 
+## CI policy (accepted 24 October 2026)
+
+Blocking for continuing development: the full distribution build, the unit/integration tests
+for the changed code, and the Minecraft **26.3** smoke job, plus most of the smoke matrix.
+**Non-blocking:** intermittent legacy smoke failures matching **KI-01** (1.14.4/1.13.2 RCON
+listener thread disappearing; see KNOWN-ISSUES). Record them as `KI-01, non-blocking` with the
+run link and continue. Do not retry repeatedly, change the smoke workflow to chase green, or
+disable tests. Never report such a run as passing. A failure in the build, 26.3, or the feature
+being changed is investigated and fixed.
+
 ## Automated matrix
 | Suite | Invocation / fixture | Scope | Status |
 | --- | --- | --- | --- |

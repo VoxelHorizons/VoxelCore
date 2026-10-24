@@ -92,13 +92,50 @@ public final class BedrockGeometryCompilerTest {
         catch(IOException expected){assertTrue(expected.getMessage().contains("Tinted"));}
     }
 
-    @Test public void rejectsRescaleWithoutInventingGeometryTransforms() throws Exception {
+    @Test public void convertsJavaRescaleIntoExactPerpendicularCuboidStretch() throws Exception {
         Map<String,byte[]> assets = modelAssets();
         String parent = new String(assets.get("assets/demo/models/bench.json"),StandardCharsets.UTF_8);
         parent = parent.replace("\"faces\":{",
             "\"rotation\":{\"axis\":\"y\",\"angle\":45,\"origin\":[8,8,8],\"rescale\":true},\"faces\":{");
         assets.put("assets/demo/models/bench.json",parent.getBytes(StandardCharsets.UTF_8));
-        try {new BedrockGeometryCompiler(assets).compile("demo:bench","demo:bench","bench");fail("rescale unsupported");}
-        catch(IOException expected){assertTrue(expected.getMessage().contains("rescale"));}
+        String shortId = "i_11112222333344445555666677778888";
+        BedrockGeometryCompiler.Output output = new BedrockGeometryCompiler(assets)
+                .compile("demo:bench","voxelcore:"+shortId,shortId);
+        JsonObject cube = JsonParser.parseString(new String(output.assets.get(
+                "models/entity/voxelcore/"+shortId+".geo.json"),StandardCharsets.UTF_8)).getAsJsonObject()
+                .getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject()
+                .getAsJsonArray("bones").get(0).getAsJsonObject().getAsJsonArray("cubes").get(0).getAsJsonObject();
+        double stretch = Math.sqrt(2.0); // 1/cos(45 deg)
+        // x and z (perpendicular to the y rotation axis) stretch about the origin; y is untouched.
+        assertEquals(32*stretch, cube.getAsJsonArray("size").get(0).getAsDouble(), 1e-6);
+        assertEquals(4, cube.getAsJsonArray("size").get(1).getAsDouble(), 1e-6);
+        assertEquals(16*stretch, cube.getAsJsonArray("size").get(2).getAsDouble(), 1e-6);
+        assertEquals((8+(-8-8)*stretch)-8, cube.getAsJsonArray("origin").get(0).getAsDouble(), 1e-6);
+        assertEquals(-8, cube.getAsJsonArray("origin").get(1).getAsDouble(), 1e-6);
+        assertEquals((8+(0-8)*stretch)-8, cube.getAsJsonArray("origin").get(2).getAsDouble(), 1e-6);
+        assertEquals(45, cube.getAsJsonArray("rotation").get(1).getAsDouble(), 1e-6);
+    }
+
+    @Test public void keepsFlatPlaneElementsButRejectsLines() throws Exception {
+        Map<String,byte[]> assets = modelAssets();
+        assets.put("assets/demo/models/plane.json",("{\"textures\":{\"wood\":\"demo:oak\"},\"elements\":["
+                + "{\"from\":[0,0,8],\"to\":[16,16,8],\"faces\":{\"north\":{\"texture\":\"#wood\"},"
+                + "\"south\":{\"texture\":\"#wood\"}}}]}").getBytes(StandardCharsets.UTF_8));
+        String shortId = "i_11112222333344445555666677778888";
+        BedrockGeometryCompiler.Output output = new BedrockGeometryCompiler(assets)
+                .compile("demo:plane","voxelcore:"+shortId,shortId);
+        assertEquals(1, output.cuboids);
+        assets.put("assets/demo/models/line.json",("{\"textures\":{\"wood\":\"demo:oak\"},\"elements\":["
+                + "{\"from\":[0,8,8],\"to\":[16,8,8],\"faces\":{\"north\":{\"texture\":\"#wood\"}}}]}")
+                .getBytes(StandardCharsets.UTF_8));
+        try { new BedrockGeometryCompiler(assets).compile("demo:line","voxelcore:"+shortId,shortId); fail("line"); }
+        catch (IOException expected) { assertTrue(expected.getMessage().contains("Degenerate")); }
+    }
+
+    @Test public void rescaleFactorIsOneWithoutRescaleFlag() {
+        JsonObject rotation = JsonParser.parseString("{\"axis\":\"x\",\"angle\":22.5}").getAsJsonObject();
+        assertEquals(1.0, BedrockIconRenderer.rescaleFactor(rotation), 0);
+        rotation.addProperty("rescale", true);
+        assertEquals(1/Math.cos(Math.toRadians(22.5)), BedrockIconRenderer.rescaleFactor(rotation), 1e-12);
     }
 }
