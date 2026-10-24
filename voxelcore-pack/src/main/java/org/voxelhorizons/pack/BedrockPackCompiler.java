@@ -57,6 +57,7 @@ public final class BedrockPackCompiler {
         }
         JsonObject items = new JsonObject();
         JsonObject textures = new JsonObject();
+        JsonObject entityModels = new JsonObject();
         Map<String, byte[]> selectors = new HashMap<String, byte[]>();
         List<String> unsupported = new ArrayList<String>();
         List<String> unsupportedGeometry = new ArrayList<String>();
@@ -173,6 +174,7 @@ public final class BedrockPackCompiler {
                 if (threeDimensional != null) {
                     for (Map.Entry<String, byte[]> generated : threeDimensional.assets.entrySet())
                         put(assets, generated.getKey(), generated.getValue());
+                    entityModels.addProperty(item.id().toString(), "voxelcore:entity_" + shortId);
                     nativeGeometryCount++;
                 }
             } catch (IOException unsupported3D) {
@@ -191,6 +193,10 @@ public final class BedrockPackCompiler {
             count++;
         }
         if (count == 0 && assets.isEmpty()) throw new IOException("No Bedrock assets or mapped items; add properties.bedrock.texture or bedrock/resource_pack assets");
+        JsonObject entityIndex = new JsonObject();
+        entityIndex.addProperty("schema", 1);
+        entityIndex.add("content_models", entityModels);
+        put(assets, "voxelcore/entity_index.json", bytes(entityIndex));
         JsonObject atlas = new JsonObject();
         atlas.addProperty("resource_pack_name", "VoxelCore"); atlas.addProperty("texture_name", "atlas.items");
         atlas.add("texture_data", textures); put(assets, "textures/item_texture.json", bytes(atlas));
