@@ -342,9 +342,11 @@ public final class PackCommand implements SubCommand {
                             org.voxelhorizons.pack.BedrockPackCompiler.Result bedrock =
                                     new org.voxelhorizons.pack.BedrockPackCompiler().compile(
                                             plugin.getPackManager().contentRoot(),
-                                            plugin.getPackManager().outputRoot().resolve("bedrock"));
+                                            plugin.getPackManager().outputRoot().resolve("bedrock"),
+                                            plugin.getPackManager().glyphAllocationManifest());
                             bedrockStatus = "Bedrock built: " + bedrock.directory + "; " + bedrock.mappedItems
-                                    + " mapped items; " + bedrock.unsupportedItems + " unsupported (see unsupported-items.txt)."
+                                    + " mapped items; " + bedrock.mappedGlyphs + " Bedrock inline glyphs; "
+                                    + bedrock.unsupportedItems + " unsupported (see unsupported-items.txt)."
                                     + (bedrock.unsupportedReasonSummary.isEmpty() ? ""
                                     : " Reasons: " + bedrock.unsupportedReasonSummary + ".");
                             if (geyserDestination.root != null) {
