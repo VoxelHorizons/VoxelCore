@@ -7,7 +7,7 @@
 - `BedrockPackCompiler` scans VoxelCore item/material selectors and Java-authored models/textures. It outputs the Bedrock pack/mappings plus `unsupported-items.txt` and `unsupported-geometry.txt`. `BedrockIconRenderer` renders 2D icons (including layered sprites); `BedrockGeometryCompiler` adds native cuboid geometry, face atlases and custom-item attachables for a strictly supported model subset, not a world entity bridge.
 - `GeyserPackPublisher` writes `packs/voxelcore.mcpack` and `custom_mappings/voxelcore-items.json` under a selected local/mounted directory, plus a trailing `voxelcore-publication.json` receipt holding their SHA-256 hashes and export revision. A filesystem lock serialises cooperating publishers; running Geyser remains separately authoritative.
 - `BedrockPlayers` uses detected Geyser/Floodgate client identity. `ContentBrowser` currently uses a readable title and delayed inventory page switch.
-- VoxelFurniture uses Java display/interaction entities; VoxelVehicles has its own Java-side renderer. There is **no implemented Bedrock entity projection**.
+- VoxelFurniture and VoxelVehicles retain Paper-side renderers and now publish immutable schema-v1 JSON state through atomic local/mounted-Geyser feeds (draft PRs #47/#21). The Geyser extension validates the native model catalog and replaces only known Paper `item_display` UUIDs on spawn; this **partial** projection does not yet synchronize transforms, resync on reconnect/chunk load, replace text/interaction entities, or implement rider behavior.
 - DeluxeMenus continues to author Java inventory/font overlay menus. A Bedrock native frontend is **not implemented**.
 
 ## Decisions
@@ -25,7 +25,7 @@
 
 **A07 Extension compatibility:** Use public Geyser API/event capabilities for versioned API extension. DisplayEntity reference is AGPL-3.0; do not copy its source without a license/redistribution review. Traditional Bedrock behavior packs are not automatically loaded by Geyser.
 
-## Planned cross-plugin protocol (design only, NOT implemented)
+## Cross-plugin protocol (schema-v1 file feed and spawn lookup IMPLEMENTED; other operations planned)
 - Content manifest: `revision` (content digest), `schema` integer, mapping and pack digests, server Minecraft version, Geyser compatibility floor, Java item model selector index.
 - Bedrock addon registry: material, Java item_model, Bedrock identifier, geometry/texture keys, active state/dye/variant properties; shared IDs across furniture/vehicle plugins.
 - World visual feed: stable Paper entity UUID, world UUID and position, model identifier, transform/scale, variant and animation parameters, lifecycle generation; operation `SPAWN|UPDATE|DESPAWN|RESYNC`. Geyser extension must rehydrate after chunk or client reconnect.
@@ -43,3 +43,10 @@
 - Native geometry paths: `models/entity/voxelcore/<short-id>.geo.json`, `attachables/<short-id>.json`, `textures/voxelcore/g_<short-id>.png`. The user-facing 2D inventory texture remains separately mapped.
 - Model limitations are never silently represented as successful 3D: unsupported complex shader, face tint, cuboid rescale, invalid axis/rotation and missing assets appear in `unsupported-geometry.txt`.
 - Geometry exports are for *held* custom items only; placing server-side Java display entities still needs B09/B10. Real-client transform, attachable controller, animations and geometry orientation remain UNVERIFIED; neither source-code compilation nor an image test proves those work.
+
+## Recovery audit: precise entity lifecycle boundaries (24 October 2026)
+
+- Paper sources are `FurnitureManager#bedrockSnapshot()` and `VehicleManager#bedrockSnapshot()`. Their publishers serialize `{schema:1,content_revision:<number>,furniture|vehicles:[...]}` to `voxelcore-projection/<kind>.json` with atomic replacement, 5-tick capture by default, and at-most-10-second unchanged-data heartbeat. Deployment is local/mounted directory only; no authentication/transport over a network.
+- `EntityProjectionIndex` maps `entity_links.display_entity_uuid` and explicitly declared furniture ITEM parts, or vehicle `entity_links.visual`, to only entity IDs present in the *active* catalog. Unmapped entities keep normal Geyser handling. `MAX_SNAPSHOT_AGE_MILLIS=60000` prevents indefinite mapping from crashed Paper publishers.
+- `VoxelCoreGeyserExtension#onDefineEntities` registers the native catalog only when the disk publication pair verifies. `#onServerEntitySpawn` is a one-time identity substitution. It is **not** a live position/scale/rotation/color/animation feed, cross-world watcher, chunk/reconnect replay, or client active-revision handshake. Never claim B10 VERIFIED on these foundations alone.
+- The extensions use Geyser API 2.11 experimental custom-entity events. Check runtime Geyser 2.12 API and actual client attachment/geometry compatibility before enabling for players. GeyserDisplayEntity is intentionally **not** bundled to avoid two competing bridges and AGPL obligations; see UPSTREAM-INTEGRATIONS.md.
