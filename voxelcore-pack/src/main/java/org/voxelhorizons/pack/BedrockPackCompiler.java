@@ -179,6 +179,7 @@ public final class BedrockPackCompiler {
             digest.update(entry.getValue());
         }
         Collections.sort(unsupported);
+        String reasonSummary = summarizeUnsupported(unsupported);
         digest.update(unsupported.toString().getBytes(StandardCharsets.UTF_8));
         digest.update(mappingBytes);
         byte[] hash = digest.digest(); String revision = hex(hash);
@@ -217,12 +218,39 @@ public final class BedrockPackCompiler {
             Files.write(staging.resolve("unsupported-items.txt"), unsupported, StandardCharsets.UTF_8);
             Path destination = outputRoot.resolve(revision);
             if (!Files.exists(destination)) Files.move(staging, destination);
-            return new Result(destination, count, unsupported.size(), revision);
+            return new Result(destination, count, unsupported.size(), revision, reasonSummary);
         } finally {
             if (Files.exists(staging)) try (Stream<Path> paths = Files.walk(staging)) {
                 for (Path path : (Iterable<Path>) paths.sorted(Comparator.reverseOrder())::iterator) Files.delete(path);
             }
         }
+    }
+    private static String summarizeUnsupported(List<String> failures) {
+        Map<String, Integer> groups = new TreeMap<String, Integer>();
+        for (String failure : failures) {
+            String cause = failure.substring(failure.indexOf(": ") + 2);
+            String type;
+            if (cause.startsWith("Missing or conflicting model")) type = "model missing/conflict";
+            else if (cause.startsWith("Missing or conflicting texture")) type = "texture missing/conflict";
+            else if (cause.startsWith("Conditional model")) type = "conditional model";
+            else if (cause.startsWith("Unsupported generated/special model")) type = "special model";
+            else if (cause.startsWith("Tinted model")) type = "tinted model";
+            else if (cause.startsWith("Rescaled element")) type = "rescaled model";
+            else if (cause.startsWith("Model rendered a fully transparent")) type = "transparent preview";
+            else type = "other";
+            groups.put(type, Integer.valueOf(groups.containsKey(type) ? groups.get(type).intValue() + 1 : 1));
+        }
+        List<Map.Entry<String, Integer>> sorted = new ArrayList<Map.Entry<String, Integer>>(groups.entrySet());
+        Collections.sort(sorted, (a,b) -> {
+            int counts = Integer.compare(b.getValue().intValue(), a.getValue().intValue());
+            return counts != 0 ? counts : a.getKey().compareTo(b.getKey());
+        });
+        StringBuilder result = new StringBuilder();
+        for (Map.Entry<String, Integer> entry : sorted) {
+            if (result.length() > 0) result.append(", ");
+            result.append(entry.getKey()).append("=").append(entry.getValue());
+        }
+        return result.toString();
     }
     private static void put(Map<String, byte[]> assets, String name, byte[] value) throws IOException {
         byte[] previous = assets.put(name, value);
@@ -241,8 +269,10 @@ public final class BedrockPackCompiler {
     }
     public static final class Result {
         public final Path directory; public final int mappedItems; public final int unsupportedItems; public final String revision;
-        Result(Path directory, int mappedItems, int unsupportedItems, String revision) {
+        public final String unsupportedReasonSummary;
+        Result(Path directory, int mappedItems, int unsupportedItems, String revision, String unsupportedReasonSummary) {
             this.directory = directory; this.mappedItems = mappedItems; this.unsupportedItems = unsupportedItems; this.revision = revision;
+            this.unsupportedReasonSummary = unsupportedReasonSummary;
         }
     }
 }
