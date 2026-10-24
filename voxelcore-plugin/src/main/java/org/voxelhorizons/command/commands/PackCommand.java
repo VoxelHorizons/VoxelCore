@@ -69,6 +69,24 @@ public final class PackCommand implements SubCommand {
      * Geyser instance actually runs on a Velocity/Bungee proxy.
      * Call on the server thread, not from the async pack builder.
      */
+    /**
+     * bedrock.vanilla_assets: 'auto' downloads and caches the official client jar for this
+     * server's Minecraft version; 'off' disables; anything else is a client jar or extracted
+     * assets folder path. Called from the async build task only.
+     */
+    private static java.nio.file.Path vanillaAssets(VoxelCore plugin) throws java.io.IOException {
+        String setting = plugin.getConfig().getString("bedrock.vanilla_assets", "auto").trim();
+        if (setting.isEmpty() || setting.equalsIgnoreCase("off")) return null;
+        if (!setting.equalsIgnoreCase("auto")) {
+            java.nio.file.Path path = java.nio.file.Paths.get(setting);
+            if (!java.nio.file.Files.exists(path)) throw new java.io.IOException("bedrock.vanilla_assets not found: " + path);
+            return path;
+        }
+        String version = plugin.getServer().getBukkitVersion().split("-", 2)[0];
+        return org.voxelhorizons.pack.VanillaClientJar.resolve(
+                plugin.getDataFolder().toPath().resolve("cache").resolve("vanilla"), version);
+    }
+
     private static java.nio.file.Path localGeyserDataDirectory(VoxelCore plugin) {
         for (org.bukkit.plugin.Plugin installed : plugin.getServer().getPluginManager().getPlugins()) {
             String name = installed.getName();
@@ -443,8 +461,17 @@ public final class PackCommand implements SubCommand {
                     if (currentServerTarget && bedrockEnabled) {
                         try {
                             // 1.21.4+: item_model definitions; 1.14-1.21.3: Geyser legacy custom_model_data definitions.
+                            String vanillaNote = "";
+                            java.nio.file.Path vanilla = null;
+                            try {
+                                vanilla = vanillaAssets(plugin);
+                            } catch (Exception unavailable) {
+                                vanillaNote = " Vanilla textures unavailable (" + unavailable.getMessage()
+                                        + "); items using minecraft: textures may lack icons/3D.";
+                                plugin.getLogger().warning("Bedrock vanilla assets unavailable: " + unavailable.getMessage());
+                            }
                             org.voxelhorizons.pack.BedrockPackCompiler.Result bedrock =
-                                    new org.voxelhorizons.pack.BedrockPackCompiler().compile(
+                                    new org.voxelhorizons.pack.BedrockPackCompiler().withVanillaAssets(vanilla).compile(
                                             plugin.getPackManager().contentRoot(),
                                             plugin.getPackManager().outputRoot().resolve("bedrock"),
                                             plugin.getPackManager().glyphAllocationManifest(),
@@ -455,7 +482,8 @@ public final class PackCommand implements SubCommand {
                                     + bedrock.unsupportedGeometryCount + " 3D limitations (unsupported-geometry.txt); "
                                     + bedrock.unsupportedItems + " items unsupported (unsupported-items.txt)."
                                     + (bedrock.unsupportedReasonSummary.isEmpty() ? ""
-                                    : " Reasons: " + bedrock.unsupportedReasonSummary + ".");
+                                    : " Reasons: " + bedrock.unsupportedReasonSummary + ".")
+                                    + vanillaNote;
                             if (geyserDestination.root != null) {
                                 new org.voxelhorizons.pack.GeyserPackPublisher().publish(bedrock, geyserDestination.root);
                                 java.nio.file.Path pack = geyserDestination.root.resolve("packs/voxelcore.mcpack");
