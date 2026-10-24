@@ -130,7 +130,12 @@ public final class VoxelCoreGeyserExtension implements Extension {
     @Subscribe
     public void onServerEntitySpawn(ServerSpawnEntityEvent event) {
         EntityProjectionIndex current = projectionIndex;
-        if (current==null || !event.entityType().is(Identifier.of("minecraft:item_display"))) return;
+        if (current==null) return;
+        boolean itemDisplay=event.entityType().is(Identifier.of("minecraft:item_display"));
+        // Diagnostics only: other model carriers a plugin might use. Plain mobs skip the feed lookup.
+        Identifier carrier = itemDisplay ? null
+                : OTHER_CARRIERS.stream().filter(type -> event.entityType().is(type)).findFirst().orElse(null);
+        if (!itemDisplay && carrier == null) return;
         final EntityProjectionIndex.Projection projection;
         try {
             projection=current.projection(event.uuid());
@@ -138,9 +143,19 @@ public final class VoxelCoreGeyserExtension implements Extension {
             logger().warning("VoxelCore projection failed: " + readError.getMessage());
             return;
         }
-        if (projection==null || !nativeEntityIdentifiers.containsValue(projection.entityType())) return;
+        if (!itemDisplay) {
+            // A fed UUID on another entity type (armor stand, block display, ...) is never substituted.
+            if (projection!=null) spawnStats.otherType(carrier.namespace() + ":" + carrier.path());
+            return;
+        }
+        if (projection==null) { spawnStats.notInFeed.incrementAndGet(); return; }
+        if (!nativeEntityIdentifiers.containsValue(projection.entityType())) {
+            spawnStats.unregistered(projection.entityType());
+            return;
+        }
         try {
             event.definition(CustomEntityDefinition.of(Identifier.of(projection.entityType())));
+            spawnStats.substituted.incrementAndGet();
             final Float visualScale=projection.scale();
             final GeyserIntEntityProperty dyeProperty=dyeProperties.get(projection.entityType());
             final Integer dye=projection.dye();
@@ -155,10 +170,15 @@ public final class VoxelCoreGeyserExtension implements Extension {
                 });
             }
         } catch (RuntimeException invalid) {
+            spawnStats.rejected.incrementAndGet();
             logger().warning("VoxelCore custom entity replacement rejected for "
                     + event.uuid() + ": " + invalid.getMessage());
         }
     }
+
+    private final SpawnStats spawnStats = new SpawnStats();
+    private static final List<Identifier> OTHER_CARRIERS = List.of(Identifier.of("minecraft:armor_stand"),
+            Identifier.of("minecraft:block_display"), Identifier.of("minecraft:interaction"));
 
 
     @Subscribe
@@ -332,6 +352,7 @@ public final class VoxelCoreGeyserExtension implements Extension {
                             Set<String> missing = index.unmappedModels();
                             source.sendMessage("Projected entities: " + index.size() + "; addon models without a Bedrock entity: "
                                     + missing.size() + (missing.isEmpty() ? "" : " " + preview(missing)));
+                            source.sendMessage("Spawns since start: " + spawnStats.describe());
                         } catch (IOException invalid) {
                             source.sendMessage("Projection feed invalid: " + invalid.getMessage());
                         }
