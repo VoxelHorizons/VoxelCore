@@ -122,6 +122,17 @@ public final class PackCommand implements SubCommand {
                         + "); mappings: " + mappings + " ("
                         + (java.nio.file.Files.isRegularFile(mappings) ? "present" : "missing")
                         + "). Geyser restart and Bedrock reconnect required after updating.");
+                try {
+                    org.voxelhorizons.pack.GeyserPackPublisher.PublicationState state =
+                            org.voxelhorizons.pack.GeyserPackPublisher.inspect(destination.root);
+                    sender.sendMessage("Geyser VoxelCore publication: " + state);
+                    if (!"VERIFIED_ON_DISK".equals(state.status))
+                        sender.sendMessage(org.bukkit.ChatColor.YELLOW
+                                + "Geyser files are not verified as a matching VoxelCore revision.");
+                } catch (java.io.IOException inspection) {
+                    sender.sendMessage(org.bukkit.ChatColor.RED
+                            + "Unable to verify Geyser publication: " + inspection.getMessage());
+                }
             }
             sender.sendMessage("Known targets: " + knownTargets());
         }
@@ -356,7 +367,9 @@ public final class PackCommand implements SubCommand {
                                 bedrockStatus += " Published to " + geyserDestination.source
                                         + ": " + pack + " (" + java.nio.file.Files.size(pack) + " bytes), "
                                         + mappings + " (" + java.nio.file.Files.size(mappings)
-                                        + " bytes). Restart Geyser, then reconnect Bedrock clients.";
+                                        + " bytes). Publication receipt: "
+                                        + org.voxelhorizons.pack.GeyserPackPublisher.inspect(geyserDestination.root)
+                                        + ". Restart Geyser, then reconnect Bedrock clients.";
                             } else {
                                 bedrockStatus += " Export only: " + geyserDestination.explanation;
                             }
