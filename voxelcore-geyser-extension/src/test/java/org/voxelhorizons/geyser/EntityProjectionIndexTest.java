@@ -43,6 +43,23 @@ public final class EntityProjectionIndexTest {
         assertEquals(0,index.size());
     }
 
+    @Test public void reportsAddonModelsWithoutRegisteredBedrockEntity() throws Exception {
+        Path root=temp.newFolder().toPath(),dir=root.resolve("voxelcore-projection");
+        Files.createDirectories(dir);
+        Path file=dir.resolve("furniture.json");
+        Files.writeString(file,"{\"schema\":1,\"furniture\":[{\"model_item\":\"voxel:unknown_sofa\","
+                +"\"entity_links\":{\"display_entity_uuid\":\""+UUID.randomUUID()+"\",\"parts\":[]}},"
+                +"{\"model_item\":\"voxel:oak_bench\",\"entity_links\":{\"display_entity_uuid\":\""+UUID.randomUUID()
+                +"\",\"parts\":[{\"type\":\"ITEM\",\"java_entity_uuid\":\""+UUID.randomUUID()
+                +"\",\"model_item\":\"voxel:cushion\"}]}}]}",StandardCharsets.UTF_8);
+        EntityProjectionIndex index=new EntityProjectionIndex(root,
+                Map.of("voxel:oak_bench","voxelcore:entity_i_1234567890abcdef1234567890abcdef"));
+        assertEquals(1,index.size());
+        assertEquals(java.util.Set.of("voxel:unknown_sofa","voxel:cushion"),index.unmappedModels());
+        Files.delete(file);
+        assertTrue(index.unmappedModels().isEmpty());
+    }
+
     @Test public void stalePaperFileDoesNotReplaceNewDisplaysAndExpiresCachedMappings() throws Exception {
         Path root=temp.newFolder().toPath(),dir=root.resolve("voxelcore-projection");
         Files.createDirectories(dir);

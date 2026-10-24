@@ -182,8 +182,29 @@ public final class VoxelCoreGeyserExtension implements Extension {
                             + (state.revision().isEmpty() ? "" : " revision=" + state.revision())
                             + " (" + state.details() + ")");
                     source.sendMessage("Note: this verifies on-disk artifacts, not each client's active resources.");
+                    EntityProjectionIndex index = projectionIndex;
+                    if (index != null) {
+                        try {
+                            Set<String> missing = index.unmappedModels();
+                            source.sendMessage("Projected entities: " + index.size() + "; addon models without a Bedrock entity: "
+                                    + missing.size() + (missing.isEmpty() ? "" : " " + preview(missing)));
+                        } catch (IOException invalid) {
+                            source.sendMessage("Projection feed invalid: " + invalid.getMessage());
+                        }
+                    }
                 })
                 .build());
+    }
+
+    private static String preview(Set<String> models) {
+        StringBuilder text = new StringBuilder("[");
+        int shown = 0;
+        for (String model : models) {
+            if (shown++ == 8) { text.append(", ..."); break; }
+            if (shown > 1) text.append(", ");
+            text.append(model);
+        }
+        return text.append(']').toString();
     }
 
     @Subscribe
