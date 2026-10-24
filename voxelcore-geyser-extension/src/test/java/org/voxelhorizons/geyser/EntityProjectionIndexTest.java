@@ -60,6 +60,24 @@ public final class EntityProjectionIndexTest {
         assertTrue(index.unmappedModels().isEmpty());
     }
 
+    @Test public void mergesPerBackendFeedsAndExpiresThemIndependently() throws Exception {
+        Path root=temp.newFolder().toPath(),dir=root.resolve("voxelcore-projection");
+        Files.createDirectories(dir);
+        UUID lobby=UUID.randomUUID(), survival=UUID.randomUUID();
+        Path lobbyFeed=dir.resolve("furniture-lobby.json"), survivalFeed=dir.resolve("furniture-survival.json");
+        Files.writeString(lobbyFeed,fixture(lobby.toString(),"voxel:oak_bench"));
+        Files.writeString(survivalFeed,fixture(survival.toString(),"voxel:oak_bench"));
+        Files.writeString(dir.resolve("furniture-Bad Name.json"),fixture(UUID.randomUUID().toString(),"voxel:oak_bench"));
+        String mapped="voxelcore:entity_i_1234567890abcdef1234567890abcdef";
+        EntityProjectionIndex index=new EntityProjectionIndex(root,Map.of("voxel:oak_bench",mapped));
+        assertEquals("Only well-named feeds are read",2,index.size());
+        assertEquals(mapped,index.entityType(lobby));
+        assertEquals(mapped,index.entityType(survival));
+        Files.setLastModifiedTime(survivalFeed,FileTime.fromMillis(System.currentTimeMillis()-120_000L));
+        assertNull("A crashed backend's feed expires",index.entityType(survival));
+        assertEquals("Other backends keep projecting",mapped,index.entityType(lobby));
+    }
+
     @Test public void stalePaperFileDoesNotReplaceNewDisplaysAndExpiresCachedMappings() throws Exception {
         Path root=temp.newFolder().toPath(),dir=root.resolve("voxelcore-projection");
         Files.createDirectories(dir);

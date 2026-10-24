@@ -53,9 +53,10 @@ public final class EntityProjectionIndex {
     private final Map<String,String> modelEntities;
     private Map<UUID,Projection> current = Collections.emptyMap();
     private Set<String> unmapped = Collections.emptySet();
-    private long furnitureSize=-1,vehiclesSize=-1;
-    private long furnitureTime=-1,vehiclesTime=-1;
-    private boolean furnitureFresh,vehiclesFresh;
+    /** Feed file -> size/mtime/freshness seen at the last load; any change reloads all feeds. */
+    private Map<Path,String> stamps=Collections.emptyMap();
+    /** {@code furniture.json}, {@code vehicles.json} or a per-backend {@code furniture-<id>.json}. */
+    static final java.util.regex.Pattern FEED=java.util.regex.Pattern.compile("(furniture|vehicles)(-[a-z0-9_-]{1,32})?\\.json");
 
     public EntityProjectionIndex(Path geyserData, Map<String,String> modelEntities) {
         if (geyserData==null || modelEntities==null)
@@ -92,26 +93,32 @@ public final class EntityProjectionIndex {
     }
 
     private void refresh() throws IOException {
-        Path furniture=folder.resolve("furniture.json"), vehicles=folder.resolve("vehicles.json");
-        long fSize=sizeOf(furniture),vSize=sizeOf(vehicles);
-        long fTime=modified(furniture),vTime=modified(vehicles);
+        Map<Path,String> next=new java.util.TreeMap<Path,String>();
         long now=System.currentTimeMillis();
-        boolean fFresh=fSize>=0 && now-fTime<=MAX_SNAPSHOT_AGE_MILLIS;
-        boolean vFresh=vSize>=0 && now-vTime<=MAX_SNAPSHOT_AGE_MILLIS;
-        // Freshness can change even when size/mtime do not: expiring a feed must
-        // evict mappings already cached by an earlier spawn event.
-        if(fSize==furnitureSize && vSize==vehiclesSize && fTime==furnitureTime && vTime==vehiclesTime
-                && fFresh==furnitureFresh && vFresh==vehiclesFresh)
-            return;
+        if(Files.isDirectory(folder,LinkOption.NOFOLLOW_LINKS)) {
+            try(java.util.stream.Stream<Path> files=Files.list(folder)) {
+                for(Path file:(Iterable<Path>)files::iterator) {
+                    if(!FEED.matcher(file.getFileName().toString()).matches())continue;
+                    long size=sizeOf(file),time=modified(file);
+                    if(size<0)continue;
+                    // Freshness can change even when size/mtime do not: expiring a feed must
+                    // evict mappings already cached by an earlier spawn event.
+                    boolean fresh=now-time<=MAX_SNAPSHOT_AGE_MILLIS;
+                    next.put(file,size+"/"+time+"/"+fresh);
+                }
+            }
+        }
+        if(next.equals(stamps))return;
         Map<UUID,Projection> updated=new HashMap<UUID,Projection>();
         Set<String> missing=new TreeSet<String>();
-        if(fFresh)load(furniture,"furniture",updated,missing);
-        if(vFresh)load(vehicles,"vehicles",updated,missing);
+        for(Map.Entry<Path,String> feed:next.entrySet()) {
+            if(!feed.getValue().endsWith("/true"))continue;
+            String name=feed.getKey().getFileName().toString();
+            load(feed.getKey(),name.startsWith("furniture")?"furniture":"vehicles",updated,missing);
+        }
         current=Collections.unmodifiableMap(updated);
         unmapped=Collections.unmodifiableSet(missing);
-        furnitureSize=fSize;vehiclesSize=vSize;
-        furnitureTime=fTime;vehiclesTime=vTime;
-        furnitureFresh=fFresh;vehiclesFresh=vFresh;
+        stamps=next;
     }
 
     private static long sizeOf(Path path) throws IOException {
