@@ -1,11 +1,34 @@
 # Bedrock recovery handoff — 24 October 2026 (Australia/Melbourne)
 
-## Latest checkpoint — 24 October 2026, session 4 (supersedes everything below)
+## Latest checkpoint — 24 October 2026, session 4 end (supersedes everything below)
 
 Fetch live HEADs first; this file is not a ref. No PR merged, no force push.
 
-| Repo | Branch / PR | Code commits this session (oldest→newest) | CI |
+| Repo | Branch / PR | Code commits this session | CI |
 | --- | --- | --- | --- |
+| VoxelCore | `feat/bedrock-pack-publishing`, [PR #84](https://github.com/VoxelHorizons/VoxelCore/pull/84) | `d0ec247` rescale+planes · `d0b847b` rule predicates · `9448ec2` tints · `a9511d6` signed pack sync · `f811217` Bedrock tooltip · `991c7b0` legacy CMD mappings · `4b8dffa` per-backend feeds · `f8f32f0` signed feed transport | build SUCCESS on all through `4b8dffa`; smoke 8/8 on all except `991c7b0` (one run red; next two runs incl. that code 8/8 → KI-01, non-blocking). `f8f32f0`: re-query |
+| DeluxeMenus | `feat/bedrock-forms` (no PR; CI via `workflow_dispatch`) | `557bac4` forms · `6b8d858` `bedrock_image` · `7e2b869` click-type chooser | all [SUCCESS](https://github.com/VoxelHorizons/DeluxeMenus/actions/runs/40083515069) |
+| VoxelFurniture | PR #47 | `b1b7585` model re-send · `6fb62ee` feed-id | SUCCESS |
+| VoxelVehicles | PR #21 | `09a0abb` model re-send · `d0b084c` feed-id | SUCCESS |
+
+**CI policy:** TESTING.md "CI policy" — build + changed-code tests + 26.3 smoke blocking; KI-01 legacy smoke recorded only.
+
+**Status (IMPLEMENTED; TESTED where CI green; nothing VERIFIED live):** B05 rule predicates; B06 rescale/planes; B07 constant tints; B08 audit complete (no addon models outside VoxelCore); B10 live scale + model re-send; B14 glyph migration; B15 DeluxeMenus forms incl. click-type chooser; B16 stats/avatars/tooltip text; B17 signed pack/mappings sync + per-backend feeds + signed feed transport; B18 legacy CMD mappings.
+
+**Local test method (no Maven repo access here):** `javac` against `~/.m2` gson/junit/snakeyaml with `-sourcepath voxelcore-common/src/main/java:voxelcore-pack/src/main/java`; pack 49, extension 21, DeluxeMenus text 5 tests pass locally. Bukkit/Geyser/Paper glue compiles only in CI.
+
+**Findings to reuse**
+- Geyser API: no plugin-messaging hook; `SEAT_OFFSET` rider-side with Geyser baseline; custom-item definitions sharing a Java model sort by `priority` desc → predicate count → range threshold; range = `value >= threshold`; `legacy` definitions take `custom_model_data`; `GeyserDefineEntityPropertiesEvent` registers per-entity float/int/bool/enum properties (Molang `query.property`).
+- Furniture dye is arbitrary RGB (`FurnitureManager#dye(int)`), so a palette texture array would only approximate it.
+- Cumulus via reflection: resolve on public interfaces only.
+
+**Remaining (needs live client or a decision)**
+1. B10 dye/animation: property-driven render controllers — design needs a Bedrock client to validate material/colour semantics.
+2. B11 vehicle seats/riders/steering parity — needs live client (seat baseline).
+3. DeluxeMenus `feat/bedrock-forms` → `main` PR: not opened (user has not asked); open when requested.
+4. B19 BLOCKED: real Bedrock client + VoxelHorizons Geyser server; then B20 acceptance.
+
+--- | --- | --- | --- |
 | VoxelCore | `feat/bedrock-pack-publishing`, [PR #84](https://github.com/VoxelHorizons/VoxelCore/pull/84) | `d0ec247` rescale+flat planes; `d0b847b` render.rule→Geyser predicates; `9448ec2` constant tints; `a9511d6` B17 signed remote sync; `f811217` Bedrock tooltip; `991c7b0` legacy CMD mappings | build SUCCESS on every commit through `a9511d6`; smoke 8/8 on `d0ec247`, `d0b847b`, `9448ec2`; later runs: re-query. KI-01 = non-blocking |
 | DeluxeMenus | `feat/bedrock-forms` (no PR; CI via `workflow_dispatch` on build.yml) | `557bac4` form frontend; `6b8d858` `bedrock_image` | both [SUCCESS](https://github.com/VoxelHorizons/DeluxeMenus/actions/runs/40082176306) |
 | VoxelFurniture | PR #47 | `b1b7585` | SUCCESS |
