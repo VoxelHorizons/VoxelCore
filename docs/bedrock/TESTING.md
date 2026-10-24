@@ -57,3 +57,16 @@
 - **Core `363147abd04889d84acb3cf77f02b4410f58ff1c`:** first recovery fix expiring stale Paper display projection files, with regression tests `stalePaperFileDoesNotReplaceNewDisplaysAndExpiresCachedMappings` and `expiringOneFeedPreservesOtherFreshModelMappings`. [distribution run](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40076547872), [smoke run](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40076547878) **IN PROGRESS at document creation**. Promote this change to TESTED only after observing a successful build; do not imply a live render test.
 
 Next reproducible CI diagnosis: capture RCON port 25575 with `ss -lntp`/`/proc/net/tcp*`, a JVM thread dump (`jstack` or SIGQUIT diagnostics) while the RCON retry loop fails, Java process CPU state, and evidence of whether RCON's listener thread exited. Never disable those matrix versions just to achieve green.
+
+## Verified current post-recovery automated evidence
+
+| Repository and SHA | Check | Result | Scope |
+| --- | --- | --- | --- |
+| Core `a58450602d6cd7d558baeb3315e6e19982e19f2f` | [Distribution 40077155518](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40077155518) | **SUCCESS** | Compiled extension and new scale regression tests |
+| Core `a58450602d6cd7d558baeb3315e6e19982e19f2f` | [Smoke 40077155527](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40077155527) | **SUCCESS, 8/8** | All supported Java/Paper smoke matrix entries; no live Bedrock client |
+| Core `c1f3b5360f9534fe7d2f5b5ea2f095aa2402380b` | [Distribution 40077217228](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40077217228) | **SUCCESS** | Includes failure-only JVM RCON diagnostics |
+| Core `c1f3b5360f9534fe7d2f5b5ea2f095aa2402380b` | [Smoke 40077217237](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40077217237) | **SUCCESS, 8/8** | Intermittent legacy RCON failure not observed in this run |
+| Furniture `2332b3ebea2cfcee41bbe97bf59bf5e1c148280f` | [Build 40077356575](https://github.com/VoxelHorizons/VoxelFurniture/actions/runs/40077356575) | **SUCCESS** | Optional Geyser enable-order fix / snapshot build |
+| Vehicles `6eb79cbf84bebc24d262e3a9c72d92a047299ead` | [Build 40077363366](https://github.com/VoxelHorizons/VoxelVehicles/actions/runs/40077363366) | **SUCCESS** | Optional Geyser enable-order fix / snapshot build |
+
+The earlier RCON failure at Core `64b8a327` was observed again intermittently at `a85f9bef` and passed at `a5845060`/`c1f3b536`. The exact root cause is unresolved; failure-only HotSpot SIGQUIT diagnostics have been added but not triggered on the latest successful run. Tests passed is not visual verification.
