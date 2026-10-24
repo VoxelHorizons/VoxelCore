@@ -103,18 +103,25 @@ final class BedrockGeometryCompiler {
                 if (image==null) throw new IOException("Unreadable model texture "+textureRef);
                 double[] uv = face.has("uv") ? vector(face,"uv") : BedrockIconRenderer.uv(direction,from,to);
                 if (uv.length!=4) throw new IOException("Expected four Java UV coordinates for " + javaModel);
+                // Resample the Java face UV into one full Bedrock atlas cell.
+                // Java models may extend outside the 0..16 cube: clamp source UV
+                // to image bounds as in the existing preview renderer. Cropping
+                // the source image using Graphics.drawImage would leave these
+                // oversized cuboids transparent instead.
                 BufferedImage tile = new BufferedImage(16,16,BufferedImage.TYPE_INT_ARGB);
-                Graphics2D g = tile.createGraphics();
-                try {
-                    g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-                    g.translate(8,8);
-                    g.rotate(Math.toRadians(turn));
-                    int sx1=(int)Math.round(uv[0]*image.getWidth()/16.0);
-                    int sy1=(int)Math.round(uv[1]*image.getHeight()/16.0);
-                    int sx2=(int)Math.round(uv[2]*image.getWidth()/16.0);
-                    int sy2=(int)Math.round(uv[3]*image.getHeight()/16.0);
-                    g.drawImage(image,-8,-8,8,8,sx1,sy1,sx2,sy2,null);
-                } finally { g.dispose(); }
+                for (int ty=0;ty<16;ty++) for (int tx=0;tx<16;tx++) {
+                    double u=(tx+0.5)/16.0, v=(ty+0.5)/16.0;
+                    switch ((turn % 360 + 360) % 360) {
+                        case 90: { double t=u; u=v; v=1-t; break; }
+                        case 180: u=1-u; v=1-v; break;
+                        case 270: { double t=u; u=1-v; v=t; break; }
+                        default: break;
+                    }
+                    double sx=uv[0]+u*(uv[2]-uv[0]), sy=uv[1]+v*(uv[3]-uv[1]);
+                    int pixelX=Math.min(image.getWidth()-1,Math.max(0,(int)Math.floor(sx*image.getWidth()/16.0)));
+                    int pixelY=Math.min(image.getHeight()-1,Math.max(0,(int)Math.floor(sy*image.getHeight()/16.0)));
+                    tile.setRGB(tx,ty,image.getRGB(pixelX,pixelY));
+                }
                 int index=painted.size();
                 painted.add(tile);
                 JsonObject mapped = new JsonObject();
