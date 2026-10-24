@@ -42,10 +42,16 @@ public final class BedrockGeometryCompilerTest {
         String shortId = "i_11112222333344445555666677778888";
         BedrockGeometryCompiler.Output first = converter.compile("demo:bench",identifier,shortId);
         BedrockGeometryCompiler.Output child = converter.compile("demo:dark_bench",identifier,shortId);
-        assertNotNull(first); assertEquals(1,first.cuboids); assertEquals(3,first.assets.size());
+        assertNotNull(first); assertEquals(1,first.cuboids); assertEquals(4,first.assets.size());
         assertTrue(first.assets.containsKey("attachables/"+shortId+".json"));
         assertTrue(first.assets.containsKey("models/entity/voxelcore/"+shortId+".geo.json"));
         assertTrue(first.assets.containsKey("textures/voxelcore/g_"+shortId+".png"));
+        JsonObject entity = JsonParser.parseString(new String(first.assets.get(
+                "entity/voxelcore/"+shortId+".entity.json"),StandardCharsets.UTF_8)).getAsJsonObject()
+                .getAsJsonObject("minecraft:client_entity").getAsJsonObject("description");
+        assertEquals("voxelcore:entity_"+shortId, entity.get("identifier").getAsString());
+        assertEquals("geometry.voxelcore."+shortId,
+                entity.getAsJsonObject("geometry").get("default").getAsString());
         JsonObject geometry = JsonParser.parseString(new String(first.assets.get(
                 "models/entity/voxelcore/"+shortId+".geo.json"),StandardCharsets.UTF_8)).getAsJsonObject();
         assertEquals("1.12.0",geometry.get("format_version").getAsString());
