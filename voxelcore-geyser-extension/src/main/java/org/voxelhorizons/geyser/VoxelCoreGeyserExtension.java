@@ -15,6 +15,15 @@ import org.geysermc.geyser.api.command.CommandSource;
 import org.geysermc.geyser.api.event.lifecycle.GeyserDefineCommandsEvent;
 import org.geysermc.geyser.api.event.lifecycle.GeyserDefineResourcePacksEvent;
 import org.geysermc.geyser.api.event.lifecycle.GeyserPostInitializeEvent;
+import org.geysermc.geyser.api.event.lifecycle.GeyserShutdownEvent;
+import org.geysermc.geyser.api.connection.GeyserConnection;
+import org.geysermc.geyser.api.entity.type.GeyserEntity;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.geysermc.geyser.api.extension.Extension;
 
 /**
@@ -33,6 +42,11 @@ public final class VoxelCoreGeyserExtension implements Extension {
 
     private volatile Map<String,String> nativeEntityIdentifiers = java.util.Collections.emptyMap();
     private volatile EntityProjectionIndex projectionIndex;
+    private final ProjectionReconciler reconciler = new ProjectionReconciler();
+    private volatile ScheduledExecutorService reconcileLoop;
+
+    /** Projection files are polled once per second; unchanged files cost two stat calls. */
+    static final long RECONCILE_PERIOD_MILLIS = 1_000L;
 
     /**
      * Keep server Paper UUID identity intact. Only known display entities from
@@ -91,8 +105,66 @@ public final class VoxelCoreGeyserExtension implements Extension {
         }
         nativeEntityIdentifiers = catalog;
         projectionIndex = new EntityProjectionIndex(geyserApi().configDirectory(), catalog);
+        startReconcileLoop();
         logger().info("Registered " + types.size() + " VoxelCore Bedrock client entity definitions from "
-                + state.revision() + " (known UUID spawn replacement and uniform scale active; live updates/resync pending).");
+                + state.revision() + " (known UUID spawn replacement, uniform scale and live scale reconcile active).");
+    }
+
+    private synchronized void startReconcileLoop() {
+        if (reconcileLoop != null) return;
+        reconcileLoop = Executors.newSingleThreadScheduledExecutor(task -> {
+            Thread thread = new Thread(task, "VoxelCore-Geyser-projection");
+            thread.setDaemon(true);
+            return thread;
+        });
+        reconcileLoop.scheduleWithFixedDelay(this::reconcileProjections,
+                RECONCILE_PERIOD_MILLIS, RECONCILE_PERIOD_MILLIS, TimeUnit.MILLISECONDS);
+    }
+
+    /** Apply changed Paper projection state to entities already visible to Bedrock sessions. */
+    private void reconcileProjections() {
+        EntityProjectionIndex current = projectionIndex;
+        if (current == null) return;
+        try {
+            List<? extends GeyserConnection> connections = geyserApi().onlineConnections();
+            ProjectionReconciler.Result result = reconciler.reconcile(current.snapshot(),
+                    uuid -> liveTargets(connections, uuid));
+            if (result.needsRespawn > 0) {
+                logger().warning("VoxelCore projection changed model for " + result.needsRespawn
+                        + " spawned Bedrock entities; Geyser cannot redefine them until Paper re-sends the entity.");
+            }
+        } catch (IOException readError) {
+            logger().warning("VoxelCore projection reconcile skipped: " + readError.getMessage());
+        } catch (RuntimeException unexpected) {
+            // Never let one bad tick cancel the scheduled loop.
+            logger().warning("VoxelCore projection reconcile failed: " + unexpected);
+        }
+    }
+
+    private static List<ProjectionReconciler.Target> liveTargets(List<? extends GeyserConnection> connections, UUID uuid) {
+        List<ProjectionReconciler.Target> targets = new ArrayList<ProjectionReconciler.Target>();
+        for (GeyserConnection connection : connections) {
+            GeyserEntity entity = connection.entities().byUuid(uuid);
+            if (entity == null) continue;
+            targets.add(new ProjectionReconciler.Target() {
+                @Override public String definitionId() {
+                    Identifier id = entity.definition().identifier();
+                    return id.namespace() + ":" + id.path();
+                }
+                @Override public void scale(Float scale) {
+                    entity.override(GeyserEntityDataTypes.SCALE, scale);
+                }
+            });
+        }
+        return targets;
+    }
+
+    @Subscribe
+    public synchronized void onShutdown(GeyserShutdownEvent event) {
+        if (reconcileLoop != null) {
+            reconcileLoop.shutdownNow();
+            reconcileLoop = null;
+        }
     }
 
     @Subscribe

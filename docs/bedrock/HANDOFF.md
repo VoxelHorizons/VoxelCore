@@ -1,5 +1,17 @@
 # Bedrock recovery handoff — 24 October 2026 (Australia/Melbourne)
 
+## Latest checkpoint — B10 live scale reconcile (supersedes the section below)
+
+- Parent of this commit: Core `7c14c06ee4f039307c18afb64a85081b493f320d`. Fetch live HEAD; this file is not a ref.
+- **Added:** `voxelcore-geyser-extension/.../ProjectionReconciler.java` (pure, Geyser-free) + `ProjectionReconcilerTest` (3 tests); `EntityProjectionIndex#snapshot()` and `Projection` equality; `VoxelCoreGeyserExtension` runs a 1 s daemon reconcile loop (started after entity registration, stopped on `GeyserShutdownEvent`) that pushes changed uniform SCALE to already-spawned custom entities in every session via `GeyserApi#onlineConnections` → `GeyserConnection#entities().byUuid()` → `GeyserEntity#override(SCALE, …)` (override is event-loop safe in Geyser core). Model change on a live entity is only logged; removed/expired feeds leave the last visual (fail closed).
+- **API evidence:** `EntityData#byUuid` was added in Geyser "Custom Entity API (#6010)" 2026-07-05, before `2.11.2-SNAPSHOT` (2026-08-20) — same API family already used for spawn substitution. No despawn/chunk events exist in the API; Geyser translates Java remove/move packets itself and re-raises `ServerSpawnEntityEvent` on chunk reload and reconnect, which already re-reads the index.
+- **Tests:** locally `javac` + JUnit 4 on `ProjectionReconcilerTest` + `EntityProjectionIndexTest`: OK (10 tests). The extension class itself was **not compiled locally** (repo.opencollab.dev blocked by this sandbox's proxy) — CI on this commit is the first compile check. Status: IMPLEMENTED; TESTED only after CI passes; NOT VERIFIED live.
+- **Remaining B10:** (1) companion Paper publishers must re-send an entity to Bedrock viewers when its `model_item` changes (e.g. `Player#hideEntity`/`showEntity` for Floodgate players) — then the spawn event applies the new definition; (2) dye/colour/animation need schema fields plus a Bedrock geometry consumer (`GeyserEntityDataTypes.COLOR`/`VARIANT` exist); (3) non-uniform scale is impossible with Geyser SCALE — keep rejecting; (4) live client acceptance (B19, BLOCKED).
+- **Next actions:** check CI for this commit and fix any compile error in `VoxelCoreGeyserExtension`; then item (1) above in VoxelFurniture PR #47 / VoxelVehicles PR #21; then B08 or B14 per older section.
+
+---
+
+
 ## Latest verified repository checkpoint — 24 October 2026
 
 This section **supersedes any older SHA, CI status, or next-task claim below**. Refresh the remote branch HEAD on every new session; this document is not a git ref.
