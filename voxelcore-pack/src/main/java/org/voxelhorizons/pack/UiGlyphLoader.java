@@ -25,7 +25,7 @@ import java.util.Set;
 /** Parses compact UI font-image content and reconciles stable private-use Unicode allocations. */
 public final class UiGlyphLoader {
     private static final int FIRST_CODE_POINT = 0xE200;
-    private static final int LAST_CODE_POINT = 0xF3FF;
+    private static final int LAST_CODE_POINT = 0xF7FF;
 
     public UiGlyphRegistry load(Path contentRoot, Path allocationFile, boolean persist) {
         List<ContentPack> packs = new ContentPackDiscovery().discover(contentRoot);
@@ -64,6 +64,8 @@ public final class UiGlyphLoader {
             RawGlyph glyph = raw.get(id);
             Integer previous = state.active.containsKey(id) ? state.active.get(id) : state.inactive.get(id);
             Integer explicit = glyph.explicitCodePoint;
+            if (explicit != null && isBedrockReserved(explicit.intValue()))
+                migrated.put(id, explicit);
             // Bedrock reserves E000-E1FF for controller/emoji glyphs. Legacy explicit
             // symbols in this range must migrate too; the authored definition is a hint
             // and aliases remain the authoritative way to reference generated glyphs.
@@ -361,7 +363,7 @@ public final class UiGlyphLoader {
 
     private static void requirePrivateUse(int value, ContentID id) {
         if (value < 0xE000 || value > LAST_CODE_POINT) {
-            throw new ContentLoadException("UI glyph " + id + " symbol must be in U+E000..U+F3FF (U+E000..U+E1FF is remapped for Bedrock)");
+            throw new ContentLoadException("UI glyph " + id + " symbol must be in U+E000..U+F7FF (U+E000..U+E1FF is remapped for Bedrock)");
         }
     }
 
