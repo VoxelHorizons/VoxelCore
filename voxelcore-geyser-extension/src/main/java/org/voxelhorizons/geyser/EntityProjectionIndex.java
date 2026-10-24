@@ -38,6 +38,13 @@ public final class EntityProjectionIndex {
         }
         public String entityType() { return entityType; }
         public Float scale() { return scale; }
+        /** Package-private so reconciler tests can build states without JSON. */
+        static Projection of(String entityType,Float scale) { return new Projection(entityType,scale); }
+        @Override public boolean equals(Object other) {
+            return other instanceof Projection && entityType.equals(((Projection)other).entityType)
+                    && Objects.equals(scale,((Projection)other).scale);
+        }
+        @Override public int hashCode() { return Objects.hash(entityType,scale); }
     }
 
     private final Path folder;
@@ -62,6 +69,12 @@ public final class EntityProjectionIndex {
     public synchronized Projection projection(UUID paperEntityUuid) throws IOException {
         refresh();
         return current.get(paperEntityUuid);
+    }
+
+    /** Immutable view of all currently authoritative projections, refreshed from disk. */
+    public synchronized Map<UUID,Projection> snapshot() throws IOException {
+        refresh();
+        return current;
     }
 
     public synchronized int size() throws IOException {
