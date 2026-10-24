@@ -45,6 +45,33 @@ public class BedrockIconRendererTest {
   BufferedImage preview=ImageIO.read(new ByteArrayInputStream(new BedrockIconRenderer(assets).render("demo:oak")));
   assertTrue((preview.getRGB(32,32)>>>24)!=0);
  }
+ @Test public void compositesGeneratedLayersIncludingInheritedTextures() throws Exception {
+  Map<String,byte[]> assets=new HashMap<String,byte[]>();
+  BufferedImage background=new BufferedImage(16,16,BufferedImage.TYPE_INT_ARGB);
+  BufferedImage emblem=new BufferedImage(16,16,BufferedImage.TYPE_INT_ARGB);
+  for(int y=0;y<16;y++)for(int x=0;x<16;x++)background.setRGB(x,y,0xff994411);
+  emblem.setRGB(8,8,0xff55ccee);
+  ByteArrayOutputStream red=new ByteArrayOutputStream(),blue=new ByteArrayOutputStream();
+  ImageIO.write(background,"png",red);ImageIO.write(emblem,"png",blue);
+  assets.put("assets/demo/textures/base.png",red.toByteArray());
+  assets.put("assets/demo/textures/emblem.png",blue.toByteArray());
+  assets.put("assets/demo/models/base.json",
+      ("{\"parent\":\"minecraft:item/generated\",\"textures\":"
+       + "{\"layer0\":\"demo:base\",\"particle\":\"demo:base\"}}").getBytes("UTF-8"));
+  assets.put("assets/demo/models/child.json",
+      "{\"parent\":\"demo:base\",\"textures\":{\"layer1\":\"demo:emblem\"}}".getBytes("UTF-8"));
+  BufferedImage preview=ImageIO.read(new ByteArrayInputStream(new BedrockIconRenderer(assets).render("demo:child")));
+  assertEquals(0xff994411,preview.getRGB(0,0));
+  assertEquals(0xff55ccee,preview.getRGB(8,8));
+  assertEquals(16,preview.getWidth());
+ }
+ @Test public void rejectsMissingOrMismatchedGeneratedLayers() throws Exception {
+  Map<String,byte[]> assets=new HashMap<String,byte[]>();
+  assets.put("assets/demo/models/gap.json",
+      "{\"parent\":\"minecraft:item/generated\",\"textures\":{\"layer0\":\"demo:base\",\"layer2\":\"demo:badge\"}}".getBytes("UTF-8"));
+  try {new BedrockIconRenderer(assets).render("demo:gap");fail("Missing layer1 must be rejected");}
+  catch(IOException expected){assertTrue(expected.getMessage().contains("Gap"));}
+ }
  @Test public void rejectsParentCycles() throws Exception {
   Map<String,byte[]> assets=new HashMap<String,byte[]>();assets.put("assets/demo/models/a.json","{\"parent\":\"demo:a\"}".getBytes("UTF-8"));
   try {new BedrockIconRenderer(assets).render("demo:a");fail();}catch(IOException expected){assertTrue(expected.getMessage().contains("cycle"));}
