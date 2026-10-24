@@ -127,8 +127,9 @@ public final class BedrockPackCompiler {
             for (Map.Entry<String, byte[]> vanilla : VanillaAssets.load(vanillaAssets, progress).entrySet())
                 if (!javaAssets.containsKey(vanilla.getKey())) javaAssets.put(vanilla.getKey(), vanilla.getValue());
         int mappedGlyphs = glyphAllocationManifest == null ? 0
-                : BedrockGlyphAtlas.append(contentRoot, glyphAllocationManifest, javaAssets, assets);
-        progress.report("Bedrock: " + mappedGlyphs + " font glyphs placed");
+                : BedrockGlyphAtlas.append(contentRoot, glyphAllocationManifest, javaAssets, assets, unsupported);
+        progress.report("Bedrock: " + mappedGlyphs + " font glyphs placed"
+                + (unsupported.isEmpty() ? "" : "; " + unsupported.size() + " glyphs skipped (see unsupported-items.txt)"));
         BedrockIconRenderer renderer = new BedrockIconRenderer(javaAssets);
         // Hashed once: with vanilla assets the map holds thousands of files.
         byte[] assetsDigest;

@@ -55,7 +55,7 @@ public final class BedrockGeometryCompilerTest {
                 entity.getAsJsonObject("geometry").get("default").getAsString());
         JsonObject geometry = JsonParser.parseString(new String(first.assets.get(
                 "models/entity/voxelcore/"+shortId+".geo.json"),StandardCharsets.UTF_8)).getAsJsonObject();
-        assertEquals("1.12.0",geometry.get("format_version").getAsString());
+        assertEquals("1.16.0",geometry.get("format_version").getAsString());
         JsonObject cube = geometry.getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject()
                 .getAsJsonArray("bones").get(0).getAsJsonObject().getAsJsonArray("cubes").get(0).getAsJsonObject();
         assertEquals(32,cube.getAsJsonArray("size").get(0).getAsInt());
