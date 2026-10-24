@@ -30,7 +30,7 @@ public class BedrockPackCompilerTest {
         assertEquals("demo:item/token", item.get("model").getAsString());
         try (ZipFile zip = new ZipFile(first.directory.resolve("voxelcore.mcpack").toFile())) {
             assertNotNull(zip.getEntry("manifest.json")); assertNotNull(zip.getEntry("textures/item_texture.json"));
-            assertEquals(3, zip.size());
+            assertEquals(4, zip.size());
         }
         Path geyser = temp.newFolder().toPath();
         write(geyser.resolve("packs/other.mcpack"), "unrelated");
