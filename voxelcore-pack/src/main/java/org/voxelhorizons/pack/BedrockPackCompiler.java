@@ -38,18 +38,52 @@ public final class BedrockPackCompiler {
         JsonObject textures = new JsonObject();
         Set<String> selectors = new HashSet<String>();
         List<String> unsupported = new ArrayList<String>();
+        Map<String, byte[]> javaAssets = new TreeMap<String, byte[]>();
+        for (ContentPack pack : packs) {
+            Path root = pack.root().resolve("assets");
+            if (Files.exists(root)) try (Stream<Path> paths = Files.walk(root)) {
+                for (Path file : (Iterable<Path>) paths.filter(Files::isRegularFile).sorted()::iterator)
+                    put(javaAssets, "assets/" + root.relativize(file).toString().replace('\\', '/'), Files.readAllBytes(file));
+            }
+        }
+        BedrockIconRenderer renderer = new BedrockIconRenderer(javaAssets);
+        Map<String, byte[]> rendered = new HashMap<String, byte[]>();
         int count = 0;
         for (ItemDefinition item : new ContentLoader().load(contentRoot).entries().values()) {
             if (item.abstractDefinition() || item.render() == null || item.render().model() == null) continue;
             Object raw = item.properties().get("bedrock");
-            if (raw == null) { unsupported.add(item.id().toString()); continue; }
+            byte[] png = null;
+            if (raw == null) {
+                try {
+                    if (!item.render().rule().isEmpty()) throw new IOException("Conditional model requires explicit texture");
+                    String modelKey = item.render().model();
+                    png = rendered.get(modelKey);
+                    if (png == null) {
+                        MessageDigest cacheDigest;
+                        try { cacheDigest = MessageDigest.getInstance("SHA-256"); } catch (Exception e) { throw new IllegalStateException(e); }
+                        cacheDigest.update(("renderer-v1:" + modelKey).getBytes(StandardCharsets.UTF_8));
+                        for (Map.Entry<String, byte[]> asset : javaAssets.entrySet()) {
+                            cacheDigest.update(asset.getKey().getBytes(StandardCharsets.UTF_8));
+                            cacheDigest.update((byte) 0); cacheDigest.update(asset.getValue());
+                        }
+                        Path cache = outputRoot.resolve("icon-cache").resolve(hex(cacheDigest.digest()) + ".png");
+                        if (Files.isRegularFile(cache)) png = Files.readAllBytes(cache);
+                        else {
+                            png = renderer.render(modelKey); Files.createDirectories(cache.getParent());
+                            Files.write(cache, png);
+                        }
+                        rendered.put(modelKey, png);
+                    }
+                } catch (IOException | RuntimeException failure) {
+                    unsupported.add(item.id() + ": " + failure.getMessage()); continue;
+                }
+            } else {
             if (!(raw instanceof Map)) throw new IOException("properties.bedrock must be a map: " + item.id());
             Object texture = ((Map<?, ?>) raw).get("texture");
             if (!(texture instanceof String) || !((String) texture).matches("[a-z0-9_.-]+:[a-z0-9_./-]+")
                     || ((String) texture).contains(".."))
                 throw new IOException("Expected namespaced PNG texture without extension for " + item.id());
             String[] key = ((String) texture).split(":", 2);
-            byte[] png = null;
             for (ContentPack pack : packs) {
                 Path file = pack.root().resolve("assets/" + key[0] + "/textures/" + key[1] + ".png");
                 if (Files.isRegularFile(file)) {
@@ -59,9 +93,10 @@ public final class BedrockPackCompiler {
                 }
             }
             if (png == null) throw new IOException("Missing Bedrock item texture " + texture + " for " + item.id());
+            }
             if (png.length < 8 || png[0] != (byte) 137 || png[1] != 80 || png[2] != 78 || png[3] != 71
                     || javax.imageio.ImageIO.read(new ByteArrayInputStream(png)) == null)
-                throw new IOException("Not a PNG texture: " + texture);
+                throw new IOException("Not a PNG texture for " + item.id());
             String material = item.material().toLowerCase(Locale.ROOT);
             if (!material.contains(":")) material = "minecraft:" + material;
             String model = item.render().model();
