@@ -11,6 +11,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
@@ -268,9 +269,12 @@ public final class ContentBrowser implements Listener {
     private void pageLater(Player player, BrowserHolder previous, int page) {
         long ticks = BedrockPlayers.isBedrock(player.getUniqueId()) ? 2L : 1L;
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-            if (player.isOnline() && player.getOpenInventory().getTopInventory().getHolder() == previous) {
+            if (!player.isOnline()) return;
+            Inventory top = player.getOpenInventory().getTopInventory();
+            // Geyser may already have closed the previous window by this tick.
+            // Reopen from the player's crafting view, but never replace an unrelated GUI.
+            if (top.getHolder() == previous || top.getType() == InventoryType.CRAFTING)
                 open(player, previous.type, page);
-            }
         }, ticks);
     }
 
