@@ -6,7 +6,7 @@ Fetch live HEADs first; this file is not a ref. No PR merged, no force push.
 
 | Repo / PR | Last code commit this session | CI |
 | --- | --- | --- |
-| VoxelCore [PR #84](https://github.com/VoxelHorizons/VoxelCore/pull/84) | `041708b` live scale reconcile; `950a8bb` B14 glyph migration; next commit: B08 unmapped-model status + this handoff | `041708b`: [build](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40079604473) + [smoke 8/8](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40079604461) SUCCESS. Later commits: re-query |
+| VoxelCore [PR #84](https://github.com/VoxelHorizons/VoxelCore/pull/84) | `041708b` live scale reconcile; `950a8bb` B14 glyph migration; `ac68754` B08 unmapped-model status | `041708b` and `950a8bb`: build + smoke 8/8 SUCCESS ([950a8bb build](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40080049988), [smoke](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40080050052)). `ac68754`: [build SUCCESS](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40080128234); [smoke](https://github.com/VoxelHorizons/VoxelCore/actions/runs/40080128175) 7/8, 1.14.4 KI-01 RCON listener death (thread dump in KNOWN-ISSUES); failed job re-run once |
 | VoxelFurniture [PR #47](https://github.com/VoxelHorizons/VoxelFurniture/pull/47) | `b1b7585` re-send on model change | [build SUCCESS](https://github.com/VoxelHorizons/VoxelFurniture/actions/runs/40079728359) |
 | VoxelVehicles [PR #21](https://github.com/VoxelHorizons/VoxelVehicles/pull/21) | `09a0abb` re-send on model change | [build SUCCESS](https://github.com/VoxelHorizons/VoxelVehicles/actions/runs/40079763805) |
 
