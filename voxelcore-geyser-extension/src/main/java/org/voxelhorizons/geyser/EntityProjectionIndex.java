@@ -23,11 +23,16 @@ import java.util.UUID;
  * It does not mutate any seats, hitboxes, inventories or ownership.
  */
 public final class EntityProjectionIndex {
+    /** Publishers renew unchanged snapshots at least every 10 seconds. After 60 seconds
+     * without a replacement, an orphaned Paper feed must never replace a new Java entity. */
+    static final long MAX_SNAPSHOT_AGE_MILLIS = 60_000L;
+
     private final Path folder;
     private final Map<String,String> modelEntities;
     private Map<UUID,String> current = Collections.emptyMap();
     private long furnitureSize=-1,vehiclesSize=-1;
     private long furnitureTime=-1,vehiclesTime=-1;
+    private boolean furnitureFresh,vehiclesFresh;
 
     public EntityProjectionIndex(Path geyserData, Map<String,String> modelEntities) {
         if (geyserData==null || modelEntities==null)
@@ -50,14 +55,21 @@ public final class EntityProjectionIndex {
         Path furniture=folder.resolve("furniture.json"), vehicles=folder.resolve("vehicles.json");
         long fSize=sizeOf(furniture),vSize=sizeOf(vehicles);
         long fTime=modified(furniture),vTime=modified(vehicles);
-        if(fSize==furnitureSize && vSize==vehiclesSize && fTime==furnitureTime && vTime==vehiclesTime)
+        long now=System.currentTimeMillis();
+        boolean fFresh=fSize>=0 && now-fTime<=MAX_SNAPSHOT_AGE_MILLIS;
+        boolean vFresh=vSize>=0 && now-vTime<=MAX_SNAPSHOT_AGE_MILLIS;
+        // Freshness can change even when size/mtime do not: expiring a feed must
+        // evict mappings already cached by an earlier spawn event.
+        if(fSize==furnitureSize && vSize==vehiclesSize && fTime==furnitureTime && vTime==vehiclesTime
+                && fFresh==furnitureFresh && vFresh==vehiclesFresh)
             return;
         Map<UUID,String> updated=new HashMap<UUID,String>();
-        load(furniture,"furniture",updated);
-        load(vehicles,"vehicles",updated);
+        if(fFresh)load(furniture,"furniture",updated);
+        if(vFresh)load(vehicles,"vehicles",updated);
         current=Collections.unmodifiableMap(updated);
         furnitureSize=fSize;vehiclesSize=vSize;
         furnitureTime=fTime;vehiclesTime=vTime;
+        furnitureFresh=fFresh;vehiclesFresh=vFresh;
     }
 
     private static long sizeOf(Path path) throws IOException {
