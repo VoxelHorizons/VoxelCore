@@ -227,20 +227,20 @@ public final class ContentBrowser implements Listener {
 
         if (holder.revision != plugin.getContentRuntime().current().revision()) {
             player.sendMessage(ChatColor.YELLOW + "VoxelCore content changed; refreshing browser.");
-            open(player, holder.type, holder.page);
+            pageLater(player, holder, holder.page);
             return;
         }
 
         if (rawSlot == PREVIOUS_SLOT && holder.page > 0) {
-            open(player, holder.type, holder.page - 1);
+            pageLater(player, holder, holder.page - 1);
             return;
         }
         if (rawSlot == NEXT_SLOT && (holder.page + 1) * CONTENT_SLOTS < holder.ids.size()) {
-            open(player, holder.type, holder.page + 1);
+            pageLater(player, holder, holder.page + 1);
             return;
         }
         if (rawSlot == CLOSE_SLOT) {
-            player.closeInventory();
+            plugin.getServer().getScheduler().runTask(plugin, () -> player.closeInventory());
             return;
         }
 
@@ -263,6 +263,15 @@ public final class ContentBrowser implements Listener {
         } catch (IllegalArgumentException exception) {
             player.sendMessage(ChatColor.RED + exception.getMessage());
         }
+    }
+
+    private void pageLater(Player player, BrowserHolder previous, int page) {
+        long ticks = BedrockPlayers.isBedrock(player.getUniqueId()) ? 2L : 1L;
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            if (player.isOnline() && player.getOpenInventory().getTopInventory().getHolder() == previous) {
+                open(player, previous.type, page);
+            }
+        }, ticks);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
