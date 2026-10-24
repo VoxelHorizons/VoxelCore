@@ -67,7 +67,9 @@ public final class BedrockPackCompiler {
         Map<String, byte[]> rendered = new HashMap<String, byte[]>();
         int count = 0;
         for (ItemDefinition item : new ContentLoader().load(contentRoot).entries().values()) {
-            if (item.abstractDefinition() || item.render() == null || item.render().model() == null) continue;
+            // Abstract items may be GUI-only, but their rendered ItemStacks still need Geyser mappings.
+            // 'abstract' prohibits normal giving, not client-side rendering.
+            if (item.render() == null || item.render().model() == null) continue;
             Object raw = item.properties().get("bedrock");
             byte[] png = null;
             if (raw == null) {
