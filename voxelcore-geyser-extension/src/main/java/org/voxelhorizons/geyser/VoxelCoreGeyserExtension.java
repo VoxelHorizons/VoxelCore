@@ -1,6 +1,13 @@
 package org.voxelhorizons.geyser;
 
 import org.geysermc.event.subscribe.Subscribe;
+import org.geysermc.geyser.api.entity.custom.CustomEntityDefinition;
+import org.geysermc.geyser.api.event.lifecycle.GeyserDefineEntitiesEvent;
+import org.geysermc.geyser.api.util.Identifier;
+import java.util.Map;
+import java.util.TreeSet;
+import java.io.IOException;
+import java.util.Set;
 import org.geysermc.geyser.api.command.Command;
 import org.geysermc.geyser.api.command.CommandSource;
 import org.geysermc.geyser.api.event.lifecycle.GeyserDefineCommandsEvent;
@@ -20,6 +27,38 @@ public final class VoxelCoreGeyserExtension implements Extension {
         report("resource pack registration phase");
         logger().info("Geyser currently has " + event.resourcePacks().size()
                 + " registered packs; VoxelCore uses the normal packs/ scan.");
+    }
+
+    private volatile Map<String,String> nativeEntityIdentifiers = java.util.Collections.emptyMap();
+
+    @Subscribe
+    public void onDefineEntities(GeyserDefineEntitiesEvent event) {
+        PublicationVerifier.State state = PublicationVerifier.inspect(geyserApi().configDirectory());
+        if (state.status()!=PublicationVerifier.Status.VERIFIED_ON_DISK) {
+            logger().warning("VoxelCore native entity types not registered: publication is " + state.status());
+            return;
+        }
+        Map<String,String> catalog;
+        try {
+            catalog=EntityDefinitionCatalog.load(geyserApi().configDirectory());
+        } catch (IOException invalid) {
+            logger().warning("VoxelCore native entities not registered: " + invalid.getMessage());
+            return;
+        }
+        Set<String> types = new TreeSet<String>(catalog.values());
+        for(String identifier:types) {
+            try {
+                event.register(CustomEntityDefinition.of(Identifier.of(identifier)));
+            } catch (RuntimeException incompatible) {
+                logger().warning("Could not register VoxelCore entity " + identifier + ": " + incompatible.getMessage());
+                // A partial registration must not enable an incorrect model lookup.
+                nativeEntityIdentifiers=java.util.Collections.emptyMap();
+                return;
+            }
+        }
+        nativeEntityIdentifiers = catalog;
+        logger().info("Registered " + types.size() + " VoxelCore Bedrock client entity definitions from "
+                + state.revision() + " (spawn replacement/state synchronization still required).");
     }
 
     @Subscribe
