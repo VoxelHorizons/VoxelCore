@@ -1,6 +1,6 @@
 version: 9 # DO NOT CHANGE
 game:
-  bedrock_support: false # Reserved for a future integration; currently has no runtime effect
+  bedrock_support: false # Build Bedrock resources alongside the current-server Java pack
 
 resource_pack:
   host:
@@ -81,6 +81,15 @@ ui:
     page_titles:
       items: {}
       blocks: {}
+    # Bedrock inventory windows do not support Java bitmap glyph/negative-offset title art.
+    # Use separate readable titles; Bedrock retains the inventory contents and click actions.
+    # Supports & colors and {page}, {pages}, {total}, {type}, but not Java :glyph: aliases.
+    bedrock_titles:
+      items: 'VC Items {page}/{pages}'
+      blocks: 'VC Blocks {page}/{pages}'
+    bedrock_page_titles:
+      items: {}
+      blocks: {}
     # Example:
     # titles:
     #   items: '&f:offset_-8::vc_items_page_{page}:'
@@ -98,3 +107,32 @@ economy:
   currencies:
     tokens:
       decimals: 0
+
+# Geyser v2 item mappings require Geyser API 2.9.3/build 1062 or newer.
+# Packs are built on /vc admin pack build; distribution happens at Bedrock connection.
+bedrock:
+  # Automatically publish the pack + custom_mappings to the data folder of an
+  # installed local Geyser-Spigot plugin. Does not guess paths to remote/proxy instances.
+  # Set false to keep export-only behavior when geyser_data_directory is empty.
+  auto_publish_local: true
+  # Optional override. Empty = auto-detect Geyser-Spigot when installed in this server.
+  # Absolute path recommended; relative paths use the server working directory.
+  # Proxy/standalone Geyser needs a mounted path to its REAL data directory.
+  # Example local override: 'plugins/Geyser-Spigot'
+  geyser_data_directory: ''
+  # Extra folders (relative to plugins/) scanned by '/voxelcore admin pack glyphs'
+  # for literal glyphs in Bedrock's reserved U+E000..U+E1FF controller range.
+  # VoxelCore content is always included. Migration rewrites fonts and references together.
+  glyph_migration_roots:
+    - DeluxeMenus
+  # Remote/proxy Geyser (B17). When set (32+ characters, keep private), each Bedrock build
+  # also exports a signed bundle served by the resource-pack host at /bedrock/ (requires
+  # resource_pack.host.enabled). Put the same secret and the URL
+  # (e.g. https://pack.example.net/bedrock) in the VoxelCore Geyser extension's
+  # remote-sync.properties; it verifies the HMAC and digests and refuses rollbacks.
+  remote_sync:
+    secret: ''
+    # Optional live furniture/vehicle projection for a remote Geyser: a folder (relative to
+    # plugins/) that VoxelFurniture/VoxelVehicles use as bedrock.projection.geyser-data-directory,
+    # e.g. 'VoxelCore/projection-export'. Served signed at /bedrock/projection/<kind>.json.
+    projection_directory: ''

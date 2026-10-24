@@ -92,6 +92,20 @@ public class ContentBrowserTest {
                 config, ContentBrowser.Type.ITEMS, 0, 1, 1, Function.identity()));
     }
 
+    @Test
+    public void bedrockBrowserUsesSeparateReadableTitleNotJavaGlyphs() {
+        YamlConfiguration config = new YamlConfiguration();
+        config.set("ui.browser.titles.items", "&f:offset_-8::vc_items_page_{page}:");
+        assertEquals("VC Items 2/4", ContentBrowser.configuredBedrockTitle(
+                config, ContentBrowser.Type.ITEMS, 1, 4, 180));
+        config.set("ui.browser.bedrock_titles.items", "&bBedrock Items {page}/{pages} ({total})");
+        assertEquals("§bBedrock Items 3/4 (180)", ContentBrowser.configuredBedrockTitle(
+                config, ContentBrowser.Type.ITEMS, 2, 4, 180));
+        config.set("ui.browser.bedrock_page_titles.items.1", "Items First Page");
+        assertEquals("Items First Page", ContentBrowser.configuredBedrockTitle(
+                config, ContentBrowser.Type.ITEMS, 0, 4, 180));
+    }
+
     @Test(expected = IllegalArgumentException.class)
     public void preventsInvalidPageIndices() {
         ContentBrowser.configuredTitle(new YamlConfiguration(), ContentBrowser.Type.ITEMS,

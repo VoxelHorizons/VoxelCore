@@ -2,7 +2,7 @@
 
 VoxelCore is the version-aware content foundation for Voxel Horizons. It owns deterministic YAML pack discovery and inheritance, immutable runtime content, item identity/creation, Java resource-pack and UI glyph compilation, basic actions, and carrier-backed custom blocks. Higher-level placed furniture and drivable vehicles are implemented as separate [VoxelFurniture](https://github.com/VoxelHorizons/VoxelFurniture) and [VoxelVehicles](https://github.com/VoxelHorizons/VoxelVehicles) addons; VoxelCore does not own their world placement or simulation.
 
-Crops, skills, generic session-driven menus, Bedrock/Geyser assets, legacy HavenCore data conversion and network inventory remain distinct follow-up work. See [Migration-Roadmap.md](Migration-Roadmap.md) for the October 2026 status and integration priorities.
+Crops, skills, generic session-driven menus, full Bedrock/Geyser conversion, legacy HavenCore data conversion and network inventory remain distinct follow-up work. See [Migration-Roadmap.md](Migration-Roadmap.md) for the October 2026 status and integration priorities.
 
 ## Current implementation status
 
@@ -749,3 +749,5 @@ These are **not fully provided by VoxelCore itself**, or remain later roadmap ph
 **Already provided by VoxelCore itself:** basic item/block actions and carrier-backed custom blocks. Do not classify them as future MVP work. Full legacy parity and edge-case validation are still outstanding.
 
 See `Migration-Roadmap.md` for the broader rebuild plan and architectural rationale. Its repository review appendices describe the original audited snapshots; the implementation-status section in this README is the canonical description of current VoxelCore functionality.
+
+Bedrock publishing foundations: see [Bedrock setup and limitations](docs/bedrock.md) for explicit item icons, Geyser v2 mappings, build-time publication and the remaining conversion roadmap.
