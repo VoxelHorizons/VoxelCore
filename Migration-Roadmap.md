@@ -461,3 +461,5 @@ Never make raw BukkitObjectOutputStream Base64 the long-term cross-version inter
 ## Bedrock implementation checkpoint — 2026-10-24
 
 The first Bedrock increment now builds explicit item texture mappings and resource packs, exports immutable revisions, publishes VoxelCore-owned files to a configured Geyser data directory, and excludes identified Floodgate/Geyser players from Java pack requests. See [setup, implementation limits and acceptance checklist](docs/bedrock.md). This supersedes the earlier “no Bedrock pack/conversion” status only for these implemented foundations. Automatic model conversion, entity/block mappings, Bedrock menus and remote Geyser extension synchronization remain outstanding. Geyser restart and Bedrock reconnect are required after publication; full cross-platform parity is not claimed.
+
+Bedrock preview follow-up: automatic single-layer texture reuse and headless cube model icons now resolve parents, UVs and GUI transforms, with a persistent asset-hash cache and explicit unsupported-model diagnostics. Native 3D geometry conversion and shader parity remain outstanding.

@@ -91,6 +91,19 @@ public class BedrockPackCompilerTest {
             assertNull(zip.getEntry("texts/en_US.lang"));
         }
     }
+    @Test public void automaticallyMapsGeneratedModelAndCachesIcon() throws Exception {
+        Path root = fixture(), out = temp.newFolder().toPath();
+        Path items = root.resolve("demo/content/items.yml");
+        String content = new String(Files.readAllBytes(items), StandardCharsets.UTF_8);
+        content = content.replace("    properties:\n      bedrock:\n        texture: demo:item/token\n", "");
+        write(items, content);
+        write(root.resolve("demo/assets/demo/models/item/token.json"),
+                "{\"parent\":\"minecraft:item/generated\",\"textures\":{\"layer0\":\"demo:item/token\"}}");
+        BedrockPackCompiler.Result result = new BedrockPackCompiler().compile(root,out);
+        assertEquals(1,result.mappedItems);
+        try (java.util.stream.Stream<Path> files = Files.list(out.resolve("icon-cache"))) { assertEquals(1,files.count()); }
+        assertEquals(result.revision,new BedrockPackCompiler().compile(root,out).revision);
+    }
     private static void write(Path path, String text) throws Exception {
         Files.createDirectories(path.getParent()); Files.write(path,text.getBytes(StandardCharsets.UTF_8));
     }

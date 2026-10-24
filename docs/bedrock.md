@@ -15,7 +15,7 @@ bedrock:
 
 Merge into existing config sections, then reload VoxelCore configuration. Empty `geyser_data_directory` builds exports only. A relative path resolves from the server working directory. The target directory must already exist. For Geyser on a proxy or another machine, configure a mounted path to the actual Geyser data directory, or deploy the exported pair together yourself; writing into a backend-only folder cannot update remote Geyser.
 
-Add an explicit Bedrock texture to each desired concrete item (properties inherit through normal content inheritance):
+Icons are now generated automatically for supported Java models. Add an optional explicit Bedrock texture override to a concrete item (properties inherit through normal content inheritance):
 
 ```yaml
 items:
@@ -28,7 +28,7 @@ items:
         texture: voxel:item/token
 ```
 
-The source is `assets/voxel/textures/item/token.png` inside a content pack. It becomes a flat Bedrock item icon. The generated selector uses the item's actual `render.model` and vanilla material. Multiple definitions claiming the same selector are rejected. Complex models can use a separately authored icon, but this does not reproduce their 3D rendering or conditional model rules. Items without an explicit texture are listed in `unsupported-items.txt` rather than falsely reported as converted.
+The source is `assets/voxel/textures/item/token.png` inside a content pack. It becomes a flat Bedrock item icon. The generated selector uses the item's actual `render.model` and vanilla material. Multiple definitions claiming the same selector are rejected. Complex models can use a separately authored icon, but this does not reproduce their 3D rendering or conditional model rules. Items whose models cannot be rendered are listed with reasons in `unsupported-items.txt`.
 
 Optional native Bedrock assets belong under `<content-pack>/bedrock/resource_pack/` and are copied to the pack root. `manifest.json` and `textures/item_texture.json` are generated/reserved. Conflicting authored paths fail the build. No behavior pack is produced.
 
@@ -50,7 +50,8 @@ A Bedrock failure is reported separately and does not block the Java build. This
 - [x] Explicit item textures, v2 item-model mappings, resource manifests and authored assets.
 - [x] Revision exports and configured local/shared-directory Geyser publishing.
 - [x] Public Floodgate/Geyser detection and Java pack exclusion.
-- [ ] Automatic flat-model texture extraction and 3D geometry/attachable conversion.
+- [x] Automatic single-layer generated textures and headless cube-model inventory previews.
+- [ ] Full Bedrock geometry/attachable conversion.
 - [ ] Geyser-side extension: authenticated remote revision synchronization, lifecycle-safe registration, pack-only updates and active revision reporting.
 - [ ] Block mappings and experimental custom entities for furniture/vehicles, with hitbox/riding tests.
 - [ ] Bedrock menu/form frontend and deliberate alternatives for Java glyph overlays, shader portraits and tooltips.
@@ -60,3 +61,9 @@ A Bedrock failure is reported separately and does not block the Java build. This
 Automated compiler tests cover deterministic output, changed revisions, missing assets preserving previous builds, reserved files, and scoped Geyser publication. A successful unit test is not a Bedrock client compatibility test.
 
 References: [Geyser packs](https://geysermc.org/wiki/geyser/packs/), [v2 item mappings](https://geysermc.org/wiki/geyser/custom-items/), [Floodgate API](https://geysermc.org/wiki/floodgate/api/).
+
+### Automatic preview renderer
+
+Without an override, the compiler resolves authored Java model parents and texture references. Single-layer generated items reuse their PNG. Cube models render to transparent 64×64 PNGs with face UVs, UV rotation, element rotation, GUI transforms and depth testing. It is a preview renderer, not the Minecraft rendering engine; lighting/shader parity and translucent-face compositing are not implemented. Conditional models, tint-dependent faces, rescaled elements, missing vanilla assets and special models are reported for overrides. Generated flat items reuse their texture without applying GUI transforms.
+
+Icons are cached across builds in `bedrock/icon-cache`; the key includes the renderer version, model ID and all authored Java assets. Any asset change conservatively invalidates the cache. Explicit texture overrides still take precedence.
