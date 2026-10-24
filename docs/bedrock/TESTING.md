@@ -43,3 +43,8 @@
 - `87dd692d` / `1037adc3` — first native cuboid+attachable exporter and compiler integration.
 - `2b380d3d` — cuboid tests; first CI build failed because oversized Java coordinates produced transparent atlas tiles. Regression was **not deleted**.
 - `e5013dca` — corrected face raster UV source-bound sampling. Full CI outcome must be recorded from the final HEAD, not assumed.
+
+## Cross-plugin implementation and GitHub CI (2026-10-24)
+- [VoxelFurniture PR #47](https://github.com/VoxelHorizons/VoxelFurniture/pull/47), commit `7147c68b88bcac50bab6b956f63bfb126ffb95f0`, GitHub build jobs `120803682285` and `120803579986`: **SUCCESS**. Tests assert deterministic/immutable visual projection and error on unknown furniture definitions. This is not rendering verified on Bedrock.
+- [VoxelVehicles PR #21](https://github.com/VoxelHorizons/VoxelVehicles/pull/21), commit `98748d7a4e95c0e37418fd5afb038287d5978511`, GitHub build job `120804509111`: **SUCCESS**. Tests assert immutable visual/rider/geometry-state metadata and no cargo replication. This is not a working Geyser extension.
+- VoxelCore commit `98c4a32bd76d598d93bf13ed57efd213ebf6bffe`: Maven/distribution build **SUCCESS**, all smoke jobs except Minecraft 1.14.4 succeeded. The 1.14.4 smoke log shows `VOXELCORE_READY`, `Done`, and RCON starting on `0.0.0.0:25575` but `rcon-cli` refused the socket. Subsequent forced `127.0.0.1` smoke still refused RCON. Container socket/state diagnostics were added in commit `7e6fee680f44dfd11b12ef3c064f3ccf22bb2ed3`. This CI failure remains unresolved; don't claim the full matrix passed.
