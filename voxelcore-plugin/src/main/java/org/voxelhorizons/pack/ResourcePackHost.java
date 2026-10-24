@@ -26,6 +26,8 @@ public final class ResourcePackHost {
     private String bindAddress;
     private int port;
     private volatile boolean requestDebug;
+    private Path bedrockRemote;
+    private byte[] bedrockSecret;
 
     public ResourcePackHost(Path dataRoot) {
         this(dataRoot, Logger.getLogger("VoxelCore"));
@@ -45,6 +47,7 @@ public final class ResourcePackHost {
         Files.createDirectories(hostedPack.getParent());
         HttpServer candidate = HttpServer.create(new InetSocketAddress(bindAddress, port), 0);
         candidate.createContext(RESOURCE_PATH, this::servePack);
+        candidate.createContext("/bedrock/", this::serveBedrockRemote);
         candidate.setExecutor(Executors.newCachedThreadPool(runnable -> {
             Thread thread = new Thread(runnable, "VoxelCore-pack-http");
             thread.setDaemon(true);
@@ -126,6 +129,50 @@ public final class ResourcePackHost {
         return hex.toString();
     }
     public Path hostedPack() { return hostedPack; }
+
+    /** Serve a signed Bedrock remote bundle (B17) to pullers holding the derived bearer token. */
+    public synchronized void setBedrockRemote(Path exportDirectory, byte[] secret) throws IOException {
+        org.voxelhorizons.pack.RemoteBedrockBundle.requireSecret(secret);
+        this.bedrockRemote = exportDirectory;
+        this.bedrockSecret = secret.clone();
+    }
+
+    private void serveBedrockRemote(HttpExchange exchange) throws IOException {
+        int status = 404;
+        try {
+            Path directory;
+            byte[] secret;
+            synchronized (this) { directory = bedrockRemote; secret = bedrockSecret; }
+            String path = exchange.getRequestURI().getPath();
+            String name = path.startsWith("/bedrock/") ? path.substring("/bedrock/".length()) : "";
+            if (!"GET".equals(exchange.getRequestMethod()) || directory == null
+                    || !org.voxelhorizons.pack.RemoteBedrockBundle.FILES.contains(name)) {
+                exchange.sendResponseHeaders(404, -1);
+                return;
+            }
+            if (!org.voxelhorizons.pack.RemoteBedrockBundle.authorized(
+                    exchange.getRequestHeaders().getFirst("Authorization"), secret)) {
+                status = 403;
+                exchange.sendResponseHeaders(403, -1);
+                return;
+            }
+            Path file = directory.resolve(name);
+            if (Files.isSymbolicLink(file) || !Files.isRegularFile(file)) {
+                exchange.sendResponseHeaders(404, -1);
+                return;
+            }
+            byte[] body = Files.readAllBytes(file);
+            exchange.getResponseHeaders().set("Content-Type", name.endsWith(".json") ? "application/json" : "application/zip");
+            exchange.getResponseHeaders().set("Cache-Control", "no-store");
+            exchange.sendResponseHeaders(200, body.length);
+            status = 200;
+            try (OutputStream output = exchange.getResponseBody()) { output.write(body); }
+        } finally {
+            if (requestDebug) logger.info("Bedrock remote HTTP request: path=" + exchange.getRequestURI().getPath()
+                    + " remote=" + exchange.getRemoteAddress() + " status=" + status);
+            exchange.close();
+        }
+    }
 
     private void servePack(HttpExchange exchange) throws IOException {
         int status = 500;

@@ -125,3 +125,10 @@ bedrock:
   # VoxelCore content is always included. Migration rewrites fonts and references together.
   glyph_migration_roots:
     - DeluxeMenus
+  # Remote/proxy Geyser (B17). When set (32+ characters, keep private), each Bedrock build
+  # also exports a signed bundle served by the resource-pack host at /bedrock/ (requires
+  # resource_pack.host.enabled). Put the same secret and the URL
+  # (e.g. https://pack.example.net/bedrock) in the VoxelCore Geyser extension's
+  # remote-sync.properties; it verifies the HMAC and digests and refuses rollbacks.
+  remote_sync:
+    secret: ''

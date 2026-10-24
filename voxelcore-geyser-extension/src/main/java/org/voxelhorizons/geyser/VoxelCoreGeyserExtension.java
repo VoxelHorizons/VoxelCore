@@ -15,6 +15,7 @@ import org.geysermc.geyser.api.command.CommandSource;
 import org.geysermc.geyser.api.event.lifecycle.GeyserDefineCommandsEvent;
 import org.geysermc.geyser.api.event.lifecycle.GeyserDefineResourcePacksEvent;
 import org.geysermc.geyser.api.event.lifecycle.GeyserPostInitializeEvent;
+import org.geysermc.geyser.api.event.lifecycle.GeyserPreInitializeEvent;
 import org.geysermc.geyser.api.event.lifecycle.GeyserShutdownEvent;
 import org.geysermc.geyser.api.connection.GeyserConnection;
 import org.geysermc.geyser.api.entity.type.GeyserEntity;
@@ -33,6 +34,41 @@ import org.geysermc.geyser.api.extension.Extension;
  * prove that a running Geyser loaded updated mappings without a restart.
  */
 public final class VoxelCoreGeyserExtension implements Extension {
+    /**
+     * B17: a Geyser on a proxy/other host pulls the signed publication from Paper before
+     * registries read packs and custom mappings. Configure {@code remote-sync.properties}
+     * in this extension's data folder (url, secret); absent file = local/mounted mode.
+     */
+    @Subscribe
+    public void onPreInitialize(GeyserPreInitializeEvent event) {
+        java.nio.file.Path config = dataFolder().resolve("remote-sync.properties");
+        if (!java.nio.file.Files.isRegularFile(config)) return;
+        java.util.Properties properties = new java.util.Properties();
+        try (java.io.Reader reader = java.nio.file.Files.newBufferedReader(config, java.nio.charset.StandardCharsets.UTF_8)) {
+            properties.load(reader);
+        } catch (IOException unreadable) {
+            logger().warning("VoxelCore remote sync config unreadable: " + unreadable.getMessage());
+            return;
+        }
+        String url = properties.getProperty("url", "").trim();
+        byte[] secret = properties.getProperty("secret", "").trim().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        try {
+            java.net.URI base = java.net.URI.create(url);
+            boolean loopback = "http".equalsIgnoreCase(base.getScheme()) && base.getHost() != null
+                    && java.net.InetAddress.getByName(base.getHost()).isLoopbackAddress();
+            if (!"https".equalsIgnoreCase(base.getScheme()) && !loopback
+                    && !Boolean.parseBoolean(properties.getProperty("allow_insecure_http", "false")))
+                throw new IOException("url must be https (or loopback http, or set allow_insecure_http=true on a private network)");
+            RemotePublicationSync.Outcome outcome = RemotePublicationSync.sync(geyserApi().configDirectory(),
+                    dataFolder().resolve("remote-sync-state.json"), secret,
+                    RemotePublicationSync.http(base, RemotePublicationSync.pullToken(secret)), System.currentTimeMillis());
+            logger().info("VoxelCore remote publication " + outcome + " from " + base.getHost() + ".");
+        } catch (IOException | IllegalArgumentException failure) {
+            // Fail closed: the previously installed verified pair (if any) stays in place.
+            logger().warning("VoxelCore remote sync failed, keeping existing publication: " + failure.getMessage());
+        }
+    }
+
     @Subscribe
     public void onDefineResourcePacks(GeyserDefineResourcePacksEvent event) {
         report("resource pack registration phase");

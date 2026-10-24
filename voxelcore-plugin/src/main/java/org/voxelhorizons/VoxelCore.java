@@ -164,6 +164,16 @@ public final class VoxelCore extends JavaPlugin {
                     }, blockAllocationStore, modernBlockStates);
             packManager = new PackManager(getDataFolder().toPath(), contentRoot, versionAdapter.version());
             resourcePackHost = new ResourcePackHost(getDataFolder().toPath(), getLogger());
+            String remoteSecret = getConfig().getString("bedrock.remote_sync.secret", "").trim();
+            java.nio.file.Path remoteBundle = packManager.outputRoot().resolve("bedrock-remote");
+            if (!remoteSecret.isEmpty() && java.nio.file.Files.isRegularFile(remoteBundle.resolve("remote.json"))) {
+                try {
+                    // Keep serving the last signed Bedrock bundle to proxy Geysers after a restart.
+                    resourcePackHost.setBedrockRemote(remoteBundle, remoteSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                } catch (IOException weakSecret) {
+                    logger.warning("Bedrock remote sync disabled: " + weakSecret.getMessage());
+                }
+            }
             playerResourcePackService = new PlayerResourcePackService(this, resourcePackHost);
             textPlaceholderService = new TextPlaceholderService(packManager.uiGlyphs(true));
             tooltipRenderer = new TooltipRenderer(textPlaceholderService,
