@@ -25,6 +25,11 @@ final class BedrockIconRenderer {
         double[] rotation = vector(gui,"rotation",new double[]{30,225,0});
         double[] scale = vector(gui,"scale",new double[]{0.625,0.625,0.625});
         double[] translation = vector(gui,"translation",new double[]{0,0,0});
+        // Render after collecting every face so long furniture models can be centered
+        // and fitted without losing geometry outside the nominal 16x16 item cube.
+        List<RenderedFace> faces = new ArrayList<RenderedFace>();
+        double minX=Double.POSITIVE_INFINITY,minY=Double.POSITIVE_INFINITY;
+        double maxX=Double.NEGATIVE_INFINITY,maxY=Double.NEGATIVE_INFINITY;
         for (JsonElement value : resolved.getAsJsonArray("elements")) {
             JsonObject element=value.getAsJsonObject();
             double[] a=vector(element,"from",null), b=vector(element,"to",null);
@@ -48,13 +53,38 @@ final class BedrockIconRenderer {
                     }
                     for(int i=0;i<3;i++)point[i]-=8;
                     rotate(point,rotation);
-                    for(int i=0;i<3;i++)point[i]=point[i]*scale[i]+translation[i];
-                    point[0]=32+point[0]*4; point[1]=32-point[1]*4;
+                    for(int i=0;i<3;i++)point[i]=point[i]*scale[i];
+                    minX=Math.min(minX,point[0]);maxX=Math.max(maxX,point[0]);
+                    minY=Math.min(minY,point[1]);maxY=Math.max(maxY,point[1]);
                 }
-                triangle(image,depth,tex,p,coords,0,1,2,turn); triangle(image,depth,tex,p,coords,0,2,3,turn);
+                faces.add(new RenderedFace(tex,p,coords,turn));
             }
         }
+        if (faces.isEmpty()) throw new IOException("Model contains no renderable faces: "+model);
+        double fitted = Math.min(4.0, 56.0 / Math.max(0.0001, Math.max(maxX-minX,maxY-minY)));
+        double centerX=(minX+maxX)/2.0,centerY=(minY+maxY)/2.0;
+        for (RenderedFace part:faces) {
+            for(double[] point:part.points) {
+                point[0]=32+(point[0]-centerX)*fitted+translation[0]*4;
+                point[1]=32-(point[1]-centerY)*fitted-translation[1]*4;
+            }
+            triangle(image,depth,part.texture,part.points,part.uv,0,1,2,part.turn);
+            triangle(image,depth,part.texture,part.points,part.uv,0,2,3,part.turn);
+        }
+        boolean visible = false;
+        for (int y = 0; y < 64 && !visible; y++)
+            for (int x = 0; x < 64; x++)
+                if ((image.getRGB(x, y) >>> 24) != 0) { visible = true; break; }
+        if (!visible) throw new IOException("Model rendered a fully transparent icon: "+model);
         ByteArrayOutputStream out=new ByteArrayOutputStream(); ImageIO.write(image,"png",out); return out.toByteArray();
+    }
+    private static final class RenderedFace {
+        final BufferedImage texture;
+        final double[][] points, uv;
+        final int turn;
+        RenderedFace(BufferedImage texture, double[][] points, double[][] uv, int turn) {
+            this.texture=texture;this.points=points;this.uv=uv;this.turn=turn;
+        }
     }
     private JsonObject resolve(String id, Set<String> visiting) throws IOException {
         if(!visiting.add(id))throw new IOException("Model parent cycle: "+id);
@@ -68,7 +98,17 @@ final class BedrockIconRenderer {
         }
         for(Map.Entry<String,JsonElement> e:own.entrySet()) {
             if((e.getKey().equals("textures")||e.getKey().equals("display"))&&result.has(e.getKey())) {
-                JsonObject merged=result.getAsJsonObject(e.getKey()); for(Map.Entry<String,JsonElement> v:e.getValue().getAsJsonObject().entrySet())merged.add(v.getKey(),v.getValue());
+                JsonObject merged=result.getAsJsonObject(e.getKey());
+                for(Map.Entry<String,JsonElement> v:e.getValue().getAsJsonObject().entrySet()) {
+                    // Child display.gui often changes only one transform value; do not
+                    // discard the inherited rotation, translation and scale.
+                    if (e.getKey().equals("display") && merged.has(v.getKey())
+                            && merged.get(v.getKey()).isJsonObject() && v.getValue().isJsonObject()) {
+                        JsonObject inherited = merged.getAsJsonObject(v.getKey());
+                        for (Map.Entry<String,JsonElement> setting : v.getValue().getAsJsonObject().entrySet())
+                            inherited.add(setting.getKey(),setting.getValue());
+                    } else merged.add(v.getKey(),v.getValue());
+                }
             } else result.add(e.getKey(),e.getValue());
         }
         visiting.remove(id); return result;
