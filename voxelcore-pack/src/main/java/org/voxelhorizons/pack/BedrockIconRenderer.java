@@ -130,6 +130,8 @@ final class BedrockIconRenderer {
             this.texture=texture;this.points=points;this.uv=uv;this.turn=turn;
         }
     }
+    JsonObject resolvedModel(String model) throws IOException { return resolve(model, new HashSet<String>()); }
+    byte[] textureFor(JsonObject textures, String reference) throws IOException { return texture(textures, reference); }
     private JsonObject resolve(String id, Set<String> visiting) throws IOException {
         if(!visiting.add(id))throw new IOException("Model parent cycle: "+id);
         byte[] bytes=assets.get(path(id,"models",".json"));
@@ -206,7 +208,7 @@ final class BedrockIconRenderer {
             default:throw new IOException("Unknown face "+name);
         }
     }
-    private static double[] uv(String face,double[] a,double[] b) {
+    static double[] uv(String face,double[] a,double[] b) {
         switch(face){case "up":return new double[]{a[0],a[2],b[0],b[2]};case "down":return new double[]{a[0],16-b[2],b[0],16-a[2]};case "east":return new double[]{16-b[2],16-b[1],16-a[2],16-a[1]};case "west":return new double[]{a[2],16-b[1],b[2],16-a[1]};case "north":return new double[]{16-b[0],16-b[1],16-a[0],16-a[1]};default:return new double[]{a[0],16-b[1],b[0],16-a[1]};}
     }
     private static void triangle(BufferedImage out,double[] depth,BufferedImage texture,double[][] p,double[][] uv,int i,int j,int k,int turn) {
