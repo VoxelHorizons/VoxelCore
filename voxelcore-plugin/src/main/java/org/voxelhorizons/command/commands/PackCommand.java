@@ -508,6 +508,7 @@ public final class PackCommand implements SubCommand {
                                     + (bedrock.unsupportedReasonSummary.isEmpty() ? ""
                                     : " Reasons: " + bedrock.unsupportedReasonSummary + ".")
                                     + vanillaNote;
+                            plugin.loadBedrockGlyphTiles();
                             if (geyserDestination.root != null) {
                                 progress.report("Bedrock: publishing to Geyser at " + geyserDestination.root);
                                 new org.voxelhorizons.pack.GeyserPackPublisher().publish(bedrock, geyserDestination.root);

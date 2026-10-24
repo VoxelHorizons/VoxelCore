@@ -22,6 +22,21 @@ import java.util.zip.*;
 public final class BedrockPackCompiler {
     private static final Gson JSON = new GsonBuilder().setPrettyPrinting().create();
     private Path vanillaAssets;
+    /** Java glyph codepoint -> Bedrock tile codepoints, hex: {"schema":1,"tiles":{"E234":["F400","F401"]}}. */
+    public static final String GLYPH_TILES = "glyph-tiles.json";
+
+    static byte[] glyphTilesJson(Map<Integer, int[]> tiles) {
+        JsonObject root = new JsonObject();
+        root.addProperty("schema", 1);
+        JsonObject map = new JsonObject();
+        for (Map.Entry<Integer, int[]> entry : tiles.entrySet()) {
+            JsonArray sequence = new JsonArray();
+            for (int tile : entry.getValue()) sequence.add(String.format(Locale.ROOT, "%04X", tile));
+            map.add(String.format(Locale.ROOT, "%04X", entry.getKey().intValue()), sequence);
+        }
+        root.add("tiles", map);
+        return root.toString().getBytes(StandardCharsets.UTF_8);
+    }
     private BuildProgress progress = BuildProgress.NONE;
 
     /** Stage and percentage messages for server admins (thread-safe sink). */
@@ -93,6 +108,7 @@ public final class BedrockPackCompiler {
         JsonArray dyeableEntities = new JsonArray();
         Map<String, byte[]> selectors = new HashMap<String, byte[]>();
         List<String> unsupported = new ArrayList<String>();
+        Map<Integer, int[]> glyphTiles = new TreeMap<Integer, int[]>();
         List<String> unsupportedGeometry = new ArrayList<String>();
         int nativeGeometryCount = 0;
         Set<String> ambiguousAssets = new HashSet<String>();
@@ -127,7 +143,7 @@ public final class BedrockPackCompiler {
             for (Map.Entry<String, byte[]> vanilla : VanillaAssets.load(vanillaAssets, progress).entrySet())
                 if (!javaAssets.containsKey(vanilla.getKey())) javaAssets.put(vanilla.getKey(), vanilla.getValue());
         int mappedGlyphs = glyphAllocationManifest == null ? 0
-                : BedrockGlyphAtlas.append(contentRoot, glyphAllocationManifest, javaAssets, assets, unsupported);
+                : BedrockGlyphAtlas.append(contentRoot, glyphAllocationManifest, javaAssets, assets, unsupported, glyphTiles);
         progress.report("Bedrock: " + mappedGlyphs + " font glyphs placed"
                 + (unsupported.isEmpty() ? "" : "; " + unsupported.size() + " glyphs skipped (see unsupported-items.txt)"));
         BedrockIconRenderer renderer = new BedrockIconRenderer(javaAssets);
@@ -360,10 +376,16 @@ public final class BedrockPackCompiler {
             }
             zipStep.finish(assets.size() + " files, revision " + revision.substring(0, Math.min(12, revision.length())));
             Files.write(staging.resolve("voxelcore-items.json"), mappingBytes);
+            byte[] tileBytes = glyphTilesJson(glyphTiles);
+            Files.write(staging.resolve(GLYPH_TILES), tileBytes);
             Files.write(staging.resolve("unsupported-items.txt"), unsupported, StandardCharsets.UTF_8);
             Files.write(staging.resolve("unsupported-geometry.txt"), unsupportedGeometry, StandardCharsets.UTF_8);
             Path destination = outputRoot.resolve(revision);
             if (!Files.exists(destination)) Files.move(staging, destination);
+            // Stable copy for the plugin's Bedrock chat tile substitution (latest build wins).
+            Path tilesStaging = Files.createTempFile(outputRoot, ".glyph-tiles-", ".tmp");
+            Files.write(tilesStaging, tileBytes);
+            Files.move(tilesStaging, outputRoot.resolve(GLYPH_TILES), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             return new Result(destination, count, unsupported.size(), revision, reasonSummary, mappedGlyphs,
                     nativeGeometryCount, unsupportedGeometry.size());
         } finally {
