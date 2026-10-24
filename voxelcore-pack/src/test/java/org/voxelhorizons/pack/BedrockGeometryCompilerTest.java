@@ -133,6 +133,25 @@ public final class BedrockGeometryCompilerTest {
         catch (IOException expected) { assertTrue(expected.getMessage().contains("Degenerate")); }
     }
 
+    @Test public void acceptsPerAxisRotationAndInvertedBounds() throws Exception {
+        Map<String,byte[]> assets = modelAssets();
+        assets.put("assets/demo/models/tilted.json",("{\"textures\":{\"wood\":\"demo:oak\"},\"elements\":["
+                + "{\"from\":[12,4,12],\"to\":[4,0,4],\"rotation\":{\"x\":10,\"y\":60,\"origin\":[8,8,8]},"
+                + "\"faces\":{\"north\":{\"texture\":\"#wood\"},\"up\":{\"texture\":\"#wood\"}}}]}")
+                .getBytes(StandardCharsets.UTF_8));
+        String shortId = "i_11112222333344445555666677778888";
+        BedrockGeometryCompiler.Output output = new BedrockGeometryCompiler(assets)
+                .compile("demo:tilted","voxelcore:"+shortId,shortId);
+        JsonObject cube = JsonParser.parseString(new String(output.assets.get("models/entity/voxelcore/"+shortId+".geo.json"),
+                StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject()
+                .getAsJsonArray("bones").get(0).getAsJsonObject().getAsJsonArray("cubes").get(0).getAsJsonObject();
+        assertEquals("[-4.0,-8.0,-4.0]", cube.get("origin").toString());
+        assertEquals("[8.0,4.0,8.0]", cube.get("size").toString());
+        assertEquals(10.0, cube.getAsJsonArray("rotation").get(0).getAsDouble(), 0);
+        assertEquals(60.0, cube.getAsJsonArray("rotation").get(1).getAsDouble(), 0);
+        assertNotNull(new BedrockIconRenderer(assets).render("demo:tilted", null, null));
+    }
+
     @Test public void bakesConfiguredConstantTintIntoTintedFaces() throws Exception {
         Map<String,byte[]> assets = modelAssets();
         String parent = new String(assets.get("assets/demo/models/bench.json"),StandardCharsets.UTF_8);
@@ -228,7 +247,7 @@ public final class BedrockGeometryCompilerTest {
                 geometries.get(0).getAsJsonObject().getAsJsonObject("description").get("identifier").getAsString());
     }
 
-    @Test public void rescaleFactorIsOneWithoutRescaleFlag() {
+    @Test public void rescaleFactorIsOneWithoutRescaleFlag() throws Exception {
         JsonObject rotation = JsonParser.parseString("{\"axis\":\"x\",\"angle\":22.5}").getAsJsonObject();
         assertEquals(1.0, BedrockIconRenderer.rescaleFactor(rotation), 0);
         rotation.addProperty("rescale", true);

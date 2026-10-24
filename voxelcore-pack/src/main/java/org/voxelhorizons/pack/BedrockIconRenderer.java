@@ -87,6 +87,7 @@ final class BedrockIconRenderer {
             if(a==null||b==null) throw new IOException("Missing element bounds");
             for(Map.Entry<String,JsonElement> entry:element.getAsJsonObject("faces").entrySet()) {
                 JsonObject face=entry.getValue().getAsJsonObject();
+                if(!face.has("texture")) throw new IOException("Model face missing texture in "+model);
                 BufferedImage tex=ImageIO.read(new ByteArrayInputStream(texture(textures,face.get("texture").getAsString())));
                 if(tex==null) throw new IOException("Invalid PNG");
                 if(face.has("tintindex")) tex=BedrockTints.face(tex,face.get("tintindex").getAsInt(),tints,model);
@@ -98,9 +99,8 @@ final class BedrockIconRenderer {
                     if(element.has("rotation")) {
                         JsonObject r=element.getAsJsonObject("rotation");
                         double[] origin=vector(r,"origin",new double[]{8,8,8});
-                        int axis="xyz".indexOf(r.get("axis").getAsString());
-                        double angle=r.get("angle").getAsDouble();
-                        double[] angles=new double[3]; angles[axis]=angle;
+                        double[] angles=angles(r);
+                        int axis=singleAxis(r);
                         double stretch=rescaleFactor(r);
                         for(int i=0;i<3;i++){point[i]-=origin[i]; if(i!=axis)point[i]*=stretch;}
                         rotate(point,angles); for(int i=0;i<3;i++)point[i]+=origin[i];
@@ -137,9 +137,41 @@ final class BedrockIconRenderer {
      * by 1/cos(angle) about the rotation origin. Scaling uniformly in that plane commutes
      * with the rotation, so applying it before rotating is exact.
      */
-    static double rescaleFactor(JsonObject rotation) {
+    static double rescaleFactor(JsonObject rotation) throws IOException {
         if (!rotation.has("rescale") || !rotation.get("rescale").getAsBoolean()) return 1.0;
-        return 1.0 / Math.cos(Math.toRadians(Math.abs(rotation.get("angle").getAsDouble())));
+        int axis = singleAxis(rotation);
+        if (axis < 0) return 1.0;
+        return 1.0 / Math.cos(Math.toRadians(Math.abs(angles(rotation)[axis])));
+    }
+
+    /**
+     * Element rotation as x/y/z degrees. Accepts the classic {axis, angle} form and the
+     * newer per-axis {x, y, z} form (missing components are 0).
+     */
+    static double[] angles(JsonObject rotation) throws IOException {
+        double[] out = new double[3];
+        if (rotation.has("axis")) {
+            int axis = "xyz".indexOf(rotation.get("axis").getAsString());
+            if (axis < 0 || rotation.get("axis").getAsString().length() != 1)
+                throw new IOException("Unknown element rotation axis " + rotation.get("axis"));
+            if (!rotation.has("angle")) throw new IOException("Element rotation without angle");
+            out[axis] = rotation.get("angle").getAsDouble();
+        } else {
+            for (int i = 0; i < 3; i++) {
+                String key = String.valueOf("xyz".charAt(i));
+                if (rotation.has(key)) out[i] = rotation.get(key).getAsDouble();
+            }
+        }
+        for (double angle : out) if (!Double.isFinite(angle)) throw new IOException("Non-finite element rotation");
+        return out;
+    }
+
+    /** Index of the only rotated axis, or -1 when none or several are rotated. */
+    static int singleAxis(JsonObject rotation) throws IOException {
+        double[] angles = angles(rotation);
+        int axis = -1;
+        for (int i = 0; i < 3; i++) if (angles[i] != 0) { if (axis >= 0) return -1; axis = i; }
+        return axis;
     }
 
     private static final class RenderedFace {
