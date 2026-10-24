@@ -62,6 +62,38 @@ public class BedrockPackCompilerTest {
         try { new BedrockPackCompiler().compile(root,temp.newFolder().toPath()); fail(); }
         catch(java.io.IOException expected) { assertTrue(expected.getMessage().contains("generated")); }
     }
+    @Test public void automaticallyPublishesToLoadedLocalGeyserDirectory() throws Exception {
+        Path root = fixture(), out = temp.newFolder().toPath();
+        Path actualGeyser = temp.newFolder("Geyser-Spigot").toPath();
+        GeyserPackPublisher.Destination destination =
+                GeyserPackPublisher.resolveDestination("", true, actualGeyser);
+        assertEquals(actualGeyser.toAbsolutePath(), destination.root);
+        assertEquals("detected local plugin", destination.source);
+        BedrockPackCompiler.Result compiled = new BedrockPackCompiler().compile(root, out);
+        new GeyserPackPublisher().publish(compiled, destination.root);
+        assertArrayEquals(Files.readAllBytes(compiled.directory.resolve("voxelcore.mcpack")),
+                Files.readAllBytes(actualGeyser.resolve("packs/voxelcore.mcpack")));
+        assertArrayEquals(Files.readAllBytes(compiled.directory.resolve("voxelcore-items.json")),
+                Files.readAllBytes(actualGeyser.resolve("custom_mappings/voxelcore-items.json")));
+        assertFalse(Files.exists(actualGeyser.resolve("extensions/voxelcore.jar")));
+    }
+    @Test public void explicitGeyserDirectoryOverridesLocalDetection() throws Exception {
+        Path detected = temp.newFolder("local-geyser").toPath();
+        Path configured = temp.newFolder("proxy-mounted-geyser").toPath();
+        GeyserPackPublisher.Destination destination =
+                GeyserPackPublisher.resolveDestination(configured.toString(), false, detected);
+        assertEquals(configured.toAbsolutePath(), destination.root);
+        assertEquals("configured path", destination.source);
+    }
+    @Test public void missingGeyserOrAutoPublishDisabledExportsOnly() throws Exception {
+        GeyserPackPublisher.Destination absent = GeyserPackPublisher.resolveDestination("", true, null);
+        assertNull(absent.root);
+        assertTrue(absent.explanation.contains("proxy"));
+        GeyserPackPublisher.Destination disabled =
+                GeyserPackPublisher.resolveDestination("", false, temp.newFolder().toPath());
+        assertNull(disabled.root);
+        assertTrue(disabled.explanation.contains("auto_publish_local"));
+    }
     @Test public void requiresRealGeyserDirectory() throws Exception {
         BedrockPackCompiler.Result result = new BedrockPackCompiler().compile(fixture(),temp.newFolder().toPath());
         try { new GeyserPackPublisher().publish(result,temp.getRoot().toPath().resolve("missing")); fail(); }
