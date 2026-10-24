@@ -51,7 +51,7 @@ The current Bedrock output is a **resource pack plus Geyser v2 item mappings**, 
 
 | Java feature | Why simply copying Java assets does not work | Proposed implementation |
 | --- | --- | --- |
-| VoxelCore/DeluxeMenus glyph inventory backgrounds | Java bitmap font providers and negative-space glyphs in inventory titles are not a Bedrock UI screen definition | Route Bedrock users to session-driven Bedrock forms for navigation or implement a native Bedrock JSON-UI overlay with explicit compatibility testing. Do not leak private-use glyphs into visible Bedrock titles. Keep Java inventory actions authoritative. |
+| VoxelCore/DeluxeMenus glyph inventory backgrounds | Java bitmap font providers and negative-space glyphs in inventory titles are not a Bedrock UI screen definition | VoxelCore's administrative item/block browser now uses readable `ui.browser.bedrock_titles` (with optional 1-based `bedrock_page_titles`), bypassing the Java glyph resolver while retaining its inventory actions. DeluxeMenus and the profile UI still require their own Bedrock frontend/form integration, or a verified native Bedrock JSON-UI overlay. |
 | Custom profile player shader/3D portrait | Java item/model shaders and player portrait render transforms are Java-only | Use Bedrock-compatible static/avatar preview or native Bedrock UI entity preview when support is verified; never assume shader parity. |
 | VoxelCore item browser icons | Geyser mappings need the **exact Java base material + `minecraft:item_model`** at runtime. Existing compiler only reads VoxelCore content definitions and currently generates flat icon previews | Validate each inventory stack's material and item-model component against generated JSON. Map abstract display-only icons too. Add geometry/attachable exports for authored Java 3D item models, not just icon PNGs. |
 | VoxelFurniture catalog items | They may be VoxelCore-defined items or VoxelFurniture-created variants; the static VoxelCore compiler does **not** scan every runtime inventory | Define a registry/export protocol for addon items/variants and reconcile material/model/predicates and generated names across plugins. Audit VoxelFurniture inventories alongside VoxelCore. |
@@ -79,6 +79,7 @@ The current Bedrock output is a **resource pack plus Geyser v2 item mappings**, 
 - [x] Public Floodgate/Geyser detection and Java pack exclusion.
 - [x] Automatic single-layer generated textures and headless cube-model inventory previews.
 - [x] Include abstract GUI item models in Geyser mappings; merge compatible native Bedrock JSON assets and reject Java-format source trees.
+- [x] Use Bedrock-specific readable titles for VoxelCore's administrative item/block browser without Java glyph rendering.
 - [ ] Full Bedrock geometry/attachable conversion.
 - [ ] Geyser-side extension: authenticated remote revision synchronization, lifecycle-safe registration, pack-only updates and active revision reporting.
 - [ ] Block mappings and experimental custom entities for furniture/vehicles, with hitbox/riding tests.
