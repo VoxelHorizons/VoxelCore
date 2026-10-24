@@ -142,3 +142,29 @@ This is not equivalent to completed held-item animations or placed furniture: re
 - [VoxelVehicles #21](https://github.com/VoxelHorizons/VoxelVehicles/pull/21): analogous `BedrockVehicleSnapshot` for model, world position, orientation/suspension, colours, rider association, seat/hitbox offsets and chest visual entity associations. Again, Paper retains physics, cargo and authoritative interactions.
 
 Both companion PRs have passing repository build checks. Neither includes a Geyser extension or cross-process transport. They provide stable read-only APIs on which those later components can depend.
+
+
+### Remote / proxy Geyser publication (B17)
+
+For Geyser on a proxy or another host, set `bedrock.remote_sync.secret` (32+ characters) in
+VoxelCore's `config.yml` and enable `resource_pack.host`. Each Bedrock build then exports
+`remote.json`, `voxelcore.mcpack` and `voxelcore-items.json` to
+`plugins/VoxelCore/build/resource-packs/bedrock-remote/`, served at `/bedrock/<file>` only to
+requests carrying `Authorization: Bearer HMAC-SHA256(secret, "voxelcore-bedrock-pull|1")`.
+
+On the Geyser side create `<geyser>/extensions/voxelcore/remote-sync.properties` (the
+extension's data folder):
+
+```properties
+url=https://pack.example.net/bedrock
+secret=<same secret>
+# allow_insecure_http=true   # only on a private network; loopback http is always allowed
+```
+
+At Geyser pre-initialisation (before packs and custom mappings are read) the extension
+downloads the bundle, verifies the HMAC signature over revision + both SHA-256 digests +
+issue time, checks the digests, refuses a bundle older than the last one it installed
+(rollback/replay) or issued in the future, then installs the pack, mappings and the standard
+`voxelcore-publication.json` receipt atomically with rollback. Any failure keeps the previous
+verified publication. Activation still requires a Geyser restart, as for local publishing.
+Projection feeds (furniture/vehicles) remain local/mounted only.

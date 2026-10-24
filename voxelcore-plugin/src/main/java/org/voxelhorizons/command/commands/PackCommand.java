@@ -414,6 +414,8 @@ public final class PackCommand implements SubCommand {
             final VoxelCore plugin = VoxelCore.getInstance();
             // Snapshot Bukkit configuration before handing disk work to the async worker.
             final boolean bedrockEnabled = plugin.getConfig().getBoolean("game.bedrock_support", false);
+            final byte[] remoteSecret = plugin.getConfig().getString("bedrock.remote_sync.secret", "").trim()
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8);
             final org.voxelhorizons.pack.GeyserPackPublisher.Destination geyserDestination =
                     org.voxelhorizons.pack.GeyserPackPublisher.resolveDestination(
                             plugin.getConfig().getString("bedrock.geyser_data_directory", ""),
@@ -466,6 +468,16 @@ public final class PackCommand implements SubCommand {
                                         + ". Restart Geyser, then reconnect Bedrock clients.";
                             } else {
                                 bedrockStatus += " Export only: " + geyserDestination.explanation;
+                            }
+                            if (remoteSecret.length > 0) {
+                                // B17: signed bundle for Geyser on a proxy/other host, served at /bedrock/.
+                                java.nio.file.Path remote = plugin.getPackManager().outputRoot().resolve("bedrock-remote");
+                                org.voxelhorizons.pack.RemoteBedrockBundle.export(bedrock, remoteSecret, remote,
+                                        System.currentTimeMillis());
+                                plugin.getResourcePackHost().setBedrockRemote(remote, remoteSecret);
+                                bedrockStatus += " Signed remote bundle exported"
+                                        + (plugin.getResourcePackHost().isRunning() ? " and served at /bedrock/."
+                                        : "; enable resource_pack.host to serve it.");
                             }
                         } catch (Exception failure) {
                             bedrockStatus = "Bedrock build/publish FAILED: " + failure.getMessage();
