@@ -65,6 +65,18 @@ public final class RemoteBedrockBundle {
         replace(exportDir.resolve(DESCRIPTOR), descriptor.toString().getBytes(StandardCharsets.UTF_8));
     }
 
+    static final String PROJECTION_PROTOCOL = "voxelcore-projection|1|";
+    public static final List<String> PROJECTION_KINDS = Collections.unmodifiableList(Arrays.asList("furniture", "vehicles"));
+
+    /**
+     * Signature for one live projection feed response, sent as X-VoxelCore-Signature with
+     * X-VoxelCore-Issued-At (the feed file's modification time). Feeds change every few
+     * ticks, so they are signed per response instead of exported.
+     */
+    public static String projectionSignature(byte[] secret, String kind, long issuedAt, byte[] body) throws IOException {
+        return hex(hmac(secret, PROJECTION_PROTOCOL + kind + "|" + issuedAt + "|" + hex(MessageDigestHolder.sha256(body))));
+    }
+
     public static String pullToken(byte[] secret) throws IOException {
         return hex(hmac(secret, PULL_TOKEN_MESSAGE));
     }

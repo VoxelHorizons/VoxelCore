@@ -52,6 +52,8 @@ public final class VoxelCoreGeyserExtension implements Extension {
         }
         String url = properties.getProperty("url", "").trim();
         byte[] secret = properties.getProperty("secret", "").trim().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        configureRemoteFeeds(properties, secret);
+        if (url.isEmpty()) return; // Projection-only configuration.
         try {
             java.net.URI base = java.net.URI.create(url);
             boolean loopback = "http".equalsIgnoreCase(base.getScheme()) && base.getHost() != null
@@ -69,6 +71,28 @@ public final class VoxelCoreGeyserExtension implements Extension {
         }
     }
 
+    /** {@code projection.<backend-id>.url=https://backend/bedrock} entries, one per Paper backend. */
+    private void configureRemoteFeeds(java.util.Properties properties, byte[] secret) {
+        for (String key : new TreeSet<String>(properties.stringPropertyNames())) {
+            if (!key.startsWith("projection.") || !key.endsWith(".url")) continue;
+            String backend = key.substring("projection.".length(), key.length() - ".url".length());
+            try {
+                java.net.URI base = java.net.URI.create(properties.getProperty(key).trim());
+                if (!"https".equalsIgnoreCase(base.getScheme()) && !"http".equalsIgnoreCase(base.getScheme()))
+                    throw new IllegalArgumentException("unsupported scheme");
+                if ("http".equalsIgnoreCase(base.getScheme())
+                        && !java.net.InetAddress.getByName(base.getHost()).isLoopbackAddress()
+                        && !Boolean.parseBoolean(properties.getProperty("allow_insecure_http", "false")))
+                    throw new IllegalArgumentException("http requires allow_insecure_http=true");
+                remoteFeeds.add(new RemoteProjectionFeeds(geyserApi().configDirectory(), backend, secret,
+                        RemoteProjectionFeeds.http(base, RemotePublicationSync.pullToken(secret))));
+                logger().info("VoxelCore projection feed from backend '" + backend + "' at " + base.getHost());
+            } catch (IOException | RuntimeException invalid) {
+                logger().warning("VoxelCore projection feed '" + backend + "' not configured: " + invalid.getMessage());
+            }
+        }
+    }
+
     @Subscribe
     public void onDefineResourcePacks(GeyserDefineResourcePacksEvent event) {
         report("resource pack registration phase");
@@ -80,6 +104,7 @@ public final class VoxelCoreGeyserExtension implements Extension {
     private volatile EntityProjectionIndex projectionIndex;
     private final ProjectionReconciler reconciler = new ProjectionReconciler();
     private volatile ScheduledExecutorService reconcileLoop;
+    private final List<RemoteProjectionFeeds> remoteFeeds = new java.util.concurrent.CopyOnWriteArrayList<RemoteProjectionFeeds>();
 
     /** Projection files are polled once per second; unchanged files cost two stat calls. */
     static final long RECONCILE_PERIOD_MILLIS = 1_000L;
@@ -161,6 +186,8 @@ public final class VoxelCoreGeyserExtension implements Extension {
     private void reconcileProjections() {
         EntityProjectionIndex current = projectionIndex;
         if (current == null) return;
+        long now = System.currentTimeMillis();
+        for (RemoteProjectionFeeds feeds : remoteFeeds) feeds.poll(now);
         try {
             List<? extends GeyserConnection> connections = geyserApi().onlineConnections();
             ProjectionReconciler.Result result = reconciler.reconcile(current.snapshot(),

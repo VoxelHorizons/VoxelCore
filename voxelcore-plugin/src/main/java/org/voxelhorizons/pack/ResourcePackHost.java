@@ -28,6 +28,7 @@ public final class ResourcePackHost {
     private volatile boolean requestDebug;
     private Path bedrockRemote;
     private byte[] bedrockSecret;
+    private Path projectionExport;
 
     public ResourcePackHost(Path dataRoot) {
         this(dataRoot, Logger.getLogger("VoxelCore"));
@@ -137,6 +138,39 @@ public final class ResourcePackHost {
         this.bedrockSecret = secret.clone();
     }
 
+    /**
+     * Serve live furniture/vehicle projection feeds (B17) to a proxy Geyser. Point the
+     * companions' bedrock.projection.geyser-data-directory at this folder; files are read
+     * from its voxelcore-projection/ subfolder and signed per response.
+     */
+    public synchronized void setProjectionExport(Path geyserStyleFolder) {
+        this.projectionExport = geyserStyleFolder == null ? null : geyserStyleFolder.resolve("voxelcore-projection");
+    }
+
+    private boolean serveProjection(HttpExchange exchange, String name, byte[] secret) throws IOException {
+        if (!name.startsWith("projection/")) return false;
+        String file = name.substring("projection/".length());
+        String kind = file.endsWith(".json") ? file.substring(0, file.length() - 5) : "";
+        Path folder;
+        synchronized (this) { folder = projectionExport; }
+        Path feed = folder == null ? null : folder.resolve(kind + ".json");
+        if (!org.voxelhorizons.pack.RemoteBedrockBundle.PROJECTION_KINDS.contains(kind) || feed == null
+                || Files.isSymbolicLink(feed) || !Files.isRegularFile(feed)) {
+            exchange.sendResponseHeaders(404, -1);
+            return true;
+        }
+        long issuedAt = Files.getLastModifiedTime(feed).toMillis();
+        byte[] body = Files.readAllBytes(feed);
+        exchange.getResponseHeaders().set("Content-Type", "application/json");
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        exchange.getResponseHeaders().set("X-VoxelCore-Issued-At", Long.toString(issuedAt));
+        exchange.getResponseHeaders().set("X-VoxelCore-Signature",
+                org.voxelhorizons.pack.RemoteBedrockBundle.projectionSignature(secret, kind, issuedAt, body));
+        exchange.sendResponseHeaders(200, body.length);
+        try (OutputStream output = exchange.getResponseBody()) { output.write(body); }
+        return true;
+    }
+
     private void serveBedrockRemote(HttpExchange exchange) throws IOException {
         int status = 404;
         try {
@@ -145,6 +179,17 @@ public final class ResourcePackHost {
             synchronized (this) { directory = bedrockRemote; secret = bedrockSecret; }
             String path = exchange.getRequestURI().getPath();
             String name = path.startsWith("/bedrock/") ? path.substring("/bedrock/".length()) : "";
+            if ("GET".equals(exchange.getRequestMethod()) && secret != null && name.startsWith("projection/")) {
+                if (!org.voxelhorizons.pack.RemoteBedrockBundle.authorized(
+                        exchange.getRequestHeaders().getFirst("Authorization"), secret)) {
+                    status = 403;
+                    exchange.sendResponseHeaders(403, -1);
+                    return;
+                }
+                serveProjection(exchange, name, secret);
+                status = 200;
+                return;
+            }
             if (!"GET".equals(exchange.getRequestMethod()) || directory == null
                     || !org.voxelhorizons.pack.RemoteBedrockBundle.FILES.contains(name)) {
                 exchange.sendResponseHeaders(404, -1);

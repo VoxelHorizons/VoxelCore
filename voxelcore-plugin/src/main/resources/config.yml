@@ -132,3 +132,7 @@ bedrock:
   # remote-sync.properties; it verifies the HMAC and digests and refuses rollbacks.
   remote_sync:
     secret: ''
+    # Optional live furniture/vehicle projection for a remote Geyser: a folder (relative to
+    # plugins/) that VoxelFurniture/VoxelVehicles use as bedrock.projection.geyser-data-directory,
+    # e.g. 'VoxelCore/projection-export'. Served signed at /bedrock/projection/<kind>.json.
+    projection_directory: ''

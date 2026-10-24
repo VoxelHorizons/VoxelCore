@@ -167,7 +167,23 @@ issue time, checks the digests, refuses a bundle older than the last one it inst
 (rollback/replay) or issued in the future, then installs the pack, mappings and the standard
 `voxelcore-publication.json` receipt atomically with rollback. Any failure keeps the previous
 verified publication. Activation still requires a Geyser restart, as for local publishing.
-Projection feeds (furniture/vehicles) remain local/mounted only.
+
+**Live projection feeds over the network.** On each Paper backend set
+`bedrock.remote_sync.projection_directory` (e.g. `VoxelCore/projection-export`) and point
+VoxelFurniture/VoxelVehicles `bedrock.projection.geyser-data-directory` at that folder
+(`plugins/VoxelCore/projection-export`). VoxelCore serves `/bedrock/projection/<kind>.json`
+signed per response (HMAC over kind, issue time = file mtime, body SHA-256). In the Geyser
+extension's `remote-sync.properties` add one line per backend:
+
+```properties
+projection.survival.url=https://survival.example.net:8173/bedrock
+projection.lobby.url=https://lobby.example.net:8173/bedrock
+```
+
+The extension polls every second, ignores unsigned, forged or replayed responses, and mirrors
+each backend to `voxelcore-projection/<kind>-<backend>.json` with the backend's issue time, so
+an unreachable backend's displays expire after 60 s. Shared mounted folders can instead use
+the companions' `bedrock.projection.feed-id`.
 
 ### Older backends (B18)
 

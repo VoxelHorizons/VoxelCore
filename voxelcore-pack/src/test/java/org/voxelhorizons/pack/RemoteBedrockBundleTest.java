@@ -27,6 +27,13 @@ public final class RemoteBedrockBundleTest {
                 RemoteBedrockBundle.PROTOCOL + a + "|" + b + "|" + c + "|1700000000000")));
     }
 
+    @Test public void projectionSignatureVector() throws Exception {
+        // Same vector as the Geyser extension's RemoteProjectionFeedsTest.
+        assertEquals("0225a7321e7874e9e2b6a283a752af4d08f529a07b958792a5761ba40ee2d997",
+                RemoteBedrockBundle.projectionSignature(SECRET, "furniture", 1700000000000L,
+                        "{\"schema\":1}".getBytes(StandardCharsets.UTF_8)));
+    }
+
     @Test public void exportsSignedDescriptorMatchingFiles() throws Exception {
         Path build = temp.newFolder("rev").toPath(), export = temp.getRoot().toPath().resolve("remote");
         Files.write(build.resolve("voxelcore.mcpack"), new byte[]{1, 2, 3});
