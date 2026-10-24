@@ -164,15 +164,15 @@ public final class GeyserPackPublisher {
                     hook.beforeInstall(1); replace(pack, nextPack);
                     hook.beforeInstall(2); replace(mappings, nextMappings);
                     hook.beforeInstall(3); replace(receipt, nextReceipt);
+                    PublicationState state = inspect(geyserRoot);
+                    if (!"VERIFIED_ON_DISK".equals(state.status))
+                        throw new IOException("Published Bedrock pack pair failed verification: " + state);
                 } catch (IOException failure) {
                     restoreWithSuppression(pack, oldPack, failure);
                     restoreWithSuppression(mappings, oldMappings, failure);
                     restoreWithSuppression(receipt, oldReceipt, failure);
                     throw failure;
                 }
-                PublicationState state = inspect(geyserRoot);
-                if (!"VERIFIED_ON_DISK".equals(state.status))
-                    throw new IOException("Published Bedrock pack pair failed verification: " + state);
             }
         }
     }
