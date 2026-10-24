@@ -40,6 +40,11 @@ public final class PlayerResourcePackService implements Listener {
 
     public boolean send(Player player) {
         if (player == null) return false;
+        if (BedrockPlayers.isBedrock(player.getUniqueId())) {
+            plugin.getLogger().info("Java resource pack skipped for Bedrock player " + player.getName()
+                    + "; Geyser supplies the Bedrock pack during connection. Reconnect after a Geyser restart to update.");
+            return false;
+        }
         if (!host.isRunning()) {
             plugin.getLogger().warning("Resource pack not sent to " + player.getName() + ": HTTP host is not running. "
                     + "Check resource_pack.host.enabled, bind address/port, startup errors, and container port allocation.");
