@@ -1,0 +1,121 @@
+package org.voxelhorizons.geyser;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+/**
+ * Authoritative Paper-to-Geyser read-only entity projection.
+ *
+ * The writer is the corresponding Paper plugin and replaces the file atomically.
+ * This reader never invents entity ids and uses only known VoxelCore model mappings.
+ * It does not mutate any seats, hitboxes, inventories or ownership.
+ */
+public final class EntityProjectionIndex {
+    private final Path folder;
+    private final Map<String,String> modelEntities;
+    private Map<UUID,String> current = Collections.emptyMap();
+    private long furnitureSize=-1,vehiclesSize=-1;
+    private long furnitureTime=-1,vehiclesTime=-1;
+
+    public EntityProjectionIndex(Path geyserData, Map<String,String> modelEntities) {
+        if (geyserData==null || modelEntities==null)
+            throw new IllegalArgumentException("Projection inputs required");
+        this.folder=geyserData.resolve("voxelcore-projection");
+        this.modelEntities=Collections.unmodifiableMap(new HashMap<String,String>(modelEntities));
+    }
+
+    public synchronized String entityType(UUID paperEntityUuid) throws IOException {
+        refresh();
+        return current.get(paperEntityUuid);
+    }
+
+    public synchronized int size() throws IOException {
+        refresh();
+        return current.size();
+    }
+
+    private void refresh() throws IOException {
+        Path furniture=folder.resolve("furniture.json"), vehicles=folder.resolve("vehicles.json");
+        long fSize=sizeOf(furniture),vSize=sizeOf(vehicles);
+        long fTime=modified(furniture),vTime=modified(vehicles);
+        if(fSize==furnitureSize && vSize==vehiclesSize && fTime==furnitureTime && vTime==vehiclesTime)
+            return;
+        Map<UUID,String> updated=new HashMap<UUID,String>();
+        load(furniture,"furniture",updated);
+        load(vehicles,"vehicles",updated);
+        current=Collections.unmodifiableMap(updated);
+        furnitureSize=fSize;vehiclesSize=vSize;
+        furnitureTime=fTime;vehiclesTime=vTime;
+    }
+
+    private static long sizeOf(Path path) throws IOException {
+        if(Files.isSymbolicLink(path))
+            throw new IOException("Unsafe projection symlink "+path);
+        return Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS) ? Files.size(path):-1;
+    }
+    private static long modified(Path path) throws IOException {
+        return Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)
+                ? Files.getLastModifiedTime(path,LinkOption.NOFOLLOW_LINKS).toMillis():-1;
+    }
+
+    private void load(Path file, String kind, Map<UUID,String> destination) throws IOException {
+        if(!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS))return;
+        JsonObject root;
+        try {
+            if(Files.size(file)>5_000_000)throw new IOException("Projection state exceeds 5MB: "+file);
+            root=JsonParser.parseString(Files.readString(file,StandardCharsets.UTF_8)).getAsJsonObject();
+            if(root.get("schema").getAsInt()!=1)
+                throw new IOException("Unsupported Paper projection schema in "+file);
+            JsonArray rows=root.getAsJsonArray(kind);
+            if(rows==null)throw new IOException("Missing projection array "+kind);
+            for(JsonElement item:rows) {
+                JsonObject row=item.getAsJsonObject();
+                String model=row.get("model_item").getAsString();
+                String bedrockId=modelEntities.get(model);
+                if(bedrockId==null)continue; // Never invent registrations.
+                JsonObject links=row.getAsJsonObject("entity_links");
+                if(links==null)continue;
+                if("furniture".equals(kind)) {
+                    add(links.get("display_entity_uuid"),bedrockId,destination);
+                    JsonArray parts=links.getAsJsonArray("parts");
+                    if(parts!=null)for(JsonElement partElement:parts) {
+                        JsonObject part=partElement.getAsJsonObject();
+                        if(!"ITEM".equals(part.get("type").getAsString()))continue;
+                        JsonElement modelRef=part.get("model_item");
+                        if(modelRef==null||modelRef.isJsonNull())continue;
+                        String partType=modelEntities.get(modelRef.getAsString());
+                        if(partType!=null)add(part.get("java_entity_uuid"),partType,destination);
+                    }
+                } else {
+                    add(links.get("visual"),bedrockId,destination);
+                    // A chest accessory uses a distinct model; do not overwrite
+                    // it with the root vehicle geometry by guessing its identity.
+                }
+            }
+        } catch (RuntimeException invalid) {
+            throw new IOException("Invalid Paper projection state in "+file,invalid);
+        }
+    }
+
+    private static void add(JsonElement raw,String model,Map<UUID,String> result)throws IOException {
+        if(raw==null||raw.isJsonNull())return;
+        UUID id;
+        try { id=UUID.fromString(raw.getAsString()); }
+        catch(IllegalArgumentException invalid){throw new IOException("Invalid Paper display UUID in projection",invalid);}
+        String prior=result.putIfAbsent(id,model);
+        if(prior!=null && !prior.equals(model))
+            throw new IOException("Conflicting Paper entity UUID mapped to multiple models: "+id);
+    }
+}
