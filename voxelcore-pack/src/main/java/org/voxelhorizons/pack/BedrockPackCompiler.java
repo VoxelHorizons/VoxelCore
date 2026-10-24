@@ -99,7 +99,7 @@ public final class BedrockPackCompiler {
                     if (png == null) {
                         MessageDigest cacheDigest;
                         try { cacheDigest = MessageDigest.getInstance("SHA-256"); } catch (Exception e) { throw new IllegalStateException(e); }
-                        cacheDigest.update(("renderer-v1:" + modelKey).getBytes(StandardCharsets.UTF_8));
+                        cacheDigest.update(("renderer-v2-fit-gui:" + modelKey).getBytes(StandardCharsets.UTF_8));
                         for (Map.Entry<String, byte[]> asset : javaAssets.entrySet()) {
                             cacheDigest.update(asset.getKey().getBytes(StandardCharsets.UTF_8));
                             cacheDigest.update((byte) 0); cacheDigest.update(asset.getValue());
