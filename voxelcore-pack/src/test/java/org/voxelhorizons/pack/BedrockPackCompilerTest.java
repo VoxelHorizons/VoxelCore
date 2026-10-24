@@ -233,6 +233,53 @@ public class BedrockPackCompilerTest {
         try (java.util.stream.Stream<Path> files = Files.list(out.resolve("icon-cache"))) { assertEquals(1,files.count()); }
         assertEquals(result.revision,new BedrockPackCompiler().compile(root,out).revision);
     }
+    @Test public void mapsRenderRuleLeavesToPrioritizedGeyserPredicates() throws Exception {
+        Path root = temp.newFolder().toPath(), out = temp.newFolder().toPath(), data = temp.newFolder().toPath();
+        write(root.resolve("demo/pack.yml"), "schema: 1\nnamespace: demo\n");
+        write(root.resolve("demo/content/items.yml"), "items:\n  gem:\n    material: minecraft:paper\n    render:\n"
+                + "      model: demo:item/gem\n      custom_model_data:\n        variant: red\n"
+                + "      rule:\n        select:\n          key: variant\n          cases:\n            red: demo:item/gem_red\n"
+                + "          fallback: demo:item/gem\n");
+        for (String name : new String[]{"gem", "gem_red"}) {
+            Path texture = root.resolve("demo/assets/demo/textures/item/" + name + ".png");
+            Files.createDirectories(texture.getParent());
+            java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(16,16,2);
+            image.setRGB(8,8,name.equals("gem") ? 0xff00ff00 : 0xffff0000);
+            javax.imageio.ImageIO.write(image, "png", texture.toFile());
+            write(root.resolve("demo/assets/demo/models/item/" + name + ".json"),
+                    "{\"parent\":\"minecraft:item/generated\",\"textures\":{\"layer0\":\"demo:item/" + name + "\"}}");
+        }
+        try {
+            new BedrockPackCompiler().compile(root, out);
+            fail("Conditional items are reported, not guessed, without allocations");
+        } catch (java.io.IOException nothingMapped) {
+            assertTrue(nothingMapped.getMessage().contains("No Bedrock assets or mapped items"));
+        }
+
+        // Same stable allocations the Java pack build persists beside glyph-allocations.yml.
+        new org.voxelhorizons.content.render.RenderAllocationStore(data.resolve("render-allocations.yml")).save(
+                org.voxelhorizons.content.render.RenderAllocationRegistry.reconcile(
+                        new org.voxelhorizons.content.load.ContentLoader().load(root),
+                        org.voxelhorizons.content.render.RenderAllocationRegistry.empty()));
+        BedrockPackCompiler.Result result = new BedrockPackCompiler().compile(root, out, data.resolve("glyph-allocations.yml"));
+        assertEquals(2, result.mappedItems);
+        com.google.gson.JsonArray definitions = com.google.gson.JsonParser.parseString(new String(Files.readAllBytes(
+                result.directory.resolve("voxelcore-items.json")), StandardCharsets.UTF_8)).getAsJsonObject()
+                .getAsJsonObject("items").getAsJsonArray("minecraft:paper");
+        assertEquals(2, definitions.size());
+        com.google.gson.JsonObject red = null, fallback = null;
+        for (com.google.gson.JsonElement element : definitions) {
+            com.google.gson.JsonObject definition = element.getAsJsonObject();
+            assertEquals("Every leaf keeps the Java item_model", "demo:item/gem", definition.get("model").getAsString());
+            if (definition.has("predicate") && definition.getAsJsonArray("predicate").size() == 1) red = definition;
+            else fallback = definition;
+        }
+        assertNotNull(red); assertNotNull(fallback);
+        assertEquals("red", red.getAsJsonArray("predicate").get(0).getAsJsonObject().get("value").getAsString());
+        assertTrue(red.get("priority").getAsInt() > fallback.get("priority").getAsInt());
+        assertNotEquals(red.get("bedrock_identifier"), fallback.get("bedrock_identifier"));
+    }
+
     @Test public void mergesDisjointNativeBedrockJsonAssets() throws Exception {
         Path root = fixture(), out = temp.newFolder().toPath();
         write(root.resolve("other/pack.yml"), "schema: 1\nnamespace: other\n");

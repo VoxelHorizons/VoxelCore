@@ -1,7 +1,12 @@
 package org.voxelhorizons.pack;
 
 import com.google.gson.*;
+import org.voxelhorizons.content.item.CustomModelDataDefinition;
 import org.voxelhorizons.content.item.ItemDefinition;
+import org.voxelhorizons.content.item.ItemDefinitionRegistry;
+import org.voxelhorizons.content.render.RenderAllocation;
+import org.voxelhorizons.content.render.RenderAllocationRegistry;
+import org.voxelhorizons.content.render.RenderAllocationStore;
 import org.voxelhorizons.content.load.ContentLoader;
 import org.voxelhorizons.content.pack.ContentPack;
 import org.voxelhorizons.content.pack.ContentPackDiscovery;
@@ -95,7 +100,9 @@ public final class BedrockPackCompiler {
         BedrockGeometryCompiler geometry = new BedrockGeometryCompiler(javaAssets);
         Map<String, byte[]> rendered = new HashMap<String, byte[]>();
         int count = 0;
-        for (ItemDefinition item : new ContentLoader().load(contentRoot).entries().values()) {
+        ItemDefinitionRegistry itemRegistry = new ContentLoader().load(contentRoot);
+        RenderAllocationRegistry renderAllocations = renderAllocations(itemRegistry, glyphAllocationManifest);
+        for (ItemDefinition item : itemRegistry.entries().values()) {
             // Abstract items may be GUI-only, but their rendered ItemStacks still need Geyser mappings.
             // 'abstract' prohibits normal giving, not client-side rendering.
             if (item.render() == null || item.render().model() == null) continue;
@@ -105,11 +112,19 @@ public final class BedrockPackCompiler {
             Map<?, ?> bedrockSettings = raw == null ? Collections.emptyMap() : (Map<?, ?>) raw;
             Object textureOverride = bedrockSettings.get("texture");
             double[] cameraOverride = guiRotation(bedrockSettings.get("gui_rotation"), item.id().toString());
+            List<Variant> variants;
+            try {
+                variants = variants(item, renderAllocations);
+            } catch (IOException unsupportedRule) {
+                unsupported.add(item.id() + ": " + unsupportedRule.getMessage()); continue;
+            }
+            for (Variant variant : variants) {
+            String label = item.id() + variant.suffix;
+            if (variant.tinted) unsupported.add(label + ": Tinted rule model mapped without Bedrock tint (shows untinted)");
             byte[] png = null;
             if (textureOverride == null) {
                 try {
-                    if (!item.render().rule().isEmpty()) throw new IOException("Conditional model requires explicit texture");
-                    String modelKey = item.render().model();
+                    String modelKey = variant.renderModel;
                     String cacheKey = modelKey + "|" + Arrays.toString(cameraOverride);
                     png = rendered.get(cacheKey);
                     if (png == null) {
@@ -129,7 +144,7 @@ public final class BedrockPackCompiler {
                         rendered.put(cacheKey, png);
                     }
                 } catch (IOException | RuntimeException failure) {
-                    unsupported.add(item.id() + ": " + failure.getMessage()); continue;
+                    unsupported.add(label + ": " + failure.getMessage()); continue;
                 }
             } else {
             Object texture = textureOverride;
@@ -153,7 +168,7 @@ public final class BedrockPackCompiler {
             String material = item.material().toLowerCase(Locale.ROOT);
             if (!material.contains(":")) material = "minecraft:" + material;
             String model = item.render().model();
-            byte[] existingIcon = selectors.put(material + "|" + model, png);
+            byte[] existingIcon = selectors.put(material + "|" + model + variant.suffix, png);
             if (existingIcon != null) {
                 if (Arrays.equals(existingIcon, png)) continue; // Same Java representation shares one mapping.
                 throw new IOException("Ambiguous Bedrock mapping for " + material + " / " + model);
@@ -161,24 +176,27 @@ public final class BedrockPackCompiler {
             // A fixed-length 128-bit SHA-256 prefix avoids the Bedrock <80-character path
             // compatibility limit, regardless of the Java item's original ID length.
             // Stable across builds, and never based on iteration/order-dependent indices.
-            String shortId = "i_" + hex(sha256(item.id().toString())).substring(0, 32);
-            String previousOwner = generatedIds.putIfAbsent(shortId, item.id().toString());
-            if (previousOwner != null && !previousOwner.equals(item.id().toString()))
+            String shortId = "i_" + hex(sha256(label)).substring(0, 32);
+            String previousOwner = generatedIds.putIfAbsent(shortId, label);
+            if (previousOwner != null && !previousOwner.equals(label))
                 throw new IOException("Bedrock item identifier hash collision between "
-                        + previousOwner + " and " + item.id());
+                        + previousOwner + " and " + label);
             String identifier = "voxelcore:" + shortId;
             String icon = "voxelcore." + shortId;
             String path = "textures/voxelcore/" + shortId;
             try {
-                BedrockGeometryCompiler.Output threeDimensional = geometry.compile(model, identifier, shortId);
+                BedrockGeometryCompiler.Output threeDimensional = geometry.compile(variant.renderModel, identifier, shortId);
                 if (threeDimensional != null) {
                     for (Map.Entry<String, byte[]> generated : threeDimensional.assets.entrySet())
                         put(assets, generated.getKey(), generated.getValue());
-                    entityModels.addProperty(item.id().toString(), "voxelcore:entity_" + shortId);
+                    // Placed displays carry no custom_model_data in the projection feed: use the
+                    // rule's lowest-priority (default) leaf as the item's entity model.
+                    if (variant.entityDefault)
+                        entityModels.addProperty(item.id().toString(), "voxelcore:entity_" + shortId);
                     nativeGeometryCount++;
                 }
             } catch (IOException unsupported3D) {
-                unsupportedGeometry.add(item.id() + ": " + unsupported3D.getMessage());
+                unsupportedGeometry.add(label + ": " + unsupported3D.getMessage());
             }
             put(assets, path + ".png", png);
             JsonObject tex = new JsonObject(); tex.addProperty("textures", path); textures.add(icon, tex);
@@ -188,9 +206,14 @@ public final class BedrockPackCompiler {
             definition.addProperty("bedrock_identifier", identifier);
             JsonObject options = new JsonObject(); options.addProperty("icon", icon);
             definition.add("bedrock_options", options);
+            if (variant.predicates != null) {
+                definition.add("predicate", variant.predicates);
+                definition.addProperty("priority", variant.priority);
+            }
             if (!items.has(material)) items.add(material, new JsonArray());
             items.getAsJsonArray(material).add(definition);
             count++;
+            }
         }
         if (count == 0 && assets.isEmpty()) throw new IOException("No Bedrock assets or mapped items; add properties.bedrock.texture or bedrock/resource_pack assets");
         JsonObject entityIndex = new JsonObject();
@@ -259,6 +282,48 @@ public final class BedrockPackCompiler {
             }
         }
     }
+    /** One Bedrock mapping for an item: the plain model, or one leaf of its render.rule. */
+    private static final class Variant {
+        final String renderModel, suffix;
+        final JsonArray predicates;
+        final int priority;
+        final boolean tinted, entityDefault;
+        Variant(String renderModel, String suffix, JsonArray predicates, int priority, boolean tinted, boolean entityDefault) {
+            this.renderModel = renderModel; this.suffix = suffix; this.predicates = predicates;
+            this.priority = priority; this.tinted = tinted; this.entityDefault = entityDefault;
+        }
+    }
+
+    static List<Variant> variants(ItemDefinition item, RenderAllocationRegistry allocations) throws IOException {
+        String model = item.render().model();
+        if (item.render().rule().isEmpty())
+            return Collections.singletonList(new Variant(model, "", null, 0, false, true));
+        RenderAllocation allocation = allocations == null ? null : allocations.get(item.id()).orElse(null);
+        if (allocation == null)
+            throw new IOException("Conditional model needs render allocations (build the Java pack first) or an explicit texture");
+        List<BedrockRuleLeaves.Leaf> leaves = BedrockRuleLeaves.flatten(item.render().rule(), item.id().namespace(),
+                (type, key) -> allocation.structuredModelData()
+                        .index(CustomModelDataDefinition.ValueType.valueOf(type.name()), key).orElse(null));
+        List<Variant> out = new ArrayList<Variant>();
+        for (int i = 0; i < leaves.size(); i++) {
+            BedrockRuleLeaves.Leaf leaf = leaves.get(i);
+            out.add(new Variant(leaf.model, "#rule" + i, leaf.predicates, leaf.priority, leaf.tinted, i == leaves.size() - 1));
+        }
+        return out;
+    }
+
+    /** Render allocations sit beside the glyph manifest (plugins/VoxelCore/render-allocations.yml). */
+    private static RenderAllocationRegistry renderAllocations(ItemDefinitionRegistry items, Path glyphAllocationManifest) {
+        if (glyphAllocationManifest == null) return null;
+        Path manifest = glyphAllocationManifest.resolveSibling("render-allocations.yml");
+        if (!Files.isRegularFile(manifest)) return null;
+        try {
+            return RenderAllocationRegistry.reconcile(items, new RenderAllocationStore(manifest).load());
+        } catch (RuntimeException unreadable) {
+            return null; // Conditional items are then reported, never guessed.
+        }
+    }
+
     private static double[] guiRotation(Object raw, String id) throws IOException {
         if (raw == null) return null;
         if (!(raw instanceof List) || ((List<?>) raw).size() != 3)
