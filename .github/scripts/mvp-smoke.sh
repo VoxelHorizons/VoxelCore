@@ -21,7 +21,7 @@ rcon() {
   local command="$1"
   local output
   for _ in $(seq 1 30); do
-    if output="$(docker exec "$NAME" rcon-cli --password voxelcore-smoke "$command" 2>&1)"; then
+    if output="$(docker exec "$NAME" rcon-cli --host 127.0.0.1 --password voxelcore-smoke "$command" 2>&1)"; then
       printf '%s\n' "$output"
       return 0
     fi
@@ -96,7 +96,7 @@ PACK_ZIP="$DATA_DIR/plugins/VoxelCore/build/resource-packs/$PACK_TARGET.zip"
 PACK_BUILD_COMPLETE=0
 PACK_BUILD_INFO=""
 for _ in $(seq 1 120); do
-  PACK_BUILD_INFO="$(docker exec "$NAME" rcon-cli --password voxelcore-smoke \
+  PACK_BUILD_INFO="$(docker exec "$NAME" rcon-cli --host 127.0.0.1 --password voxelcore-smoke \
       'voxelcore admin content info' 2>&1 || true)"
   if [[ -f "$PACK_ZIP" ]] && grep -q 'content revision 2: 4 items' <<<"$PACK_BUILD_INFO"; then
     PACK_BUILD_COMPLETE=1
