@@ -357,7 +357,9 @@ public final class PackCommand implements SubCommand {
                                             plugin.getPackManager().glyphAllocationManifest());
                             bedrockStatus = "Bedrock built: " + bedrock.directory + "; " + bedrock.mappedItems
                                     + " mapped items; " + bedrock.mappedGlyphs + " Bedrock inline glyphs; "
-                                    + bedrock.unsupportedItems + " unsupported (see unsupported-items.txt)."
+                                    + bedrock.nativeGeometryCount + " native 3D attachables; "
+                                    + bedrock.unsupportedGeometryCount + " 3D limitations (unsupported-geometry.txt); "
+                                    + bedrock.unsupportedItems + " items unsupported (unsupported-items.txt)."
                                     + (bedrock.unsupportedReasonSummary.isEmpty() ? ""
                                     : " Reasons: " + bedrock.unsupportedReasonSummary + ".");
                             if (geyserDestination.root != null) {
