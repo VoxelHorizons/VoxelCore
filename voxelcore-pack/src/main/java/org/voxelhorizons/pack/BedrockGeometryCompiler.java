@@ -327,7 +327,7 @@ final class BedrockGeometryCompiler {
         heldGeom.add("description",heldDescription); heldGeom.add("bones",heldBones);
         JsonArray geometries = new JsonArray(); geometries.add(geom); geometries.add(heldGeom);
         JsonObject geoRoot = new JsonObject();
-        geoRoot.addProperty("format_version","1.12.0");
+        geoRoot.addProperty("format_version","1.16.0");
         geoRoot.add("minecraft:geometry",geometries);
 
         JsonObject attachDescription = new JsonObject();

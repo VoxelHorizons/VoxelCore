@@ -254,7 +254,7 @@ public class BedrockPackCompilerTest {
             try (java.io.InputStream image = zip.getInputStream(zip.getEntry("font/glyph_E3.png"))) {
                 java.awt.image.BufferedImage atlas = javax.imageio.ImageIO.read(image);
                 assertEquals("U+E300 cell holds the red icon", 0xffff0000, atlas.getRGB(7,7));
-                assertEquals("U+E301 blank cell stays empty", 0, atlas.getRGB(16+8,8) >>> 24);
+                assertEquals("U+E301 blank cell stays empty", 0, atlas.getRGB(32+8,8) >>> 24);
             }
         }
     }
@@ -279,6 +279,31 @@ public class BedrockPackCompilerTest {
             try (java.io.InputStream image = zip.getInputStream(zip.getEntry("font/glyph_E2.png"))) {
                 java.awt.image.BufferedImage atlas = javax.imageio.ImageIO.read(image);
                 assertTrue((atlas.getRGB(8,8) >>> 24) != 0);
+            }
+        }
+    }
+    @Test public void highResolutionManagedGlyphIsScaledAndExtremeTagIsReported() throws Exception {
+        Path root = fixture(), out = temp.newFolder().toPath();
+        write(root.resolve("demo/content/ui.yml"), "ui:\n  rank_player:\n    path: ui/player.png\n    scale_ratio: 9\n"
+                + "  banner_tag:\n    path: ui/banner.png\n    scale_ratio: 8\n");
+        Path dir = root.resolve("demo/assets/demo/textures/ui");
+        Files.createDirectories(dir);
+        java.awt.image.BufferedImage player = new java.awt.image.BufferedImage(64,64,2);
+        for (int y=0;y<64;y++) for (int x=0;x<64;x++) player.setRGB(x,y,0xff3366ff);
+        javax.imageio.ImageIO.write(player,"png",dir.resolve("player.png").toFile());
+        java.awt.image.BufferedImage banner = new java.awt.image.BufferedImage(100,10,2);
+        for (int y=0;y<10;y++) for (int x=0;x<100;x++) banner.setRGB(x,y,0xffffffff);
+        javax.imageio.ImageIO.write(banner,"png",dir.resolve("banner.png").toFile());
+        Path allocations = temp.newFolder("glyph-hires").toPath().resolve("glyph-allocations.yml");
+        new UiGlyphLoader().load(root, allocations, true);
+        BedrockPackCompiler.Result result = new BedrockPackCompiler().compile(root,out,allocations);
+        assertEquals("64px icons were skipped before; now scaled into the cell", 1, result.mappedGlyphs);
+        String unsupported = new String(Files.readAllBytes(result.directory.resolve("unsupported-items.txt")), StandardCharsets.UTF_8);
+        assertTrue(unsupported, unsupported.contains("banner_tag") && unsupported.contains("100x10"));
+        try (ZipFile zip = new ZipFile(result.directory.resolve("voxelcore.mcpack").toFile())) {
+            try (java.io.InputStream image = zip.getInputStream(zip.getEntry("font/glyph_E2.png"))) {
+                java.awt.image.BufferedImage atlas = javax.imageio.ImageIO.read(image);
+                assertEquals(BedrockGlyphAtlas.SHEET_SIZE, atlas.getWidth());
             }
         }
     }

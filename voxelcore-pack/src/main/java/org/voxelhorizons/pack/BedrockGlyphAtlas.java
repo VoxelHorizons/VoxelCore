@@ -22,30 +22,43 @@ import java.util.TreeMap;
 final class BedrockGlyphAtlas {
     private BedrockGlyphAtlas() {}
 
+    /** New Bedrock glyph pages: 512px = 32px cells, so high-res Java icons stay crisp. */
+    static final int SHEET_SIZE = 512;
+    /** Wider pictures shrink to a speck in one square Bedrock glyph cell. */
+    static final double MAX_ASPECT = 4.0;
+
     static int append(Path contentRoot, Path allocationManifest, Map<String, byte[]> javaAssets,
                       Map<String, byte[]> bedrockAssets) throws IOException {
+        return append(contentRoot, allocationManifest, javaAssets, bedrockAssets, new java.util.ArrayList<String>());
+    }
+
+    /** @param skipped receives one line per glyph that has no Bedrock cell, with the reason */
+    static int append(Path contentRoot, Path allocationManifest, Map<String, byte[]> javaAssets,
+                      Map<String, byte[]> bedrockAssets, java.util.List<String> skipped) throws IOException {
         UiGlyphRegistry glyphs = new UiGlyphLoader().load(contentRoot, allocationManifest, false);
         Map<Integer, BufferedImage> sheets = new TreeMap<Integer, BufferedImage>();
         int count = 0;
         for (UiGlyphDefinition glyph : glyphs.entries().values()) {
-            if (glyph.gui() || glyph.scaleRatio() > 32) continue;
+            String label = "glyph " + glyph.id();
+            // GUI overlays (menu backgrounds) and tall pictures are Java screen art, not inline text.
+            if (glyph.gui()) continue;
+            if (glyph.scaleRatio() > 32) { skipped.add(label + ": Java height " + glyph.scaleRatio() + " is too tall for a Bedrock text glyph"); continue; }
             int codePoint = glyph.codePoint();
-            if (codePoint < 0xE200 || codePoint > 0xF3FF) continue;
+            if (codePoint < 0xE200 || codePoint > 0xF3FF) { skipped.add(label + ": codepoint outside U+E200..U+F3FF"); continue; }
             String[] ref = glyph.texture().split(":", 2);
             byte[] source = javaAssets.get("assets/" + ref[0] + "/textures/" + ref[1] + ".png");
             // A broken glyph bitmap is the Java build's error to report; never block Bedrock on it.
-            if (source == null) continue;
-            BufferedImage icon = ImageIO.read(new ByteArrayInputStream(source));
-            if (icon == null || icon.getWidth() < 1 || icon.getHeight() < 1) continue;
-            // Keep the native sheet limited to small inline icons. Wide pictures and
-            // fullscreen GUI overlays are incompatible with 16x16 Bedrock font tiles.
-            if (icon.getWidth() > 32 || icon.getHeight() > 32) continue;
+            if (source == null) { skipped.add(label + ": texture " + glyph.texture() + " not found"); continue; }
+            BufferedImage icon = trim(ImageIO.read(new ByteArrayInputStream(source)));
+            if (icon == null) { skipped.add(label + ": empty or unreadable bitmap"); continue; }
+            String unfit = unfit(icon);
+            if (unfit != null) { skipped.add(label + ": " + unfit); continue; }
             if (!place(sheets, bedrockAssets, codePoint, icon))
                 throw new IOException("Bedrock font cell U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT)
                         + " is already occupied (managed glyph " + glyph.id() + ")");
             count++;
         }
-        count += appendAuthored(contentRoot, javaAssets, sheets, bedrockAssets);
+        count += appendAuthored(contentRoot, javaAssets, sheets, bedrockAssets, skipped);
         for (Map.Entry<Integer,BufferedImage> entry : sheets.entrySet()) {
             String name = String.format(java.util.Locale.ROOT, "font/glyph_%02X.png", entry.getKey());
             ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -63,7 +76,7 @@ final class BedrockGlyphAtlas {
      * glyphs win) are skipped; migrate reserved literals with '/voxelcore admin pack glyphs'.
      */
     static int appendAuthored(Path contentRoot, Map<String, byte[]> javaAssets, Map<Integer, BufferedImage> sheets,
-                              Map<String, byte[]> bedrockAssets) throws IOException {
+                              Map<String, byte[]> bedrockAssets, java.util.List<String> skipped) throws IOException {
         int count = 0;
         for (org.voxelhorizons.content.pack.ContentPack pack : new org.voxelhorizons.content.pack.ContentPackDiscovery().discover(contentRoot)) {
             Path font = pack.root().resolve("assets/minecraft/font/default.json");
@@ -82,6 +95,9 @@ final class BedrockGlyphAtlas {
                 if (!provider.has("type") || !"bitmap".equals(provider.get("type").getAsString())
                         || !provider.has("file") || !provider.has("chars")) continue;
                 String file = provider.get("file").getAsString();
+                int javaHeight = provider.has("height") ? provider.get("height").getAsInt() : 8;
+                // Java screen art (menu backgrounds) is drawn tall; it is not inline text.
+                if (javaHeight > 32) continue;
                 String[] ref = file.contains(":") ? file.split(":", 2) : new String[]{"minecraft", file};
                 String path = ref[1].endsWith(".png") ? ref[1] : ref[1] + ".png";
                 byte[] bytes = javaAssets.get("assets/" + ref[0] + "/textures/" + path);
@@ -106,8 +122,13 @@ final class BedrockGlyphAtlas {
                         if (codePoint >= 0xE000 && codePoint <= 0xE1FF) continue; // Bedrock controller glyphs.
                         if (codePoint < 0xE000) continue; // Ordinary text keeps Bedrock's own font.
                         BufferedImage icon = trim(bitmap.getSubimage(c * cellWidth, r * cellHeight, cellWidth, cellHeight));
-                        // Fullscreen backgrounds would shrink to an unreadable speck in one text cell.
-                        if (icon == null || icon.getWidth() > 64 || icon.getHeight() > 64) continue;
+                        if (icon == null) continue;
+                        String unfit = unfit(icon);
+                        if (unfit != null) {
+                            skipped.add("font glyph U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT)
+                                    + " (" + file + "): " + unfit);
+                            continue;
+                        }
                         if (place(sheets, bedrockAssets, codePoint, icon)) count++;
                     }
                 }
@@ -116,8 +137,23 @@ final class BedrockGlyphAtlas {
         return count;
     }
 
-    /** Crop transparent margins; null when the cell is empty. */
+    /**
+     * Why a bitmap cannot become one square Bedrock text glyph, or null when it can. Large
+     * square icons are fine (scaled into the cell); very wide tags and fullscreen art are not.
+     */
+    static String unfit(BufferedImage icon) {
+        double aspect = Math.max((double) icon.getWidth() / icon.getHeight(), (double) icon.getHeight() / icon.getWidth());
+        if (aspect > MAX_ASPECT)
+            return icon.getWidth() + "x" + icon.getHeight() + " px is wider than " + (int) MAX_ASPECT
+                    + ":1 and would be unreadable in one Bedrock glyph cell";
+        if (icon.getWidth() > 1024 || icon.getHeight() > 1024)
+            return icon.getWidth() + "x" + icon.getHeight() + " px is fullscreen art, not an inline glyph";
+        return null;
+    }
+
+    /** Crop transparent margins; null when the cell is empty or unreadable. */
     private static BufferedImage trim(BufferedImage cell) {
+        if (cell == null) return null;
         int minX = cell.getWidth(), minY = cell.getHeight(), maxX = -1, maxY = -1;
         for (int y = 0; y < cell.getHeight(); y++) for (int x = 0; x < cell.getWidth(); x++) {
             if ((cell.getRGB(x, y) >>> 24) == 0) continue;
@@ -140,7 +176,7 @@ final class BedrockGlyphAtlas {
                 if (sheet == null || sheet.getWidth() != sheet.getHeight()
                         || sheet.getWidth() % 16 != 0 || sheet.getWidth() < 256)
                     throw new IOException("Invalid authored Bedrock glyph atlas " + name);
-            } else sheet = new BufferedImage(256, 256, BufferedImage.TYPE_INT_ARGB);
+            } else sheet = new BufferedImage(SHEET_SIZE, SHEET_SIZE, BufferedImage.TYPE_INT_ARGB);
             sheets.put(page, sheet);
         }
         int cell = sheet.getWidth() / 16;
