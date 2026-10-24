@@ -70,6 +70,23 @@ jobs:
             done
           done
 
+      - name: Verify Geyser extension metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          ext=$(find voxelcore-geyser-extension/target -maxdepth 1 -name 'VoxelCore-GeyserExtension-*.jar' -print -quit)
+          test -n "$ext"
+          unzip -p "$ext" extension.yml | grep -Fx 'api: 2.11.0'
+          unzip -p "$ext" extension.yml | grep -Fx 'id: voxelcore'
+          unzip -Z1 "$ext" | grep -Fx 'org/voxelhorizons/geyser/VoxelCoreGeyserExtension.class'
+          unzip -Z1 "$ext" | grep -Fx 'org/voxelhorizons/geyser/PublicationVerifier.class'
+
+      - name: Upload VoxelCore Geyser Extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoxelCore-GeyserExtension
+          path: voxelcore-geyser-extension/target/VoxelCore-GeyserExtension-*.jar
+
       - name: Upload Minecraft 1.12-1.13 artifact
         uses: actions/upload-artifact@v4
         with:
