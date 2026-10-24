@@ -99,6 +99,21 @@ public final class EntityProjectionIndexTest {
                 EntityProjectionIndex.furnitureTransform(com.google.gson.JsonParser.parseString("[1,0,3]")));
     }
 
+    @Test public void mapsVehicleChestAccessoryToItsOwnModel() throws Exception {
+        Path root=temp.newFolder().toPath(),dir=root.resolve("voxelcore-projection");
+        Files.createDirectories(dir);
+        UUID visual=UUID.randomUUID(),chest=UUID.randomUUID();
+        Files.writeString(dir.resolve("vehicles.json"),"{\"schema\":1,\"vehicles\":[{\"model_item\":\"voxel:tractor\","
+                +"\"chest_model_item\":\"voxel:tractor_chest\",\"chest_scale\":0.5,\"entity_links\":{"
+                +"\"visual\":\""+visual+"\",\"chest_display\":\""+chest+"\"}}]}");
+        EntityProjectionIndex index=new EntityProjectionIndex(root,Map.of(
+                "voxel:tractor","voxelcore:entity_i_11111111111111111111111111111111",
+                "voxel:tractor_chest","voxelcore:entity_i_22222222222222222222222222222222"));
+        assertEquals("voxelcore:entity_i_22222222222222222222222222222222",index.entityType(chest));
+        assertEquals(Float.valueOf(0.5f),index.projection(chest).scale());
+        assertEquals("voxelcore:entity_i_11111111111111111111111111111111",index.entityType(visual));
+    }
+
     @Test public void stalePaperFileDoesNotReplaceNewDisplaysAndExpiresCachedMappings() throws Exception {
         Path root=temp.newFolder().toPath(),dir=root.resolve("voxelcore-projection");
         Files.createDirectories(dir);

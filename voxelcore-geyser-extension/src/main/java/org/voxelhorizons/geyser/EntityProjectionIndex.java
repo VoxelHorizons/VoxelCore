@@ -182,8 +182,15 @@ public final class EntityProjectionIndex {
                 } else {
                     add(links.get("visual"),bedrockId,scale(row.get("scale")),dye(row.get("dye_rgb")),
                             vehicleTransform(row),destination);
-                    // A chest accessory uses a distinct model; do not overwrite
-                    // it with the root vehicle geometry by guessing its identity.
+                    // A chest accessory uses its own published model (chest_model_item),
+                    // never the root vehicle geometry.
+                    JsonElement chestModel=row.get("chest_model_item");
+                    if(chestModel!=null&&!chestModel.isJsonNull()) {
+                        String chestType=modelEntities.get(chestModel.getAsString());
+                        if(chestType==null)missing.add(chestModel.getAsString());
+                        else add(links.get("chest_display"),chestType,scale(row.get("chest_scale")),
+                                dye(row.get("dye_rgb")),null,destination);
+                    }
                 }
             }
         } catch (RuntimeException invalid) {
