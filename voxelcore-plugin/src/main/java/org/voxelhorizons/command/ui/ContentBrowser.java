@@ -204,11 +204,10 @@ public final class ContentBrowser implements Listener {
             }
         }
 
-        Collections.sort(ids, new Comparator<ContentID>() {
-            @Override public int compare(ContentID left, ContentID right) {
-                return left.toString().compareTo(right.toString());
-            }
-        });
+        // Use a comparator method reference rather than an anonymous inner class.
+        // Older distribution artifacts missed ContentBrowser$1.class at runtime on
+        // both Java and Bedrock; a Java 8 lambda compiles without that class file.
+        Collections.sort(ids, Comparator.comparing(ContentID::toString));
         return ids;
     }
 
