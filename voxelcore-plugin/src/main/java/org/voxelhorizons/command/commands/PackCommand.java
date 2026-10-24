@@ -62,6 +62,22 @@ public final class PackCommand implements SubCommand {
         return selected;
     }
 
+    /**
+     * Resolve only a genuinely loaded Bukkit Geyser plugin. Scanning stale folders in
+     * plugins/ would risk silently publishing into an old backend copy when the live
+     * Geyser instance actually runs on a Velocity/Bungee proxy.
+     * Call on the server thread, not from the async pack builder.
+     */
+    private static java.nio.file.Path localGeyserDataDirectory(VoxelCore plugin) {
+        for (org.bukkit.plugin.Plugin installed : plugin.getServer().getPluginManager().getPlugins()) {
+            String name = installed.getName();
+            if ("Geyser-Spigot".equalsIgnoreCase(name) || "Geyser".equalsIgnoreCase(name)) {
+                return installed.getDataFolder().toPath();
+            }
+        }
+        return null;
+    }
+
     private static String knownTargets() {
         StringBuilder out = new StringBuilder();
         for (JavaPackTarget target : JavaPackTarget.knownTargets()) {
@@ -90,9 +106,23 @@ public final class PackCommand implements SubCommand {
             sender.sendMessage("Hosted file: " + VoxelCore.getInstance().getResourcePackHost().hostedPack()
                     + " (" + hostedFileSize(VoxelCore.getInstance().getResourcePackHost()) + " bytes; SHA-1 "
                     + VoxelCore.getInstance().getResourcePackHost().sha1Hex() + ")");
-            sender.sendMessage("Bedrock builds: " + VoxelCore.getInstance().getConfig().getBoolean("game.bedrock_support", false)
-                    + "; Geyser data directory: " + VoxelCore.getInstance().getConfig().getString("bedrock.geyser_data_directory", "")
-                    + "; activation requires Geyser restart and client reconnect.");
+            VoxelCore plugin = VoxelCore.getInstance();
+            org.voxelhorizons.pack.GeyserPackPublisher.Destination destination =
+                    org.voxelhorizons.pack.GeyserPackPublisher.resolveDestination(
+                            plugin.getConfig().getString("bedrock.geyser_data_directory", ""),
+                            plugin.getConfig().getBoolean("bedrock.auto_publish_local", true),
+                            localGeyserDataDirectory(plugin));
+            sender.sendMessage("Bedrock builds: " + plugin.getConfig().getBoolean("game.bedrock_support", false)
+                    + "; Geyser publish target: " + destination.explanation);
+            if (destination.root != null) {
+                java.nio.file.Path pack = destination.root.resolve("packs/voxelcore.mcpack");
+                java.nio.file.Path mappings = destination.root.resolve("custom_mappings/voxelcore-items.json");
+                sender.sendMessage("Geyser pack: " + pack + " ("
+                        + (java.nio.file.Files.isRegularFile(pack) ? "present" : "missing")
+                        + "); mappings: " + mappings + " ("
+                        + (java.nio.file.Files.isRegularFile(mappings) ? "present" : "missing")
+                        + "). Geyser restart and Bedrock reconnect required after updating.");
+            }
             sender.sendMessage("Known targets: " + knownTargets());
         }
     }
@@ -281,7 +311,11 @@ public final class PackCommand implements SubCommand {
             final VoxelCore plugin = VoxelCore.getInstance();
             // Snapshot Bukkit configuration before handing disk work to the async worker.
             final boolean bedrockEnabled = plugin.getConfig().getBoolean("game.bedrock_support", false);
-            final String geyserDirectory = plugin.getConfig().getString("bedrock.geyser_data_directory", "").trim();
+            final org.voxelhorizons.pack.GeyserPackPublisher.Destination geyserDestination =
+                    org.voxelhorizons.pack.GeyserPackPublisher.resolveDestination(
+                            plugin.getConfig().getString("bedrock.geyser_data_directory", ""),
+                            plugin.getConfig().getBoolean("bedrock.auto_publish_local", true),
+                            localGeyserDataDirectory(plugin));
             final long startingRevision = plugin.getContentRuntime().current().revision();
             sender.sendMessage("VoxelCore pack build for " + target.id()
                     + " started asynchronously; the server will remain responsive.");
@@ -311,11 +345,17 @@ public final class PackCommand implements SubCommand {
                                             plugin.getPackManager().outputRoot().resolve("bedrock"));
                             bedrockStatus = "Bedrock built: " + bedrock.directory + "; " + bedrock.mappedItems
                                     + " mapped items; " + bedrock.unsupportedItems + " unsupported (see unsupported-items.txt).";
-                            if (!geyserDirectory.isEmpty()) {
-                                new org.voxelhorizons.pack.GeyserPackPublisher().publish(bedrock,
-                                        java.nio.file.Paths.get(geyserDirectory).toAbsolutePath());
-                                bedrockStatus += " Published Geyser files. Restart Geyser, then reconnect Bedrock players.";
-                            } else bedrockStatus += " Export only: set bedrock.geyser_data_directory to publish to Geyser.";
+                            if (geyserDestination.root != null) {
+                                new org.voxelhorizons.pack.GeyserPackPublisher().publish(bedrock, geyserDestination.root);
+                                java.nio.file.Path pack = geyserDestination.root.resolve("packs/voxelcore.mcpack");
+                                java.nio.file.Path mappings = geyserDestination.root.resolve("custom_mappings/voxelcore-items.json");
+                                bedrockStatus += " Published to " + geyserDestination.source
+                                        + ": " + pack + " (" + java.nio.file.Files.size(pack) + " bytes), "
+                                        + mappings + " (" + java.nio.file.Files.size(mappings)
+                                        + " bytes). Restart Geyser, then reconnect Bedrock clients.";
+                            } else {
+                                bedrockStatus += " Export only: " + geyserDestination.explanation;
+                            }
                         } catch (Exception failure) {
                             bedrockStatus = "Bedrock build/publish FAILED: " + failure.getMessage();
                             plugin.getLogger().log(Level.WARNING, bedrockStatus, failure);
