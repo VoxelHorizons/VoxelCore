@@ -112,6 +112,7 @@ public final class BedrockPackCompiler {
             Map<?, ?> bedrockSettings = raw == null ? Collections.emptyMap() : (Map<?, ?>) raw;
             Object textureOverride = bedrockSettings.get("texture");
             double[] cameraOverride = guiRotation(bedrockSettings.get("gui_rotation"), item.id().toString());
+            Map<Integer, Integer> tints = BedrockTints.parse(bedrockSettings.get("tints"), item.id().toString());
             List<Variant> variants;
             try {
                 variants = variants(item, renderAllocations);
@@ -125,7 +126,7 @@ public final class BedrockPackCompiler {
             if (textureOverride == null) {
                 try {
                     String modelKey = variant.renderModel;
-                    String cacheKey = modelKey + "|" + Arrays.toString(cameraOverride);
+                    String cacheKey = modelKey + "|" + Arrays.toString(cameraOverride) + "|" + tints;
                     png = rendered.get(cacheKey);
                     if (png == null) {
                         MessageDigest cacheDigest;
@@ -138,7 +139,7 @@ public final class BedrockPackCompiler {
                         Path cache = outputRoot.resolve("icon-cache").resolve(hex(cacheDigest.digest()) + ".png");
                         if (Files.isRegularFile(cache)) png = Files.readAllBytes(cache);
                         else {
-                            png = renderer.render(modelKey, cameraOverride); Files.createDirectories(cache.getParent());
+                            png = renderer.render(modelKey, cameraOverride, tints); Files.createDirectories(cache.getParent());
                             Files.write(cache, png);
                         }
                         rendered.put(cacheKey, png);
@@ -185,7 +186,7 @@ public final class BedrockPackCompiler {
             String icon = "voxelcore." + shortId;
             String path = "textures/voxelcore/" + shortId;
             try {
-                BedrockGeometryCompiler.Output threeDimensional = geometry.compile(variant.renderModel, identifier, shortId);
+                BedrockGeometryCompiler.Output threeDimensional = geometry.compile(variant.renderModel, identifier, shortId, tints);
                 if (threeDimensional != null) {
                     for (Map.Entry<String, byte[]> generated : threeDimensional.assets.entrySet())
                         put(assets, generated.getKey(), generated.getValue());

@@ -42,6 +42,10 @@ final class BedrockGeometryCompiler {
      * @throws IOException if 3D geometry exists but uses features not safely translatable.
      */
     Output compile(String javaModel, String bedrockIdentifier, String shortId) throws IOException {
+        return compile(javaModel, bedrockIdentifier, shortId, Collections.<Integer, Integer>emptyMap());
+    }
+
+    Output compile(String javaModel, String bedrockIdentifier, String shortId, Map<Integer, Integer> tints) throws IOException {
         JsonObject model = resolver.resolvedModel(javaModel);
         if (!model.has("elements")) return null;
         JsonArray elements = model.getAsJsonArray("elements");
@@ -108,8 +112,6 @@ final class BedrockGeometryCompiler {
                 if (!Arrays.asList("north","south","east","west","up","down").contains(direction))
                     throw new IOException("Unsupported cuboid face " + direction + " in " + javaModel);
                 JsonObject face = side.getValue().getAsJsonObject();
-                if (face.has("tintindex"))
-                    throw new IOException("Tinted cuboid face requires Bedrock tint/variant support: " + javaModel);
                 int turn = face.has("rotation") ? face.get("rotation").getAsInt() : 0;
                 if (turn % 90 != 0)
                     throw new IOException("Unsupported non-90-degree UV rotation in " + javaModel);
@@ -117,6 +119,7 @@ final class BedrockGeometryCompiler {
                 String textureRef = face.get("texture").getAsString();
                 BufferedImage image = ImageIO.read(new ByteArrayInputStream(resolver.textureFor(textures,textureRef)));
                 if (image==null) throw new IOException("Unreadable model texture "+textureRef);
+                if (face.has("tintindex")) image = BedrockTints.face(image, face.get("tintindex").getAsInt(), tints, javaModel);
                 double[] uv = face.has("uv") ? vector(face,"uv") : BedrockIconRenderer.uv(direction,from,to);
                 if (uv.length!=4) throw new IOException("Expected four Java UV coordinates for " + javaModel);
                 // Resample the Java face UV into one full Bedrock atlas cell.

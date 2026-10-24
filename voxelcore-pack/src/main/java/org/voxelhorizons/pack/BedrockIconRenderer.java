@@ -15,6 +15,9 @@ final class BedrockIconRenderer {
         return render(model, null);
     }
     byte[] render(String model, double[] guiRotationOverride) throws IOException {
+        return render(model, guiRotationOverride, Collections.<Integer, Integer>emptyMap());
+    }
+    byte[] render(String model, double[] guiRotationOverride, Map<Integer, Integer> tints) throws IOException {
         JsonObject resolved = resolve(model, new HashSet<String>());
         JsonObject textures = resolved.has("textures") ? resolved.getAsJsonObject("textures") : new JsonObject();
         if (!resolved.has("elements")) {
@@ -38,15 +41,19 @@ final class BedrockIconRenderer {
                     throw new IOException("Invalid generated texture layer " + key + " in " + model, invalid);
                 }
             }
-            if (layers.size() == 1 && layers.containsKey(Integer.valueOf(0)))
+            if (layers.size() == 1 && layers.containsKey(Integer.valueOf(0)) && !tints.containsKey(Integer.valueOf(0)))
                 return texture(textures, "#layer0");
             for (int index=0; index<layers.size(); index++)
                 if (!layers.containsKey(Integer.valueOf(index)))
                     throw new IOException("Gap in generated texture layers at layer" + index + " in " + model);
             BufferedImage combined = null;
-            for (String layerRef : layers.values()) {
+            for (Map.Entry<Integer, String> layer : layers.entrySet()) {
+                String layerRef = layer.getValue();
                 BufferedImage source = ImageIO.read(new ByteArrayInputStream(texture(textures, layerRef)));
                 if (source == null) throw new IOException("Invalid generated layer PNG: " + layerRef);
+                // Generated item tints address layers by index (items/*.json tints list).
+                Integer tint = tints.get(layer.getKey());
+                if (tint != null) source = BedrockTints.apply(source, tint.intValue());
                 if (combined == null) {
                     combined = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_INT_ARGB);
                 } else if (combined.getWidth() != source.getWidth() || combined.getHeight() != source.getHeight()) {
@@ -80,9 +87,9 @@ final class BedrockIconRenderer {
             if(a==null||b==null) throw new IOException("Missing element bounds");
             for(Map.Entry<String,JsonElement> entry:element.getAsJsonObject("faces").entrySet()) {
                 JsonObject face=entry.getValue().getAsJsonObject();
-                if(face.has("tintindex")) throw new IOException("Tinted model needs an explicit Bedrock texture");
                 BufferedImage tex=ImageIO.read(new ByteArrayInputStream(texture(textures,face.get("texture").getAsString())));
                 if(tex==null) throw new IOException("Invalid PNG");
+                if(face.has("tintindex")) tex=BedrockTints.face(tex,face.get("tintindex").getAsInt(),tints,model);
                 double[][] p=face(entry.getKey(),a,b);
                 double[] uv=face.has("uv") ? vector(face,"uv",null) : uv(entry.getKey(),a,b);
                 int turn=face.has("rotation")?face.get("rotation").getAsInt()/90:0;

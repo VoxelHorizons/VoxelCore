@@ -25,6 +25,17 @@ public class BedrockIconRendererTest {
   BufferedImage result=ImageIO.read(new ByteArrayInputStream(new BedrockIconRenderer(assets).render("demo:cross")));
   assertEquals(0xff00ff00,result.getRGB(32,32));
  }
+ @Test public void tintsGeneratedLayerByLayerIndex() throws Exception {
+  Map<String,byte[]> assets=new HashMap<String,byte[]>();
+  BufferedImage texture=new BufferedImage(16,16,2);for(int y=0;y<16;y++)for(int x=0;x<16;x++)texture.setRGB(x,y,0xffffffff);
+  ByteArrayOutputStream out=new ByteArrayOutputStream();ImageIO.write(texture,"png",out);assets.put("assets/demo/textures/white.png",out.toByteArray());
+  assets.put("assets/demo/models/leaf.json","{\"parent\":\"minecraft:item/generated\",\"textures\":{\"layer0\":\"demo:white\"}}".getBytes("UTF-8"));
+  Map<Integer,Integer> tints=BedrockTints.parse(Collections.singletonMap(0,"#48b518"),"demo:leaf");
+  BufferedImage result=ImageIO.read(new ByteArrayInputStream(new BedrockIconRenderer(assets).render("demo:leaf",null,tints)));
+  assertEquals(0xff48b518,result.getRGB(3,3));
+  try{BedrockTints.parse(Collections.singletonMap("x","#000000"),"demo:leaf");fail("index");}catch(IOException expected){}
+  try{BedrockTints.parse(Collections.singletonMap("0","green"),"demo:leaf");fail("colour");}catch(IOException expected){}
+ }
  @Test public void childTextureOverrideChangesInheritedParentIcon() throws Exception {
   Map<String,byte[]> assets=new HashMap<String,byte[]>();
   BufferedImage red=new BufferedImage(16,16,2),blue=new BufferedImage(16,16,2);
