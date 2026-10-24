@@ -22,8 +22,12 @@ import java.util.TreeMap;
 final class BedrockGlyphAtlas {
     private BedrockGlyphAtlas() {}
 
-    /** New Bedrock glyph pages: 512px = 32px cells, so high-res Java icons stay crisp. */
-    static final int SHEET_SIZE = 512;
+    /**
+     * New Bedrock glyph pages: 256px = 16px cells. Bedrock draws a glyph-page pixel at a fixed
+     * on-screen size (a 512px page made icons twice as big, live test), so icons are drawn at
+     * their Java font height in page pixels, which matches their size relative to text on Java.
+     */
+    static final int SHEET_SIZE = 256;
     /**
      * Bedrock draws every glyph as one square cell, so a wide rank tag squeezed into one cell
      * becomes unreadable. Glyphs wider than this ratio are also cut into square tiles at
@@ -61,14 +65,17 @@ final class BedrockGlyphAtlas {
             byte[] source = javaAssets.get("assets/" + ref[0] + "/textures/" + ref[1] + ".png");
             // A broken glyph bitmap is the Java build's error to report; never block Bedrock on it.
             if (source == null) { skipped.add(label + ": texture " + glyph.texture() + " not found"); continue; }
-            BufferedImage icon = trim(ImageIO.read(new ByteArrayInputStream(source)));
+            BufferedImage original = ImageIO.read(new ByteArrayInputStream(source));
+            BufferedImage icon = trim(original);
             if (icon == null) { skipped.add(label + ": empty or unreadable bitmap"); continue; }
+            // Java scales the whole bitmap to its font height; the trimmed part keeps its share.
+            int javaHeight = visibleHeight(glyph.scaleRatio(), icon.getHeight(), original.getHeight());
             String unfit = unfit(icon);
             if (unfit != null) { skipped.add(label + ": " + unfit); continue; }
-            if (!place(sheets, bedrockAssets, codePoint, icon))
+            if (!place(sheets, bedrockAssets, codePoint, icon, javaHeight))
                 throw new IOException("Bedrock font cell U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT)
                         + " is already occupied (managed glyph " + glyph.id() + ")");
-            tile(sheets, bedrockAssets, codePoint, icon, tiles, skipped, label);
+            tile(sheets, bedrockAssets, codePoint, icon, javaHeight, tiles, skipped, label);
             count++;
         }
         count += appendAuthored(contentRoot, javaAssets, sheets, bedrockAssets, skipped, tiles);
@@ -143,8 +150,9 @@ final class BedrockGlyphAtlas {
                                     + " (" + file + "): " + unfit);
                             continue;
                         }
-                        if (place(sheets, bedrockAssets, codePoint, icon)) {
-                            tile(sheets, bedrockAssets, codePoint, icon, tiles, skipped,
+                        int visible = visibleHeight(javaHeight, icon.getHeight(), cellHeight);
+                        if (place(sheets, bedrockAssets, codePoint, icon, visible)) {
+                            tile(sheets, bedrockAssets, codePoint, icon, visible, tiles, skipped,
                                     "font glyph U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT));
                             count++;
                         }
@@ -182,8 +190,8 @@ final class BedrockGlyphAtlas {
      * codepoints. Tiles are drawn at an integer scale where possible so pixel art stays sharp.
      */
     private static void tile(Map<Integer, BufferedImage> sheets, Map<String, byte[]> bedrockAssets, int codePoint,
-                             BufferedImage icon, Map<Integer, int[]> tiles, java.util.List<String> skipped,
-                             String label) throws IOException {
+                             BufferedImage icon, int javaHeight, Map<Integer, int[]> tiles,
+                             java.util.List<String> skipped, String label) throws IOException {
         if ((double) icon.getWidth() / icon.getHeight() <= TILE_ASPECT) return;
         int side = icon.getHeight(), count = (icon.getWidth() + side - 1) / side;
         int next = FIRST_TILE;
@@ -199,7 +207,7 @@ final class BedrockGlyphAtlas {
             Graphics2D graphics = part.createGraphics();
             try { graphics.drawImage(icon.getSubimage(i * side, 0, width, side), 0, 0, null); }
             finally { graphics.dispose(); }
-            if (!placeTile(sheets, bedrockAssets, next + i, part, width))
+            if (!placeTile(sheets, bedrockAssets, next + i, part, javaHeight))
                 throw new IOException("Bedrock tile cell U+" + Integer.toHexString(next + i) + " is already occupied");
             sequence[i] = next + i;
         }
@@ -208,20 +216,14 @@ final class BedrockGlyphAtlas {
 
     /** Like {@link #place} for a tile: left/top aligned (no centring) so neighbours line up. */
     private static boolean placeTile(Map<Integer, BufferedImage> sheets, Map<String, byte[]> bedrockAssets,
-                                     int codePoint, BufferedImage tile, int contentWidth) throws IOException {
+                                     int codePoint, BufferedImage tile, int javaHeight) throws IOException {
         BufferedImage sheet = sheet(sheets, bedrockAssets, codePoint >>> 8);
         int cell = sheet.getWidth() / 16;
         int slot = codePoint & 255, x = (slot % 16) * cell, y = (slot / 16) * cell;
         for (int yy=y; yy<y+cell; yy++) for(int xx=x;xx<x+cell;xx++)
             if ((sheet.getRGB(xx, yy) >>> 24) != 0) return false;
-        int side = tile.getHeight();
-        double scale = side <= cell ? Math.floor((double) cell / side) : (double) cell / side;
-        int drawn = (int) Math.round(side * scale);
-        Graphics2D graphics = sheet.createGraphics();
-        try {
-            graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-            graphics.drawImage(tile, x, y + (cell - drawn) / 2, drawn, drawn, null);
-        } finally { graphics.dispose(); }
+        int drawn = targetHeight(cell, javaHeight);
+        draw(sheet, tile, x, y + (cell - drawn) / 2, drawn, drawn);
         return true;
     }
 
@@ -242,22 +244,59 @@ final class BedrockGlyphAtlas {
         return sheet;
     }
 
+    /** Java on-screen height of the trimmed part of a bitmap drawn at {@code javaHeight}. */
+    static int visibleHeight(int javaHeight, int trimmedHeight, int fullHeight) {
+        if (javaHeight <= 0 || fullHeight <= 0) return javaHeight;
+        return Math.max(1, (int) Math.round((double) javaHeight * trimmedHeight / fullHeight));
+    }
+
+    /** Page pixels for a glyph of the given Java font height (8 = text height), at most one cell. */
+    static int targetHeight(int cell, int javaHeight) {
+        return Math.max(1, Math.min(cell, javaHeight <= 0 ? 8 : javaHeight));
+    }
+
+    /** Downscale smoothly (high-res sources), upscale pixel-exact (pixel art). */
+    private static void draw(BufferedImage sheet, BufferedImage image, int x, int y, int width, int height) {
+        Graphics2D graphics = sheet.createGraphics();
+        try {
+            boolean shrinking = width < image.getWidth() || height < image.getHeight();
+            graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, shrinking
+                    ? RenderingHints.VALUE_INTERPOLATION_BICUBIC : RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+            graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            graphics.drawImage(shrinking ? smoothShrink(image, width, height) : image, x, y, width, height, null);
+        } finally { graphics.dispose(); }
+    }
+
+    /** Halve repeatedly before the final bicubic pass so large sources do not alias. */
+    private static BufferedImage smoothShrink(BufferedImage image, int width, int height) {
+        BufferedImage current = image;
+        while (current.getWidth() / 2 >= width && current.getHeight() / 2 >= height) {
+            BufferedImage half = new BufferedImage(Math.max(1, current.getWidth() / 2), Math.max(1, current.getHeight() / 2),
+                    BufferedImage.TYPE_INT_ARGB);
+            Graphics2D graphics = half.createGraphics();
+            try {
+                graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                graphics.drawImage(current, 0, 0, half.getWidth(), half.getHeight(), null);
+            } finally { graphics.dispose(); }
+            current = half;
+        }
+        return current;
+    }
+
     /** Draw an icon into its Bedrock glyph cell; false when the cell is already occupied. */
     private static boolean place(Map<Integer, BufferedImage> sheets, Map<String, byte[]> bedrockAssets,
-                                 int codePoint, BufferedImage icon) throws IOException {
+                                 int codePoint, BufferedImage icon, int javaHeight) throws IOException {
         BufferedImage sheet = sheet(sheets, bedrockAssets, codePoint >>> 8);
         int cell = sheet.getWidth() / 16;
         int slot = codePoint & 255, x = (slot % 16) * cell, y = (slot / 16) * cell;
         for (int yy=y; yy<y+cell; yy++) for(int xx=x;xx<x+cell;xx++)
             if ((sheet.getRGB(xx, yy) >>> 24) != 0) return false;
-        double ratio = Math.min((double)cell/icon.getWidth(), (double)cell/icon.getHeight());
+        // Java height first; a wider-than-cell icon (wide tag fallback) is fitted to the cell width.
+        double ratio = (double) targetHeight(cell, javaHeight) / icon.getHeight();
+        ratio = Math.min(ratio, (double) cell / icon.getWidth());
         int width = Math.max(1,(int)Math.round(icon.getWidth()*ratio));
         int height = Math.max(1,(int)Math.round(icon.getHeight()*ratio));
-        Graphics2D graphics = sheet.createGraphics();
-        try {
-            graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-            graphics.drawImage(icon,x+(cell-width)/2,y+(cell-height)/2,width,height,null);
-        } finally { graphics.dispose(); }
+        draw(sheet, icon, x+(cell-width)/2, y+(cell-height)/2, width, height);
         return true;
     }
 }
