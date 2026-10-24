@@ -45,7 +45,8 @@ public class BedrockPackCompilerTest {
         byte[] original = Files.readAllBytes(first.directory.resolve("voxelcore.mcpack"));
         Files.delete(root.resolve("demo/assets/demo/textures/item/token.png"));
         try { compiler.compile(root,out); fail("Missing texture must fail"); }
-        catch (java.io.IOException expected) { assertTrue(expected.getMessage().contains("Missing Bedrock item texture")); }
+        // The broken item is skipped (reported); with nothing left to map the build still fails.
+        catch (java.io.IOException expected) { assertTrue(expected.getMessage().contains("No Bedrock assets or mapped items")); }
         assertArrayEquals(original, Files.readAllBytes(first.directory.resolve("voxelcore.mcpack")));
     }
     @Test public void textureChangeCreatesNewRevisionAndKeepsPrevious() throws Exception {
@@ -170,6 +171,23 @@ public class BedrockPackCompilerTest {
         Files.write(items, content.getBytes(StandardCharsets.UTF_8));
         assertEquals(1,new BedrockPackCompiler().compile(root,temp.newFolder().toPath()).mappedItems);
     }
+    @Test public void conflictingIconsForOneJavaModelAreReportedNotFatal() throws Exception {
+        Path root = fixture(), out = temp.newFolder().toPath();
+        Path items = root.resolve("demo/content/items.yml");
+        String content = new String(Files.readAllBytes(items), StandardCharsets.UTF_8);
+        content += "  twin:\n    material: minecraft:paper\n    render:\n      model: demo:item/token\n"
+                + "    properties:\n      bedrock:\n        texture: demo:item/twin\n";
+        Files.write(items, content.getBytes(StandardCharsets.UTF_8));
+        Path twin = root.resolve("demo/assets/demo/textures/item/twin.png");
+        java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(16,16,2);
+        image.setRGB(1,1,0xff123456);
+        javax.imageio.ImageIO.write(image, "png", twin.toFile());
+        BedrockPackCompiler.Result result = new BedrockPackCompiler().compile(root, out);
+        assertEquals("Only one Geyser definition per Java model", 1, result.mappedItems);
+        String report = new String(Files.readAllBytes(result.directory.resolve("unsupported-items.txt")), StandardCharsets.UTF_8);
+        assertTrue(report, report.contains("shares Java item minecraft:paper / demo:item/token"));
+    }
+
     @Test public void authoredAssetsAreIncludedAndRemovedOnRebuild() throws Exception {
         Path root = fixture(), out = temp.newFolder().toPath();
         Path asset = root.resolve("demo/bedrock/resource_pack/texts/en_US.lang");

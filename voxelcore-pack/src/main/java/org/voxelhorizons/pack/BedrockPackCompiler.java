@@ -117,6 +117,7 @@ public final class BedrockPackCompiler {
         ItemDefinitionRegistry itemRegistry = new ContentLoader().load(contentRoot);
         RenderAllocationRegistry renderAllocations = renderAllocations(itemRegistry, glyphAllocationManifest);
         for (ItemDefinition item : itemRegistry.entries().values()) {
+            try {
             // Abstract items may be GUI-only, but their rendered ItemStacks still need Geyser mappings.
             // 'abstract' prohibits normal giving, not client-side rendering.
             if (item.render() == null || item.render().model() == null) continue;
@@ -200,12 +201,16 @@ public final class BedrockPackCompiler {
             String material = item.material().toLowerCase(Locale.ROOT);
             if (!material.contains(":")) material = "minecraft:" + material;
             String model = item.render().model();
-            byte[] existingIcon = selectors.put(material + "|" + (legacy ? "cmd:" + legacyModelData : model)
-                    + variant.suffix, png);
-            if (existingIcon != null) {
-                if (Arrays.equals(existingIcon, png)) continue; // Same Java representation shares one mapping.
-                throw new IOException("Ambiguous Bedrock mapping for " + material + " / " + model);
-            }
+            // Geyser maps one Bedrock item per Java (material, item model[, predicates]). Items that
+            // share it share that mapping; a conflicting icon is reported, never fatal for the build,
+            // and every item still gets its own native entity for placed displays.
+            String selector = material + "|" + (legacy ? "cmd:" + legacyModelData : model) + variant.suffix;
+            byte[] existingIcon = selectors.get(selector);
+            boolean mapItem = existingIcon == null;
+            if (mapItem) selectors.put(selector, png);
+            else if (!Arrays.equals(existingIcon, png))
+                unsupported.add(label + ": shares Java item " + material + " / " + model
+                        + " with another item whose Bedrock icon differs; Geyser can map only one (first kept)");
             // A fixed-length 128-bit SHA-256 prefix avoids the Bedrock <80-character path
             // compatibility limit, regardless of the Java item's original ID length.
             // Stable across builds, and never based on iteration/order-dependent indices.
@@ -236,6 +241,7 @@ public final class BedrockPackCompiler {
             } catch (IOException unsupported3D) {
                 unsupportedGeometry.add(label + ": " + unsupported3D.getMessage());
             }
+            if (!mapItem) continue;
             put(assets, path + ".png", png);
             JsonObject tex = new JsonObject(); tex.addProperty("textures", path); textures.add(icon, tex);
             JsonObject definition = new JsonObject();
@@ -256,6 +262,11 @@ public final class BedrockPackCompiler {
             if (!items.has(material)) items.add(material, new JsonArray());
             items.getAsJsonArray(material).add(definition);
             count++;
+            }
+            } catch (IOException perItem) {
+                // One broken item (missing override texture, bad bedrock settings) must never
+                // block the whole Bedrock publication; it is reported in unsupported-items.txt.
+                unsupported.add(item.id() + ": " + perItem.getMessage());
             }
         }
         if (count == 0 && assets.isEmpty()) throw new IOException("No Bedrock assets or mapped items; add properties.bedrock.texture or bedrock/resource_pack assets");
