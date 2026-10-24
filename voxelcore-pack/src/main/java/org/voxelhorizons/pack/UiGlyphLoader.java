@@ -244,6 +244,21 @@ public final class UiGlyphLoader {
         throw new ContentLoadException("UI glyph " + id + " texture is fully transparent");
     }
 
+    /**
+     * Every codepoint a literal-glyph migration must not reuse: authored font symbols,
+     * tooltip/spacing glyphs and active plus retired managed allocations. Read-only.
+     */
+    static Set<Integer> occupiedCodePoints(Path contentRoot, Path allocationFile) {
+        Set<Integer> used = new HashSet<Integer>(
+                AuthoredFontSupport.reservedCodePoints(new ContentPackDiscovery().discover(contentRoot)));
+        used.addAll(TooltipGlyphs.reservedCodePoints());
+        used.addAll(UiSpacingGlyphs.advances().keySet());
+        AllocationState state = readAllocations(allocationFile);
+        used.addAll(state.active.values());
+        used.addAll(state.inactive.values());
+        return used;
+    }
+
     private static AllocationState readAllocations(Path file) {
         AllocationState state = new AllocationState();
         if (!Files.isRegularFile(file)) return state;
