@@ -91,8 +91,12 @@ public final class EntityProjectionIndexTest {
         Files.createDirectories(dir);
         UUID id=UUID.randomUUID();
         Path file=dir.resolve("furniture.json");
-        String uniform=fixture(id.toString(),"voxel:oak_bench")
-                .replace("\\\"entity_links\\\":","\\\"scale\\\":[2.5,2.5,2.5],\\\"entity_links\\\":");
+        com.google.gson.JsonObject uniformFeed=com.google.gson.JsonParser.parseString(
+                fixture(id.toString(),"voxel:oak_bench")).getAsJsonObject();
+        com.google.gson.JsonArray uniformScale=new com.google.gson.JsonArray();
+        uniformScale.add(2.5); uniformScale.add(2.5); uniformScale.add(2.5);
+        uniformFeed.getAsJsonArray("furniture").get(0).getAsJsonObject().add("scale",uniformScale);
+        String uniform=uniformFeed.toString();
         Files.writeString(file,uniform);
         EntityProjectionIndex index=new EntityProjectionIndex(root,Map.of(
                 "voxel:oak_bench","voxelcore:entity_bench"));
