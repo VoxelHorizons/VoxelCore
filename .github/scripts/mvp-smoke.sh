@@ -50,6 +50,13 @@ fi
 cp "$JAR" "$DATA_DIR/plugins/VoxelCore.jar"
 cp -R "$PWD/$FIXTURE_ROOT/." "$DATA_DIR/plugins/VoxelCore/content/"
 
+# Legacy 1.14.4 Spigot generates its initial world and code caches under
+# Java 8; 1 GiB can cause sustained allocation/GC pressure on shared CI runners.
+# Give it the same room as a normal local smoke environment, without weakening
+# any of the command or resource-pack assertions.
+MEMORY_ALLOCATION="1G"
+if [[ "$MC_VERSION" == "1.14.4" ]]; then MEMORY_ALLOCATION="2G"; fi
+
 docker run -d --name "$NAME" \
   -e EULA=TRUE \
   -e TYPE="$SERVER_TYPE" \
@@ -57,7 +64,7 @@ docker run -d --name "$NAME" \
   -e ONLINE_MODE=FALSE \
   -e ENABLE_RCON=TRUE \
   -e RCON_PASSWORD=voxelcore-smoke \
-  -e MEMORY=1G \
+  -e MEMORY="$MEMORY_ALLOCATION" \
   -v "$DATA_DIR:/data" \
   "$IMAGE" >/dev/null
 
