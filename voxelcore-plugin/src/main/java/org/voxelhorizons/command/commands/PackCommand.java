@@ -90,6 +90,9 @@ public final class PackCommand implements SubCommand {
             sender.sendMessage("Hosted file: " + VoxelCore.getInstance().getResourcePackHost().hostedPack()
                     + " (" + hostedFileSize(VoxelCore.getInstance().getResourcePackHost()) + " bytes; SHA-1 "
                     + VoxelCore.getInstance().getResourcePackHost().sha1Hex() + ")");
+            sender.sendMessage("Bedrock builds: " + VoxelCore.getInstance().getConfig().getBoolean("game.bedrock_support", false)
+                    + "; Geyser data directory: " + VoxelCore.getInstance().getConfig().getString("bedrock.geyser_data_directory", "")
+                    + "; activation requires Geyser restart and client reconnect.");
             sender.sendMessage("Known targets: " + knownTargets());
         }
     }
@@ -215,6 +218,10 @@ public final class PackCommand implements SubCommand {
                 return;
             }
             VoxelCore plugin = VoxelCore.getInstance();
+            if (org.voxelhorizons.pack.BedrockPlayers.isBedrock(target.getUniqueId())) {
+                sender.sendMessage("Bedrock packs are supplied by Geyser at connection; restart Geyser after publishing and reconnect this player.");
+                return;
+            }
             ResourcePackHost host = plugin.getResourcePackHost();
             if (!host.isRunning()) {
                 sender.sendMessage("Pack not sent: resource-pack HTTP host is stopped. Check /vc admin pack host and startup logs.");
@@ -272,6 +279,9 @@ public final class PackCommand implements SubCommand {
             }
 
             final VoxelCore plugin = VoxelCore.getInstance();
+            // Snapshot Bukkit configuration before handing disk work to the async worker.
+            final boolean bedrockEnabled = plugin.getConfig().getBoolean("game.bedrock_support", false);
+            final String geyserDirectory = plugin.getConfig().getString("bedrock.geyser_data_directory", "").trim();
             final long startingRevision = plugin.getContentRuntime().current().revision();
             sender.sendMessage("VoxelCore pack build for " + target.id()
                     + " started asynchronously; the server will remain responsive.");
@@ -290,6 +300,28 @@ public final class PackCommand implements SubCommand {
                     }
                     JavaPackTarget serverTarget = plugin.getPackManager().currentTarget();
                     final boolean currentServerTarget = serverTarget != null && serverTarget.id().equals(target.id());
+                    String bedrockStatus = "";
+                    if (currentServerTarget && bedrockEnabled) {
+                        try {
+                            if (target.mode() != org.voxelhorizons.pack.JavaPackMode.ITEM_MODEL_1_21_4_PLUS)
+                                throw new IllegalArgumentException("Bedrock item-model mappings require a 1.21.4+ backend");
+                            org.voxelhorizons.pack.BedrockPackCompiler.Result bedrock =
+                                    new org.voxelhorizons.pack.BedrockPackCompiler().compile(
+                                            plugin.getPackManager().contentRoot(),
+                                            plugin.getPackManager().outputRoot().resolve("bedrock"));
+                            bedrockStatus = "Bedrock built: " + bedrock.directory + "; " + bedrock.mappedItems
+                                    + " mapped items; " + bedrock.unsupportedItems + " unsupported (see unsupported-items.txt).";
+                            if (!geyserDirectory.isEmpty()) {
+                                new org.voxelhorizons.pack.GeyserPackPublisher().publish(bedrock,
+                                        java.nio.file.Paths.get(geyserDirectory).toAbsolutePath());
+                                bedrockStatus += " Published Geyser files. Restart Geyser, then reconnect Bedrock players.";
+                            } else bedrockStatus += " Export only: set bedrock.geyser_data_directory to publish to Geyser.";
+                        } catch (Exception failure) {
+                            bedrockStatus = "Bedrock build/publish FAILED: " + failure.getMessage();
+                            plugin.getLogger().log(Level.WARNING, bedrockStatus, failure);
+                        }
+                    }
+                    final String bedrockMessage = bedrockStatus;
                     String hostPublishError = null;
                     if (currentServerTarget) {
                         try {
@@ -310,6 +342,7 @@ public final class PackCommand implements SubCommand {
                     final ContentDefinitions prepared = candidate;
                     final String prepareError = loadError;
                     complete(plugin, () -> {
+                        if (!bedrockMessage.isEmpty()) sender.sendMessage(bedrockMessage);
                         sender.sendMessage("VoxelCore pack built for " + target.id() + ": " + output.output()
                                 + " (" + output.renderedItems() + " rendered items, " + output.renderedBlocks()
                                 + " rendered blocks, " + output.copiedAssets() + " authored assets)");

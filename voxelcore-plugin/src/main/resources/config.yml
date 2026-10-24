@@ -1,6 +1,6 @@
 version: 9 # DO NOT CHANGE
 game:
-  bedrock_support: false # Reserved for a future integration; currently has no runtime effect
+  bedrock_support: false # Build Bedrock resources alongside the current-server Java pack
 
 resource_pack:
   host:
@@ -98,3 +98,10 @@ economy:
   currencies:
     tokens:
       decimals: 0
+
+# Geyser v2 item mappings require Geyser API 2.9.3/build 1062 or newer.
+# Packs are built on /vc admin pack build; distribution happens at Bedrock connection.
+bedrock:
+  # Empty = export only. Absolute path recommended; relative paths use the server working directory.
+  # For a proxy/standalone Geyser, this must be its mounted data directory, not a backend-local copy.
+  geyser_data_directory: ''

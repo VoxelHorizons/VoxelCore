@@ -456,3 +456,8 @@ Never make raw BukkitObjectOutputStream Base64 the long-term cross-version inter
 - [src/com/randamonium/havenrealms/commands/DynamicServerCommand.java](https://github.com/VoxelHorizons/HavenNetwork/blob/2c6524f6604174967cf8724da0022fe79d419d7b/src/com/randamonium/havenrealms/commands/DynamicServerCommand.java) — DynamicServerCommand, execute
 - [src/com/randamonium/havenrealms/messaging/TooltipChannel.java](https://github.com/VoxelHorizons/HavenNetwork/blob/2c6524f6604174967cf8724da0022fe79d419d7b/src/com/randamonium/havenrealms/messaging/TooltipChannel.java) — on
 - [src/com/randamonium/havenrealms/web/RestProvider.java](https://github.com/VoxelHorizons/HavenNetwork/blob/2c6524f6604174967cf8724da0022fe79d419d7b/src/com/randamonium/havenrealms/web/RestProvider.java) — RestProvider, main, MyHandler, handle
+
+
+## Bedrock implementation checkpoint — 2026-10-24
+
+The first Bedrock increment now builds explicit item texture mappings and resource packs, exports immutable revisions, publishes VoxelCore-owned files to a configured Geyser data directory, and excludes identified Floodgate/Geyser players from Java pack requests. See [setup, implementation limits and acceptance checklist](docs/bedrock.md). This supersedes the earlier “no Bedrock pack/conversion” status only for these implemented foundations. Automatic model conversion, entity/block mappings, Bedrock menus and remote Geyser extension synchronization remain outstanding. Geyser restart and Bedrock reconnect are required after publication; full cross-platform parity is not claimed.
