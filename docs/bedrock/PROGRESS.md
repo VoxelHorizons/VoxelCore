@@ -7,7 +7,7 @@ This is the authoritative operational handoff for **VoxelCore Bedrock developmen
 - Repository: `VoxelHorizons/VoxelCore`
 - Working branch: `feat/bedrock-pack-publishing`
 - Open PR: [#84](https://github.com/VoxelHorizons/VoxelCore/pull/84); **do not merge without owner approval**.
-- Recorded head after implementation and documentation: `c971f6f4a795c8e58ee430344779ddb73d6830c5`.
+- Recorded head before final handoff update: `7e6fee680f44dfd11b12ef3c064f3ccf22bb2ed3` (new documentation commits follow; refresh `git log` / PR head).
 - Authoritative spec: [../bedrock.md](../bedrock.md)
 - Milestone IDs/statuses: [ROADMAP.md](ROADMAP.md)
 - Design decisions: [ARCHITECTURE.md](ARCHITECTURE.md)
@@ -41,7 +41,9 @@ This is the authoritative operational handoff for **VoxelCore Bedrock developmen
 - B06: IN PROGRESS, *actual native cuboid geometry and attachable files exist*, but UV, animations, transform orientation and all Java model variants need real-client validation.
 - B12: IMPLEMENTED but Bedrock browser flashing/closing not independently retested.
 - B13: TESTED managed glyph allocator, unmanaged authored glyph migration remains B14.
-- B07–B11, B14–B17, B20: NOT STARTED or partial per ROADMAP.
+- B07–B08, B10, B14–B17, B20: NOT STARTED or partial per ROADMAP.
+- B09: TESTED schema-v1 immutable snapshot in VoxelFurniture draft PR #47; no Geyser consumer.
+- B11: IN PROGRESS (snapshot TESTED) in VoxelVehicles draft PR #21; no cross-process synchronization.
 - B18: IN PROGRESS (CI matrix present, version strategy incomplete).
 - B19: BLOCKED on physical/remote Bedrock+Geyser/Floodgate client/server access. The user previously provided screenshots/logs; current environment cannot open that live server.
 
@@ -62,3 +64,9 @@ This is the authoritative operational handoff for **VoxelCore Bedrock developmen
 
 ## Handoff contract for next session
 Read this file first, then `ROADMAP.md`, `ARCHITECTURE.md`, `TESTING.md`, `../bedrock.md`; inspect `git log` on `feat/bedrock-pack-publishing` and PR #84, validate current GitHub Actions, implement the first unblocked testable next action, and update this ledger at the next commit. Avoid reopening completed decisions and never claim 100% until all roadmap acceptance criteria are VERIFIED.
+
+## Subsequent cross-plugin work completed after original handoff record
+- `VoxelHorizons/VoxelFurniture` draft [PR #47](https://github.com/VoxelHorizons/VoxelFurniture/pull/47) on `feat/bedrock-state-projection`: commit `7147c68b`, **GitHub build SUCCESS**, capture-only versioned render snapshot.
+- `VoxelHorizons/VoxelVehicles` draft [PR #21](https://github.com/VoxelHorizons/VoxelVehicles/pull/21) on `feat/bedrock-state-projection`: commit `98748d7a`, **GitHub build SUCCESS**, capture-only vehicle render/physics visual snapshot.
+- Core CI: `98c4a32b` distribution build success and 7 of 8 Minecraft smoke tests success. Minecraft 1.14.4 smoke is a genuine unresolved RCON connectivity issue despite fully initialized Spigot/VoxelCore server in its recorded log. IPv4 RCON explicit attempt `9c718fde` did not fix. Commit `7e6fee68` adds socket, process and container health capture for reproducing; review next run logs to find true cause. **Do not bypass the failing matrix job**.
+- This session still has **no Bedrock client**, runtime Geyser extension, item-held visual parity or deployed furniture/vehicle entity projection. None of B06/B09/B10/B11/B15/B16/B17/B19 are VERIFIED.
