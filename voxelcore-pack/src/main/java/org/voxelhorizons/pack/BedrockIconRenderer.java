@@ -18,8 +18,48 @@ final class BedrockIconRenderer {
         JsonObject resolved = resolve(model, new HashSet<String>());
         JsonObject textures = resolved.has("textures") ? resolved.getAsJsonObject("textures") : new JsonObject();
         if (!resolved.has("elements")) {
-            if (textures.size() != 1 || !textures.has("layer0")) throw new IOException("Unsupported generated/special model " + model);
-            return texture(textures, "#layer0");
+            // Java generated/handheld sprites support multiple layers plus optional
+            // particle. Bedrock needs a single icon, so composite the transparent
+            // layers in the same order instead of dropping all but layer0.
+            if (!textures.has("layer0"))
+                throw new IOException("Unsupported generated/special model " + model + ": no layer0");
+            java.util.TreeMap<Integer,String> layers = new java.util.TreeMap<Integer,String>();
+            for (Map.Entry<String, JsonElement> entry : textures.entrySet()) {
+                String key = entry.getKey();
+                if ("particle".equals(key)) continue;
+                if (!key.matches("layer[0-9]+"))
+                    throw new IOException("Unsupported generated texture key '" + key + "' in " + model);
+                try {
+                    int layer = Integer.parseInt(key.substring(5));
+                    if (layer >= 32)
+                        throw new IOException("Too many generated texture layers in " + model);
+                    layers.put(Integer.valueOf(layer), "#" + key);
+                } catch (NumberFormatException invalid) {
+                    throw new IOException("Invalid generated texture layer " + key + " in " + model, invalid);
+                }
+            }
+            if (layers.size() == 1 && layers.containsKey(Integer.valueOf(0)))
+                return texture(textures, "#layer0");
+            for (int index=0; index<layers.size(); index++)
+                if (!layers.containsKey(Integer.valueOf(index)))
+                    throw new IOException("Gap in generated texture layers at layer" + index + " in " + model);
+            BufferedImage combined = null;
+            for (String layerRef : layers.values()) {
+                BufferedImage source = ImageIO.read(new ByteArrayInputStream(texture(textures, layerRef)));
+                if (source == null) throw new IOException("Invalid generated layer PNG: " + layerRef);
+                if (combined == null) {
+                    combined = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                } else if (combined.getWidth() != source.getWidth() || combined.getHeight() != source.getHeight()) {
+                    throw new IOException("Generated layer sizes differ in model " + model);
+                }
+                java.awt.Graphics2D g = combined.createGraphics();
+                try { g.drawImage(source, 0, 0, null); }
+                finally { g.dispose(); }
+            }
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            if (!ImageIO.write(combined, "png", output))
+                throw new IOException("Failed to encode generated layers for " + model);
+            return output.toByteArray();
         }
         BufferedImage image = new BufferedImage(64,64,BufferedImage.TYPE_INT_ARGB);
         double[] depth = new double[4096]; Arrays.fill(depth, -Double.MAX_VALUE);
