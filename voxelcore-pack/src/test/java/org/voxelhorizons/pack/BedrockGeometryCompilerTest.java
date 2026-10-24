@@ -132,6 +132,20 @@ public final class BedrockGeometryCompilerTest {
         catch (IOException expected) { assertTrue(expected.getMessage().contains("Degenerate")); }
     }
 
+    @Test public void bakesConfiguredConstantTintIntoTintedFaces() throws Exception {
+        Map<String,byte[]> assets = modelAssets();
+        String parent = new String(assets.get("assets/demo/models/bench.json"),StandardCharsets.UTF_8);
+        parent = parent.replace("\"texture\":\"#wood\"","\"texture\":\"#wood\",\"tintindex\":0");
+        assets.put("assets/demo/models/bench.json",parent.getBytes(StandardCharsets.UTF_8));
+        String shortId = "i_11112222333344445555666677778888";
+        Map<Integer,Integer> tints = BedrockTints.parse(java.util.Collections.singletonMap("0","#808080"),"demo:bench");
+        BedrockGeometryCompiler.Output output = new BedrockGeometryCompiler(assets)
+                .compile("demo:bench","voxelcore:"+shortId,shortId,tints);
+        BufferedImage atlas = ImageIO.read(new ByteArrayInputStream(output.assets.get("textures/voxelcore/g_"+shortId+".png")));
+        // 0xaa4422 multiplied by 0x80/0xff per channel.
+        assertEquals(0xff552211, atlas.getRGB(0,0));
+    }
+
     @Test public void rescaleFactorIsOneWithoutRescaleFlag() {
         JsonObject rotation = JsonParser.parseString("{\"axis\":\"x\",\"angle\":22.5}").getAsJsonObject();
         assertEquals(1.0, BedrockIconRenderer.rescaleFactor(rotation), 0);
