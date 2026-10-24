@@ -12,10 +12,11 @@ On the **Geyser** side, ensure `gameplay.enable-custom-content: true` in the Gey
 game:
   bedrock_support: true
 bedrock:
-  geyser_data_directory: '/home/container/plugins/Geyser-Spigot'
+  auto_publish_local: true
+  geyser_data_directory: '' # Auto-detect a loaded local Geyser-Spigot plugin
 ```
 
-Merge into existing config sections, then reload VoxelCore configuration. Empty `geyser_data_directory` builds exports only. A relative path resolves from the server working directory. The target directory must already exist. For Geyser on a proxy or another machine, configure a mounted path to the actual Geyser data directory, or deploy the exported pair together yourself; writing into a backend-only folder cannot update remote Geyser.
+Merge into existing config sections, then reload VoxelCore configuration. With `auto_publish_local: true` (the default), an empty `geyser_data_directory` now uses the **actual data folder of a loaded local Bukkit Geyser-Spigot plugin**, not a guessed directory name. A configured non-empty `geyser_data_directory` always takes precedence, including when local auto-publication is disabled. A relative path resolves from the server working directory; configured targets must exist. For Geyser on a proxy or another machine, configure a mounted path to the real Geyser data directory, or deploy the exported pair together yourself; writing into a backend-only folder cannot update remote Geyser. When no local Geyser is installed and the override is blank, VoxelCore exports only and explains why in the build output. To force export-only even when local Geyser is installed, set `bedrock.auto_publish_local: false` with an empty path.
 
 Icons are now generated automatically for supported Java models, including **renderable `abstract: true` GUI definitions**. Abstract item flags restrict creation/give behavior, not Geyser item-model mapping. Add an optional explicit Bedrock texture override to a concrete item (properties inherit through normal content inheritance):
 
@@ -38,7 +39,7 @@ Optional native Bedrock assets belong under `<content-pack>/bedrock/resource_pac
 
 1. Run `/vc admin pack build` for the running server's target. Bedrock compilation runs off the main thread alongside the Java publishing workflow, independently of whether Java HTTP hosting is enabled.
 2. Review output: `build/resource-packs/bedrock/<revision>/` contains `voxelcore.mcpack`, `voxelcore-items.json`, and `unsupported-items.txt`. Prior revisions remain available. Rebuilding identical inputs reuses the revision.
-3. With a configured directory, VoxelCore replaces only `packs/voxelcore.mcpack` and `custom_mappings/voxelcore-items.json`. Individual replacements are staged; an I/O failure attempts rollback. This is not a cross-process atomic transaction: do not reload Geyser during publication.
+3. With a configured or auto-detected local Geyser directory, VoxelCore replaces only `packs/voxelcore.mcpack` and `custom_mappings/voxelcore-items.json`. Build output reports the destination and file sizes, and `/vc admin pack info` reports the chosen target plus current file presence. Individual replacements are staged; an I/O failure attempts rollback. This is not a cross-process atomic transaction: do not reload Geyser during publication. **No extension jar is generated or installed** by this increment; an extension is planned for model/world-rendering parity.
 4. Restart Geyser after publishing, then reconnect Bedrock clients. Registry changes are deliberately not hot-reloaded or followed by an automatic disruptive restart. On a same-process installation, restart the server. Online Bedrock clients cannot accept pack changes mid-session.
 
 Pack header/module UUIDs stay stable. The version tuple changes with the content hash; outputs are deterministic and prior revisions support rollback. To roll back, stop Geyser, restore both files from the same revision, restart, and reconnect clients.
@@ -73,6 +74,15 @@ The current Bedrock output is a **resource pack plus Geyser v2 item mappings**, 
 5. **End-to-end parity harness.** Test profile, inventory catalog, placed chair/table/animated shelf and reconnect on the actual VoxelHorizons Geyser 26.3 stack. Confirm actions, ownership, inventory persistence, animation, scale, unload/reload and no ghost entities.
 
 **Acceptance is visual and functional, not just “pack sent”:** the same source content must show correct items and furniture when held, browsed and placed on Bedrock, with no missing textures, text glyphs, or inaccessible interaction targets. Store paired Java/Bedrock screenshots and actual Bedrock/Geyser version with every acceptance record.
+
+### Local Geyser publication smoke test
+
+1. Confirm Geyser-Spigot is loaded on the *same* Paper server, or set `bedrock.geyser_data_directory` explicitly to a mounted proxy/standalone Geyser data directory.
+2. Run `/vc admin pack info`. It should identify either `detected local plugin` or `configured path` and list the expected `packs/voxelcore.mcpack` and `custom_mappings/voxelcore-items.json` destinations.
+3. Run `/vc admin pack build`. Look for `Published to detected local plugin:` (or `configured path:`) **and the actual absolute paths and file sizes**. If it says `Export only`, it is not a successful Geyser deployment; follow the reason.
+4. Check both files exist in the **same Geyser data directory** that Geyser uses. A pre-existing empty `plugins/Geyser-Spigot` directory is not by itself evidence that Geyser runs locally.
+5. Restart Geyser, reconnect Bedrock, and inspect `unsupported-items.txt` for the list of models that have no valid Bedrock mapping. The pack cannot render unconverted models merely because it was deployed.
+6. The `extensions/` directory will still be unchanged because the initial publisher installs only mappings and resource packs; a custom-display/entity extension is a separately tracked implementation.
 
 ## Remaining roadmap and acceptance tests
 
