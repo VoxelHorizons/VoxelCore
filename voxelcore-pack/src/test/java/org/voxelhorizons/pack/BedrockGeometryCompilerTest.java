@@ -42,7 +42,7 @@ public final class BedrockGeometryCompilerTest {
         String shortId = "i_11112222333344445555666677778888";
         BedrockGeometryCompiler.Output first = converter.compile("demo:bench",identifier,shortId);
         BedrockGeometryCompiler.Output child = converter.compile("demo:dark_bench",identifier,shortId);
-        assertNotNull(first); assertEquals(1,first.cuboids); assertEquals(5,first.assets.size());
+        assertNotNull(first); assertEquals(1,first.cuboids); assertEquals(6,first.assets.size());
         assertTrue(first.assets.containsKey(BedrockGeometryCompiler.TRANSFORM_ANIMATION_PATH));
         assertTrue(first.assets.containsKey("attachables/"+shortId+".json"));
         assertTrue(first.assets.containsKey("models/entity/voxelcore/"+shortId+".geo.json"));
@@ -167,7 +167,7 @@ public final class BedrockGeometryCompilerTest {
         assertEquals(0xffaa4422, undyed.getRGB(0,0));
         assertEquals(0xff750c05, red.getRGB(0,0));
         String controller = new String(output.assets.get(BedrockGeometryCompiler.DYE_CONTROLLER_PATH), StandardCharsets.UTF_8);
-        assertTrue(controller.contains("Array.dye[query.property('voxelcore:dye')]"));
+        assertTrue(controller.contains("Array.dye[query.has_property('voxelcore:dye') ? query.property('voxelcore:dye') : 0]"));
         assertTrue(controller.contains("Texture.dye_16"));
 
         BedrockGeometryCompiler.Output untinted = new BedrockGeometryCompiler(modelAssets()).compileDyeable("demo:bench",
@@ -199,6 +199,33 @@ public final class BedrockGeometryCompilerTest {
         JsonObject rootBone = geometry.getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject()
                 .getAsJsonArray("bones").get(0).getAsJsonObject();
         assertEquals("root", rootBone.get("name").getAsString());
+    }
+
+    @Test public void heldAttachableBindsToHandAndUsesJavaHeldTransform() throws Exception {
+        Map<String,byte[]> assets = modelAssets();
+        String parent = new String(assets.get("assets/demo/models/bench.json"),StandardCharsets.UTF_8);
+        parent = parent.replaceFirst("\\{", "{\"display\":{\"thirdperson_righthand\":{\"rotation\":[10,20,30],\"translation\":[0,3,1],\"scale\":[0.5,0.5,0.5]}},");
+        assets.put("assets/demo/models/bench.json",parent.getBytes(StandardCharsets.UTF_8));
+        String shortId = "i_11112222333344445555666677778888";
+        BedrockGeometryCompiler.Output output = new BedrockGeometryCompiler(assets).compile("demo:bench","voxelcore:"+shortId,shortId);
+        JsonObject attachable = JsonParser.parseString(new String(output.assets.get("attachables/"+shortId+".json"),
+                StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("minecraft:attachable").getAsJsonObject("description");
+        String heldGeometry = attachable.getAsJsonObject("geometry").get("default").getAsString();
+        assertEquals("geometry.voxelcore."+shortId+".held", heldGeometry);
+        JsonArray geometries = JsonParser.parseString(new String(output.assets.get("models/entity/voxelcore/"+shortId+".geo.json"),
+                StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonArray("minecraft:geometry");
+        JsonObject held = geometries.get(1).getAsJsonObject();
+        assertEquals(heldGeometry, held.getAsJsonObject("description").get("identifier").getAsString());
+        assertEquals("q.item_slot_to_bone_name(c.item_slot)",
+                held.getAsJsonArray("bones").get(0).getAsJsonObject().get("binding").getAsString());
+        assertEquals("held", held.getAsJsonArray("bones").get(1).getAsJsonObject().get("parent").getAsString());
+        JsonObject pose = JsonParser.parseString(new String(output.assets.get("animations/voxelcore_held_"+shortId+".animation.json"),
+                StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("animations")
+                .getAsJsonObject("animation.voxelcore."+shortId+".held.third_person").getAsJsonObject("bones").getAsJsonObject("model");
+        assertEquals(0.5, pose.getAsJsonArray("scale").get(0).getAsDouble(), 0);
+        assertEquals(30, pose.getAsJsonArray("rotation").get(2).getAsDouble(), 0);
+        assertEquals("Placed entities keep the unbound geometry", "geometry.voxelcore."+shortId,
+                geometries.get(0).getAsJsonObject().getAsJsonObject("description").get("identifier").getAsString());
     }
 
     @Test public void rescaleFactorIsOneWithoutRescaleFlag() {
