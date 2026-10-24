@@ -33,8 +33,22 @@ rcon() {
   docker inspect "$NAME" --format 'status={{.State.Status}} running={{.State.Running}} oom_killed={{.State.OOMKilled}} exit_code={{.State.ExitCode}}' >&2 || true
   echo "===== RCON SOCKETS =====" >&2
   docker exec "$NAME" sh -c 'cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | grep -Ei "(:63E7|local_address)" || true; ps -ef | head -30' >&2 || true
-  echo "===== SERVER OUTPUT =====" >&2
-  docker logs "$NAME" --tail 110 >&2 || true
+  echo "===== JVM THREAD STATE ON RCON FAILURE =====" >&2
+  # Legacy Java 8 Spigot can report RCON started but subsequently have no
+  # listening socket. Obtain a HotSpot thread dump only on failure, without
+  # weakening command assertions or changing healthy test behavior.
+  docker exec "$NAME" sh -c '
+    pid="$(ps -eo pid,comm | awk '\''$2=="java" {print $1;exit}'\'')"
+    if [ -n "$pid" ]; then
+      sed -n "1,45p" "/proc/$pid/status" || true
+      kill -QUIT "$pid" || true
+      sleep 2
+    else
+      echo "Java JVM not found for thread dump"
+    fi
+  ' >&2 || true
+  echo "===== SERVER OUTPUT / THREAD DUMP =====" >&2
+  docker logs "$NAME" --tail 260 >&2 || true
   return 1
 }
 
