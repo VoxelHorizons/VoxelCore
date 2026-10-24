@@ -290,14 +290,14 @@ public final class UiGlyphLoader {
 
     private static void writeMigrationReport(Path file, Map<ContentID, Integer> old,
                                              Map<ContentID, Integer> active, Map<ContentID, Integer> inactive) {
-        StringBuilder report = new StringBuilder("Bedrock PUA migration (U+E000..U+E1FF)\\n");
-        report.append("Update literal glyph characters in external DeluxeMenus/config files separately.\\n");
+        StringBuilder report = new StringBuilder("Bedrock PUA migration (U+E000..U+E1FF)\n");
+        report.append("Update literal glyph characters in external DeluxeMenus/config files separately.\n");
         List<ContentID> ids = new ArrayList<ContentID>(old.keySet());
         Collections.sort(ids, byId());
         for (ContentID id : ids) {
             Integer now = active.containsKey(id) ? active.get(id) : inactive.get(id);
             report.append(id).append(": ").append(codePoint(old.get(id).intValue()))
-                    .append(" -> ").append(codePoint(now.intValue())).append('\\n');
+                    .append(" -> ").append(codePoint(now.intValue())).append('\n');
         }
         try {
             Files.write(file.resolveSibling("glyph-bedrock-migration.txt"),
