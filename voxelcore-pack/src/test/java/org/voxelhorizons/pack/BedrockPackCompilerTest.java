@@ -105,7 +105,7 @@ public class BedrockPackCompilerTest {
     }
     @Test public void mergesDisjointNativeBedrockJsonAssets() throws Exception {
         Path root = fixture(), out = temp.newFolder().toPath();
-        write(root.resolve("other/pack.yml"), "schema: 1\\nnamespace: other\\n");
+        write(root.resolve("other/pack.yml"), "schema: 1\nnamespace: other\n");
         write(root.resolve("demo/bedrock/resource_pack/ui/_global_variables.json"), "{\"first\": 1}");
         write(root.resolve("other/bedrock/resource_pack/ui/_global_variables.json"), "{\"second\": 2}");
         BedrockPackCompiler.Result built = new BedrockPackCompiler().compile(root, out);
