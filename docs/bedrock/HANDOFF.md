@@ -1,11 +1,27 @@
 # Bedrock recovery handoff — 24 October 2026 (Australia/Melbourne)
 
-## Latest checkpoint — 24 October 2026, session 4 end (supersedes everything below)
+## Latest checkpoint — 24 October 2026, session 5 (supersedes everything below)
 
 Fetch live HEADs first; this file is not a ref. No PR merged, no force push.
 
-| Repo | Branch / PR | Code commits this session | CI |
+| Repo | Branch / PR | Code commits (session 4 → 5) | CI |
 | --- | --- | --- | --- |
+| VoxelCore | `feat/bedrock-pack-publishing`, [PR #84](https://github.com/VoxelHorizons/VoxelCore/pull/84) | s4: `d0ec247` `d0b847b` `9448ec2` `a9511d6` `f811217` `991c7b0` `4b8dffa` `f8f32f0`; s5: `7e495b9` dye property, `5859f29` transform animation, `48e2074` 250 ms reconcile, `6a8d1c1` vehicle chests | build SUCCESS on every commit; smoke 8/8 on `7e495b9`/`5859f29`; `48e2074`/`6a8d1c1` 7/8 with only 1.14.4 red (26.3 green) = **KI-01, non-blocking** |
+| DeluxeMenus | `feat/bedrock-forms` (no PR; CI via `workflow_dispatch`) | `557bac4` `6b8d858` `7e2b869` | SUCCESS |
+| VoxelFurniture | PR #47 | `b1b7585` `6fb62ee` `d72d76d` new-display re-send, `92c6b74` resend delay | SUCCESS |
+| VoxelVehicles | PR #21 | `09a0abb` `d0b084c` `ba0c322` `cf31971` `016f61b` chest model | SUCCESS |
+
+**CI policy:** TESTING.md "CI policy".
+
+**Status (IMPLEMENTED; TESTED by CI; nothing VERIFIED live):** B05 rule predicates; B06 rescale/planes; B07 constant tints; B08 audit done; B10 live scale, model/new-display re-send, dye texture arrays (`voxelcore:dye`), transform animation (`voxelcore:tx..sz`), idle/use animation covered (teleports / model swap); B11 chest accessories + vehicle translation/pitch/roll; B14 glyph migration; B15 DeluxeMenus forms; B16 stats/avatar/tooltip; B17 signed pack sync, per-backend feeds, signed feed transport; B18 legacy CMD mappings.
+
+**Local tests:** pack 51, extension 29, DeluxeMenus 5, companions 2+2 (javac; Maven repos blocked here).
+
+**Needs a live Bedrock client (B19, BLOCKED) to confirm:** transform axis signs; dye texture selection; rider seat height on item_display mounts (Geyser generic formula); steering; form UX.
+
+**Next actions:** live acceptance when a client/server is available; DeluxeMenus `feat/bedrock-forms` PR when the user asks; then B20 acceptance write-up.
+
+--- | --- | --- | --- |
 | VoxelCore | `feat/bedrock-pack-publishing`, [PR #84](https://github.com/VoxelHorizons/VoxelCore/pull/84) | `d0ec247` rescale+planes · `d0b847b` rule predicates · `9448ec2` tints · `a9511d6` signed pack sync · `f811217` Bedrock tooltip · `991c7b0` legacy CMD mappings · `4b8dffa` per-backend feeds · `f8f32f0` signed feed transport | build SUCCESS on all through `4b8dffa`; smoke 8/8 on all except `991c7b0` (one run red; next two runs incl. that code 8/8 → KI-01, non-blocking). `f8f32f0`: re-query |
 | DeluxeMenus | `feat/bedrock-forms` (no PR; CI via `workflow_dispatch`) | `557bac4` forms · `6b8d858` `bedrock_image` · `7e2b869` click-type chooser | all [SUCCESS](https://github.com/VoxelHorizons/DeluxeMenus/actions/runs/40083515069) |
 | VoxelFurniture | PR #47 | `b1b7585` model re-send · `6fb62ee` feed-id | SUCCESS |
