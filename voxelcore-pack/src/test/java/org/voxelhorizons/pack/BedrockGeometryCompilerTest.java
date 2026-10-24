@@ -42,7 +42,8 @@ public final class BedrockGeometryCompilerTest {
         String shortId = "i_11112222333344445555666677778888";
         BedrockGeometryCompiler.Output first = converter.compile("demo:bench",identifier,shortId);
         BedrockGeometryCompiler.Output child = converter.compile("demo:dark_bench",identifier,shortId);
-        assertNotNull(first); assertEquals(1,first.cuboids); assertEquals(4,first.assets.size());
+        assertNotNull(first); assertEquals(1,first.cuboids); assertEquals(5,first.assets.size());
+        assertTrue(first.assets.containsKey(BedrockGeometryCompiler.TRANSFORM_ANIMATION_PATH));
         assertTrue(first.assets.containsKey("attachables/"+shortId+".json"));
         assertTrue(first.assets.containsKey("models/entity/voxelcore/"+shortId+".geo.json"));
         assertTrue(first.assets.containsKey("textures/voxelcore/g_"+shortId+".png"));
@@ -172,6 +173,32 @@ public final class BedrockGeometryCompilerTest {
         BedrockGeometryCompiler.Output untinted = new BedrockGeometryCompiler(modelAssets()).compileDyeable("demo:bench",
                 "voxelcore:"+shortId, shortId, java.util.Collections.<Integer,Integer>emptyMap(), 0xFFFFFF);
         assertFalse("Untinted models stay single-texture", untinted.assets.containsKey(BedrockGeometryCompiler.DYE_CONTROLLER_PATH));
+    }
+
+    @Test public void entityAnimatesRootFromGuardedTransformProperties() throws Exception {
+        String shortId = "i_11112222333344445555666677778888";
+        BedrockGeometryCompiler.Output output = new BedrockGeometryCompiler(modelAssets())
+                .compile("demo:bench","voxelcore:"+shortId,shortId);
+        JsonObject description = JsonParser.parseString(new String(output.assets.get(
+                "entity/voxelcore/"+shortId+".entity.json"),StandardCharsets.UTF_8)).getAsJsonObject()
+                .getAsJsonObject("minecraft:client_entity").getAsJsonObject("description");
+        assertEquals(BedrockGeometryCompiler.TRANSFORM_ANIMATION,
+                description.getAsJsonObject("animations").get("voxelcore_transform").getAsString());
+        assertEquals("voxelcore_transform", description.getAsJsonObject("scripts").getAsJsonArray("animate").get(0).getAsString());
+        JsonObject bone = JsonParser.parseString(new String(output.assets.get(BedrockGeometryCompiler.TRANSFORM_ANIMATION_PATH),
+                StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("animations")
+                .getAsJsonObject(BedrockGeometryCompiler.TRANSFORM_ANIMATION).getAsJsonObject("bones").getAsJsonObject("root");
+        assertEquals("(query.has_property('voxelcore:sx') ? query.property('voxelcore:sx') : 1)",
+                bone.getAsJsonArray("scale").get(0).getAsString());
+        assertEquals("(query.has_property('voxelcore:tx') ? query.property('voxelcore:tx') : 0) * 16",
+                bone.getAsJsonArray("position").get(0).getAsString());
+        assertTrue(bone.getAsJsonArray("rotation").get(0).getAsString().startsWith("-(query.has_property('voxelcore:pitch')"));
+        // The root bone pivots at the entity origin, matching the Java matrix origin.
+        JsonObject geometry = JsonParser.parseString(new String(output.assets.get(
+                "models/entity/voxelcore/"+shortId+".geo.json"),StandardCharsets.UTF_8)).getAsJsonObject();
+        JsonObject rootBone = geometry.getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject()
+                .getAsJsonArray("bones").get(0).getAsJsonObject();
+        assertEquals("root", rootBone.get("name").getAsString());
     }
 
     @Test public void rescaleFactorIsOneWithoutRescaleFlag() {

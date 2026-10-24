@@ -6,6 +6,7 @@ import org.geysermc.geyser.api.entity.data.GeyserEntityDataTypes;
 import org.geysermc.geyser.api.event.lifecycle.GeyserDefineEntitiesEvent;
 import org.geysermc.geyser.api.event.lifecycle.GeyserDefineEntityPropertiesEvent;
 import org.geysermc.geyser.api.entity.property.type.GeyserIntEntityProperty;
+import org.geysermc.geyser.api.entity.property.type.GeyserFloatEntityProperty;
 import org.geysermc.geyser.api.event.java.ServerSpawnEntityEvent;
 import org.geysermc.geyser.api.util.Identifier;
 import java.util.Map;
@@ -105,6 +106,11 @@ public final class VoxelCoreGeyserExtension implements Extension {
     private volatile Map<String,String> nativeEntityIdentifiers = java.util.Collections.emptyMap();
     /** Bedrock entity identifier -> registered voxelcore:dye property (dyeable entities only). */
     private volatile Map<String,GeyserIntEntityProperty> dyeProperties = java.util.Collections.emptyMap();
+    /** Pack transform-animation properties, in EntityProjectionIndex.Projection#transform order. */
+    static final String[] TRANSFORM_PROPERTIES = {"voxelcore:tx", "voxelcore:ty", "voxelcore:tz",
+            "voxelcore:pitch", "voxelcore:roll", "voxelcore:sx", "voxelcore:sy", "voxelcore:sz"};
+    private static final float[] IDENTITY_TRANSFORM = {0, 0, 0, 0, 0, 1, 1, 1};
+    private volatile Map<String,GeyserFloatEntityProperty[]> transformProperties = java.util.Collections.emptyMap();
     private volatile EntityProjectionIndex projectionIndex;
     private final ProjectionReconciler reconciler = new ProjectionReconciler();
     private volatile ScheduledExecutorService reconcileLoop;
@@ -135,11 +141,14 @@ public final class VoxelCoreGeyserExtension implements Extension {
             final Float visualScale=projection.scale();
             final GeyserIntEntityProperty dyeProperty=dyeProperties.get(projection.entityType());
             final Integer dye=projection.dye();
-            if(visualScale!=null || (dyeProperty!=null && dye!=null)) {
+            final GeyserFloatEntityProperty[] transformProperty=transformProperties.get(projection.entityType());
+            final float[] transform=projection.transform();
+            if(visualScale!=null || (dyeProperty!=null && dye!=null) || (transformProperty!=null && transform!=null)) {
                 event.preSpawnConsumer(entity -> {
                     if(visualScale!=null) entity.override(GeyserEntityDataTypes.SCALE,visualScale);
-                    // Set before spawn so the AddEntity packet already selects the dye texture.
+                    // Set before spawn so the AddEntity packet already carries texture and transform.
                     if(dyeProperty!=null && dye!=null) entity.updateProperty(dyeProperty,dye);
+                    if(transformProperty!=null && transform!=null) applyTransform(entity,transformProperty,transform);
                 });
             }
         } catch (RuntimeException invalid) {
@@ -231,9 +240,19 @@ public final class VoxelCoreGeyserExtension implements Extension {
                     GeyserIntEntityProperty property = dyeProperties.get(definitionId());
                     if (property != null) entity.updatePropertiesBatched(update -> update.update(property, dye), true);
                 }
+                @Override public void transform(float[] transform) {
+                    GeyserFloatEntityProperty[] properties = transformProperties.get(definitionId());
+                    if (properties != null) applyTransform(entity, properties, transform == null ? IDENTITY_TRANSFORM : transform);
+                }
             });
         }
         return targets;
+    }
+
+    private static void applyTransform(GeyserEntity entity, GeyserFloatEntityProperty[] properties, float[] values) {
+        entity.updatePropertiesBatched(update -> {
+            for (int i = 0; i < properties.length; i++) update.update(properties[i], Float.valueOf(values[i]));
+        }, true);
     }
 
     @Subscribe
@@ -257,8 +276,23 @@ public final class VoxelCoreGeyserExtension implements Extension {
             dyeable = EntityDefinitionCatalog.loadDyeable(geyserApi().configDirectory());
         } catch (IOException invalid) {
             logger().warning("VoxelCore dye properties not registered: " + invalid.getMessage());
-            return;
+            dyeable = java.util.Collections.emptySet();
         }
+        Map<String,GeyserFloatEntityProperty[]> transforms = new java.util.HashMap<String,GeyserFloatEntityProperty[]>();
+        for (String identifier : new TreeSet<String>(nativeEntityIdentifiers.values())) {
+            try {
+                GeyserFloatEntityProperty[] properties = new GeyserFloatEntityProperty[TRANSFORM_PROPERTIES.length];
+                for (int i = 0; i < properties.length; i++) {
+                    float limit = i < 3 ? 64f : i < 5 ? 180f : 64f;
+                    properties[i] = event.registerFloatProperty(Identifier.of(identifier), Identifier.of(TRANSFORM_PROPERTIES[i]),
+                            i < 5 ? -limit : 0f, limit, Float.valueOf(IDENTITY_TRANSFORM[i]));
+                }
+                transforms.put(identifier, properties);
+            } catch (RuntimeException incompatible) {
+                logger().warning("Could not register transform properties for " + identifier + ": " + incompatible.getMessage());
+            }
+        }
+        transformProperties = java.util.Collections.unmodifiableMap(transforms);
         Map<String,GeyserIntEntityProperty> registered = new java.util.HashMap<String,GeyserIntEntityProperty>();
         for (String identifier : dyeable) {
             if (!nativeEntityIdentifiers.containsValue(identifier)) continue;

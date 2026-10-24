@@ -35,23 +35,34 @@ public final class EntityProjectionIndex {
         private final String entityType;
         private final Float scale;
         private final Integer dye;
-        private Projection(String entityType,Float scale,Integer dye) {
+        private final float[] transform;
+        private Projection(String entityType,Float scale,Integer dye,float[] transform) {
             this.entityType=entityType;
             this.scale=scale;
             this.dye=dye;
+            this.transform=transform;
         }
+        /**
+         * Java display transformation Geyser cannot apply, as the pack's transform-animation
+         * properties {tx,ty,tz,pitch,roll,sx,sy,sz} (blocks, degrees, factors); null = identity.
+         */
+        public float[] transform() { return transform==null?null:transform.clone(); }
         public String entityType() { return entityType; }
         public Float scale() { return scale; }
         /** voxelcore:dye value: 0 = undyed, 1..16 = Java DyeColor order; null = not reported. */
         public Integer dye() { return dye; }
         /** Package-private so reconciler tests can build states without JSON. */
-        static Projection of(String entityType,Float scale) { return new Projection(entityType,scale,null); }
-        static Projection of(String entityType,Float scale,Integer dye) { return new Projection(entityType,scale,dye); }
+        static Projection of(String entityType,Float scale) { return new Projection(entityType,scale,null,null); }
+        static Projection of(String entityType,Float scale,Integer dye) { return new Projection(entityType,scale,dye,null); }
+        static Projection of(String entityType,Float scale,Integer dye,float[] transform) {
+            return new Projection(entityType,scale,dye,transform);
+        }
         @Override public boolean equals(Object other) {
             return other instanceof Projection && entityType.equals(((Projection)other).entityType)
-                    && Objects.equals(scale,((Projection)other).scale) && Objects.equals(dye,((Projection)other).dye);
+                    && Objects.equals(scale,((Projection)other).scale) && Objects.equals(dye,((Projection)other).dye)
+                    && java.util.Arrays.equals(transform,((Projection)other).transform);
         }
-        @Override public int hashCode() { return Objects.hash(entityType,scale,dye); }
+        @Override public int hashCode() { return Objects.hash(entityType,scale,dye)*31+java.util.Arrays.hashCode(transform); }
     }
 
     private final Path folder;
@@ -155,7 +166,8 @@ public final class EntityProjectionIndex {
                 JsonObject links=row.getAsJsonObject("entity_links");
                 if(links==null)continue;
                 if("furniture".equals(kind)) {
-                    add(links.get("display_entity_uuid"),bedrockId,scale(row.get("scale")),dye(row.get("dye_rgb")),destination);
+                    add(links.get("display_entity_uuid"),bedrockId,scale(row.get("scale")),dye(row.get("dye_rgb")),
+                            furnitureTransform(row.get("scale")),destination);
                     JsonArray parts=links.getAsJsonArray("parts");
                     if(parts!=null)for(JsonElement partElement:parts) {
                         JsonObject part=partElement.getAsJsonObject();
@@ -165,10 +177,11 @@ public final class EntityProjectionIndex {
                         String partType=modelEntities.get(modelRef.getAsString());
                         if(partType==null)missing.add(modelRef.getAsString());
                         else add(part.get("java_entity_uuid"),partType,
-                                scale(part.get("scale")),null,destination);
+                                scale(part.get("scale")),null,null,destination);
                     }
                 } else {
-                    add(links.get("visual"),bedrockId,scale(row.get("scale")),dye(row.get("dye_rgb")),destination);
+                    add(links.get("visual"),bedrockId,scale(row.get("scale")),dye(row.get("dye_rgb")),
+                            vehicleTransform(row),destination);
                     // A chest accessory uses a distinct model; do not overwrite
                     // it with the root vehicle geometry by guessing its identity.
                 }
@@ -214,13 +227,41 @@ public final class EntityProjectionIndex {
         return Integer.valueOf(best+1);
     }
 
-    private static void add(JsonElement raw,String model,Float scale,Integer dye,
+    /** Non-uniform furniture scale goes through the transform; uniform scale uses Geyser SCALE. */
+    static float[] furnitureTransform(JsonElement scale) {
+        if(scale==null||!scale.isJsonArray()||scale.getAsJsonArray().size()!=3)return null;
+        JsonArray values=scale.getAsJsonArray();
+        float x=values.get(0).getAsFloat(),y=values.get(1).getAsFloat(),z=values.get(2).getAsFloat();
+        if(Math.abs(x-y)<=0.0001f&&Math.abs(x-z)<=0.0001f)return null;
+        for(float v:new float[]{x,y,z})if(!Float.isFinite(v)||v<=0f||v>64f)return null;
+        return new float[]{0,0,0,0,0,x,y,z};
+    }
+
+    /**
+     * VoxelVehicles renders the model at the seat anchor with a display matrix of
+     * translate(-seat_offset) * rotateX(-pitch) * rotateZ(roll) * scale; scale is applied
+     * through Geyser SCALE, the rest through the transform animation.
+     */
+    static float[] vehicleTransform(JsonObject row) {
+        float[] t=new float[]{0,0,0,0,0,1,1,1};
+        JsonElement seat=row.get("seat_offset");
+        if(seat!=null&&seat.isJsonArray()&&seat.getAsJsonArray().size()==3)
+            for(int i=0;i<3;i++)t[i]=-seat.getAsJsonArray().get(i).getAsFloat();
+        if(row.has("pitch")&&!row.get("pitch").isJsonNull())t[3]=row.get("pitch").getAsFloat();
+        if(row.has("roll")&&!row.get("roll").isJsonNull())t[4]=row.get("roll").getAsFloat();
+        for(int i=0;i<5;i++)if(!Float.isFinite(t[i])||Math.abs(t[i])>(i<3?64f:180f))return null;
+        boolean identity=true;
+        for(int i=0;i<5;i++)identity&=t[i]==0f;
+        return identity?null:t;
+    }
+
+    private static void add(JsonElement raw,String model,Float scale,Integer dye,float[] transform,
                             Map<UUID,Projection> result)throws IOException {
         if(raw==null||raw.isJsonNull())return;
         UUID id;
         try { id=UUID.fromString(raw.getAsString()); }
         catch(IllegalArgumentException invalid){throw new IOException("Invalid Paper display UUID in projection",invalid);}
-        Projection projection=new Projection(model,scale,dye);
+        Projection projection=new Projection(model,scale,dye,transform);
         Projection prior=result.putIfAbsent(id,projection);
         if(prior!=null && !prior.equals(projection))
             throw new IOException("Conflicting Paper entity UUID mapped to multiple visual states: "+id);
