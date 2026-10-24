@@ -43,6 +43,40 @@ public final class EntityProjectionIndexTest {
         assertEquals(0,index.size());
     }
 
+    @Test public void stalePaperFileDoesNotReplaceNewDisplaysAndExpiresCachedMappings() throws Exception {
+        Path root=temp.newFolder().toPath(),dir=root.resolve("voxelcore-projection");
+        Files.createDirectories(dir);
+        UUID id=UUID.randomUUID();
+        Path file=dir.resolve("furniture.json");
+        Files.writeString(file,fixture(id.toString(),"voxel:oak_bench"),StandardCharsets.UTF_8);
+        String mapped="voxelcore:entity_i_1234567890abcdef1234567890abcdef";
+        EntityProjectionIndex index=new EntityProjectionIndex(root,Map.of("voxel:oak_bench",mapped));
+        Files.setLastModifiedTime(file,FileTime.fromMillis(System.currentTimeMillis()-120_000L));
+        assertNull("An orphaned Paper file is not authoritative",index.entityType(id));
+        Files.setLastModifiedTime(file,FileTime.fromMillis(System.currentTimeMillis()));
+        assertEquals("A renewed feed becomes usable",mapped,index.entityType(id));
+        Files.setLastModifiedTime(file,FileTime.fromMillis(System.currentTimeMillis()-120_000L));
+        assertNull("Cached entries must expire when the source goes stale",index.entityType(id));
+        assertEquals(0,index.size());
+    }
+
+    @Test public void expiringOneFeedPreservesOtherFreshModelMappings() throws Exception {
+        Path root=temp.newFolder().toPath(),dir=root.resolve("voxelcore-projection");
+        Files.createDirectories(dir);
+        UUID furniture=UUID.randomUUID(), vehicle=UUID.randomUUID();
+        Path furnitureFile=dir.resolve("furniture.json"),vehicleFile=dir.resolve("vehicles.json");
+        Files.writeString(furnitureFile,fixture(furniture.toString(),"voxel:oak_bench"));
+        Files.writeString(vehicleFile,"{\\"schema\\":1,\\"vehicles\\":[{\\"model_item\\":\\"voxel:tractor\\","
+                +"\\"entity_links\\":{\\"visual\\":\\""+vehicle+"\\"}}]}");
+        Files.setLastModifiedTime(furnitureFile,FileTime.fromMillis(System.currentTimeMillis()-120_000L));
+        EntityProjectionIndex index=new EntityProjectionIndex(root,Map.of(
+                "voxel:oak_bench","voxelcore:entity_bench",
+                "voxel:tractor","voxelcore:entity_tractor"));
+        assertNull(index.entityType(furniture));
+        assertEquals("voxelcore:entity_tractor",index.entityType(vehicle));
+        assertEquals(1,index.size());
+    }
+
     @Test public void doesNotMapUnknownModelVariants() throws Exception {
         Path root=temp.newFolder().toPath(),dir=root.resolve("voxelcore-projection");
         Files.createDirectories(dir);
