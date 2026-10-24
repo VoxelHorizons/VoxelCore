@@ -86,6 +86,47 @@ public final class EntityProjectionIndexTest {
         assertEquals(1,index.size());
     }
 
+    @Test public void projectsUniformFurnitureScaleButNotAnisotropicOrInvalidScale() throws Exception {
+        Path root=temp.newFolder().toPath(),dir=root.resolve("voxelcore-projection");
+        Files.createDirectories(dir);
+        UUID id=UUID.randomUUID();
+        Path file=dir.resolve("furniture.json");
+        String uniform=fixture(id.toString(),"voxel:oak_bench")
+                .replace("\\\"entity_links\\\":","\\\"scale\\\":[2.5,2.5,2.5],\\\"entity_links\\\":");
+        Files.writeString(file,uniform);
+        EntityProjectionIndex index=new EntityProjectionIndex(root,Map.of(
+                "voxel:oak_bench","voxelcore:entity_bench"));
+        assertEquals(Float.valueOf(2.5f),index.projection(id).scale());
+        assertEquals("voxelcore:entity_bench",index.entityType(id));
+        Files.writeString(file,uniform.replace("[2.5,2.5,2.5]","[2.5,3,2.5]"));
+        Files.setLastModifiedTime(file,FileTime.fromMillis(System.currentTimeMillis()+5000));
+        assertNull("XYZ anisotropic scale is not a Geyser uniform scale",index.projection(id).scale());
+        Files.writeString(file,uniform.replace("[2.5,2.5,2.5]","[0,0,0]"));
+        Files.setLastModifiedTime(file,FileTime.fromMillis(System.currentTimeMillis()+10000));
+        assertNull("Non-positive scale is unsafe",index.projection(id).scale());
+    }
+
+    @Test public void projectsVehicleUniformScaleWithoutInventingMissingValues() throws Exception {
+        Path root=temp.newFolder().toPath(),dir=root.resolve("voxelcore-projection");
+        Files.createDirectories(dir);
+        UUID vehicle=UUID.randomUUID();
+        com.google.gson.JsonObject links=new com.google.gson.JsonObject();
+        links.addProperty("visual",vehicle.toString());
+        com.google.gson.JsonObject entry=new com.google.gson.JsonObject();
+        entry.addProperty("model_item","voxel:tractor");
+        entry.addProperty("scale",1.75);
+        entry.add("entity_links",links);
+        com.google.gson.JsonArray entries=new com.google.gson.JsonArray();
+        entries.add(entry);
+        com.google.gson.JsonObject feed=new com.google.gson.JsonObject();
+        feed.addProperty("schema",1);
+        feed.add("vehicles",entries);
+        Files.writeString(dir.resolve("vehicles.json"),feed.toString());
+        EntityProjectionIndex index=new EntityProjectionIndex(root,Map.of(
+                "voxel:tractor","voxelcore:entity_tractor"));
+        assertEquals(Float.valueOf(1.75f),index.projection(vehicle).scale());
+    }
+
     @Test public void doesNotMapUnknownModelVariants() throws Exception {
         Path root=temp.newFolder().toPath(),dir=root.resolve("voxelcore-projection");
         Files.createDirectories(dir);

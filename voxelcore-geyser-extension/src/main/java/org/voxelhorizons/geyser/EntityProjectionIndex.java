@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -27,9 +28,21 @@ public final class EntityProjectionIndex {
      * without a replacement, an orphaned Paper feed must never replace a new Java entity. */
     static final long MAX_SNAPSHOT_AGE_MILLIS = 60_000L;
 
+    /** Supported Bedrock spawn-time model state. Null scale means leave Geyser default. */
+    public static final class Projection {
+        private final String entityType;
+        private final Float scale;
+        private Projection(String entityType,Float scale) {
+            this.entityType=entityType;
+            this.scale=scale;
+        }
+        public String entityType() { return entityType; }
+        public Float scale() { return scale; }
+    }
+
     private final Path folder;
     private final Map<String,String> modelEntities;
-    private Map<UUID,String> current = Collections.emptyMap();
+    private Map<UUID,Projection> current = Collections.emptyMap();
     private long furnitureSize=-1,vehiclesSize=-1;
     private long furnitureTime=-1,vehiclesTime=-1;
     private boolean furnitureFresh,vehiclesFresh;
@@ -42,6 +55,11 @@ public final class EntityProjectionIndex {
     }
 
     public synchronized String entityType(UUID paperEntityUuid) throws IOException {
+        Projection projection=projection(paperEntityUuid);
+        return projection==null ? null : projection.entityType();
+    }
+
+    public synchronized Projection projection(UUID paperEntityUuid) throws IOException {
         refresh();
         return current.get(paperEntityUuid);
     }
@@ -63,7 +81,7 @@ public final class EntityProjectionIndex {
         if(fSize==furnitureSize && vSize==vehiclesSize && fTime==furnitureTime && vTime==vehiclesTime
                 && fFresh==furnitureFresh && vFresh==vehiclesFresh)
             return;
-        Map<UUID,String> updated=new HashMap<UUID,String>();
+        Map<UUID,Projection> updated=new HashMap<UUID,Projection>();
         if(fFresh)load(furniture,"furniture",updated);
         if(vFresh)load(vehicles,"vehicles",updated);
         current=Collections.unmodifiableMap(updated);
@@ -82,7 +100,7 @@ public final class EntityProjectionIndex {
                 ? Files.getLastModifiedTime(path,LinkOption.NOFOLLOW_LINKS).toMillis():-1;
     }
 
-    private void load(Path file, String kind, Map<UUID,String> destination) throws IOException {
+    private void load(Path file, String kind, Map<UUID,Projection> destination) throws IOException {
         if(!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS))return;
         JsonObject root;
         try {
@@ -100,7 +118,7 @@ public final class EntityProjectionIndex {
                 JsonObject links=row.getAsJsonObject("entity_links");
                 if(links==null)continue;
                 if("furniture".equals(kind)) {
-                    add(links.get("display_entity_uuid"),bedrockId,destination);
+                    add(links.get("display_entity_uuid"),bedrockId,scale(row.get("scale")),destination);
                     JsonArray parts=links.getAsJsonArray("parts");
                     if(parts!=null)for(JsonElement partElement:parts) {
                         JsonObject part=partElement.getAsJsonObject();
@@ -108,10 +126,11 @@ public final class EntityProjectionIndex {
                         JsonElement modelRef=part.get("model_item");
                         if(modelRef==null||modelRef.isJsonNull())continue;
                         String partType=modelEntities.get(modelRef.getAsString());
-                        if(partType!=null)add(part.get("java_entity_uuid"),partType,destination);
+                        if(partType!=null)add(part.get("java_entity_uuid"),partType,
+                                scale(part.get("scale")),destination);
                     }
                 } else {
-                    add(links.get("visual"),bedrockId,destination);
+                    add(links.get("visual"),bedrockId,scale(row.get("scale")),destination);
                     // A chest accessory uses a distinct model; do not overwrite
                     // it with the root vehicle geometry by guessing its identity.
                 }
@@ -121,13 +140,33 @@ public final class EntityProjectionIndex {
         }
     }
 
-    private static void add(JsonElement raw,String model,Map<UUID,String> result)throws IOException {
+    /** Geyser's SCALE is a uniform Float. Never turn a non-uniform XYZ
+     * transform into a guessed uniform scale or trust invalid numeric values. */
+    private static Float scale(JsonElement value) {
+        if(value==null||value.isJsonNull())return null;
+        float amount;
+        if(value.isJsonArray()) {
+            JsonArray values=value.getAsJsonArray();
+            if(values.size()!=3)return null;
+            amount=values.get(0).getAsFloat();
+            if(Math.abs(amount-values.get(1).getAsFloat())>0.0001f
+                    ||Math.abs(amount-values.get(2).getAsFloat())>0.0001f)return null;
+        } else {
+            amount=value.getAsFloat();
+        }
+        return Float.isFinite(amount) && amount>0f && amount<=64f
+                ? Float.valueOf(amount) : null;
+    }
+
+    private static void add(JsonElement raw,String model,Float scale,
+                            Map<UUID,Projection> result)throws IOException {
         if(raw==null||raw.isJsonNull())return;
         UUID id;
         try { id=UUID.fromString(raw.getAsString()); }
         catch(IllegalArgumentException invalid){throw new IOException("Invalid Paper display UUID in projection",invalid);}
-        String prior=result.putIfAbsent(id,model);
-        if(prior!=null && !prior.equals(model))
-            throw new IOException("Conflicting Paper entity UUID mapped to multiple models: "+id);
+        Projection projection=new Projection(model,scale);
+        Projection prior=result.putIfAbsent(id,projection);
+        if(prior!=null && (!prior.entityType().equals(model) || !Objects.equals(prior.scale(),scale)))
+            throw new IOException("Conflicting Paper entity UUID mapped to multiple visual states: "+id);
     }
 }
