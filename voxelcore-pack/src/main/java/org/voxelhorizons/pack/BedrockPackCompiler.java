@@ -512,29 +512,38 @@ public final class BedrockPackCompiler {
         }
         return result.toString();
     }
+    /** Every language Bedrock ships (Mojang bedrock-samples resource_pack/texts/languages.json). */
+    static final String[] BEDROCK_LANGUAGES = {"en_US", "en_GB", "de_DE", "es_ES", "es_MX", "fr_FR", "fr_CA",
+            "it_IT", "ja_JP", "ko_KR", "pt_BR", "pt_PT", "ru_RU", "zh_CN", "zh_TW", "nl_NL", "bg_BG", "cs_CZ",
+            "da_DK", "el_GR", "fi_FI", "hu_HU", "id_ID", "nb_NO", "pl_PL", "sk_SK", "sv_SE", "tr_TR", "uk_UA"};
+
     /**
      * Riding a native entity makes Bedrock show action.hint.exit.<entity id> on the action bar;
      * without a translation it printed the raw key (live test, vehicles). Each generated entity
-     * gets its item's VoxelCore name. Lines are appended to an authored texts/en_US.lang, and
-     * texts/languages.json lists en_US.
+     * gets its item's VoxelCore name, in every Bedrock language (the name is not localized, but
+     * a player in any language must not see the key). Lines are appended to authored texts/*.lang
+     * files (authored keys win), and texts/languages.json lists every language.
      */
     static void appendEntityTexts(Map<String, byte[]> assets, Map<String, String> entityNames) throws IOException {
         if (entityNames.isEmpty()) return;
-        String lang = "texts/en_US.lang";
-        byte[] authored = assets.get(lang);
-        StringBuilder text = new StringBuilder(authored == null ? "" : new String(authored, StandardCharsets.UTF_8));
-        if (text.length() > 0 && text.charAt(text.length() - 1) != '\n') text.append('\n');
-        for (Map.Entry<String, String> entity : entityNames.entrySet()) {
-            String key = "action.hint.exit." + entity.getKey() + "=";
-            if (text.indexOf("\n" + key) >= 0 || text.indexOf(key) == 0) continue; // authored wins
-            text.append(key).append(entity.getValue()).append('\n');
+        for (String language : BEDROCK_LANGUAGES) {
+            String lang = "texts/" + language + ".lang";
+            byte[] authored = assets.get(lang);
+            StringBuilder text = new StringBuilder(authored == null ? "" : new String(authored, StandardCharsets.UTF_8));
+            if (text.length() > 0 && text.charAt(text.length() - 1) != '\n') text.append('\n');
+            for (Map.Entry<String, String> entity : entityNames.entrySet()) {
+                String key = "action.hint.exit." + entity.getKey() + "=";
+                if (text.indexOf("\n" + key) >= 0 || text.indexOf(key) == 0) continue; // authored wins
+                text.append(key).append(entity.getValue()).append('\n');
+            }
+            assets.put(lang, text.toString().getBytes(StandardCharsets.UTF_8));
         }
-        assets.put(lang, text.toString().getBytes(StandardCharsets.UTF_8));
         String languages = "texts/languages.json";
         JsonArray list = assets.containsKey(languages)
                 ? JsonParser.parseString(new String(assets.get(languages), StandardCharsets.UTF_8)).getAsJsonArray()
                 : new JsonArray();
-        if (!list.contains(new JsonPrimitive("en_US"))) list.add("en_US");
+        for (String language : BEDROCK_LANGUAGES)
+            if (!list.contains(new JsonPrimitive(language))) list.add(language);
         assets.put(languages, bytes(list));
     }
 
