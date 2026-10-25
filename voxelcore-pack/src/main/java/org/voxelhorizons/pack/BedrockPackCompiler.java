@@ -24,6 +24,14 @@ public final class BedrockPackCompiler {
     private Path vanillaAssets;
     private BuildProgress progress = BuildProgress.NONE;
     private boolean overrideControllerGlyphPages;
+    private BedrockGlyphAtlas.Shrink glyphShrink = BedrockGlyphAtlas.Shrink.AREA;
+
+    /** area (default), nearest or native: how glyphs taller than their Bedrock size are reduced. */
+    public BedrockPackCompiler withGlyphShrink(String mode) {
+        try { glyphShrink = BedrockGlyphAtlas.Shrink.valueOf(mode.trim().toUpperCase(Locale.ROOT)); }
+        catch (RuntimeException unknown) { glyphShrink = BedrockGlyphAtlas.Shrink.AREA; }
+        return this;
+    }
 
     /** Write authored glyphs in Bedrock's controller pages U+E000..U+E1FF (see BedrockGlyphAtlas). */
     public BedrockPackCompiler withControllerGlyphPages(boolean override) {
@@ -135,7 +143,7 @@ public final class BedrockPackCompiler {
                 if (!javaAssets.containsKey(vanilla.getKey())) javaAssets.put(vanilla.getKey(), vanilla.getValue());
         int mappedGlyphs = glyphAllocationManifest == null ? 0
                 : BedrockGlyphAtlas.append(contentRoot, glyphAllocationManifest, javaAssets, assets, unsupported,
-                        overrideControllerGlyphPages);
+                        overrideControllerGlyphPages, glyphShrink);
         progress.report("Bedrock: " + mappedGlyphs + " font glyphs placed"
                 + (unsupported.isEmpty() ? "" : "; " + unsupported.size() + " glyphs skipped (see unsupported-items.txt)"));
         BedrockIconRenderer renderer = new BedrockIconRenderer(javaAssets);

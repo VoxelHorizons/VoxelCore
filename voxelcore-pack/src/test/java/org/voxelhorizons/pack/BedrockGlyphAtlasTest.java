@@ -31,7 +31,7 @@ public class BedrockGlyphAtlasTest {
         assertSame("Tag untouched", tag.art, tagOut);
         BufferedImage flagOut = BedrockGlyphAtlas.sized(flag.art, flag.javaHeight, ratio);
         assertEquals("Same Java height -> same Bedrock height as the tag", 11, flagOut.getHeight());
-        assertEquals("Nearest-neighbour: no blended colours", 0xffc0102e, flagOut.getRGB(0, 5));
+        assertEquals("Solid areas keep their exact colour", 0xffc0102e, flagOut.getRGB(0, 5));
         assertEquals(0xff00247d, flagOut.getRGB(flagOut.getWidth() - 1, 5));
     }
 
@@ -44,6 +44,20 @@ public class BedrockGlyphAtlasTest {
         assertEquals(11.0 / 18, ratio, 1e-9);
         assertSame(tag.art, BedrockGlyphAtlas.sized(tag.art, tag.javaHeight, ratio));
         assertEquals(10, BedrockGlyphAtlas.sized(flag.art, flag.javaHeight, ratio).getHeight());
+    }
+
+    @Test public void shrinkingKeepsThinDetailAndTransparentEdgesAreNotDarkened() {
+        BufferedImage star = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++) star.setRGB(x, y, 0xff00247d);
+        star.setRGB(5, 5, 0xffffffff); // 1px star: nearest 16->10 would sample past it
+        BufferedImage out = BedrockGlyphAtlas.areaAverage(star, 10, 10);
+        boolean lighter = false;
+        for (int y = 0; y < 10; y++) for (int x = 0; x < 10; x++) lighter |= ((out.getRGB(x, y) >> 16) & 255) > 0x20;
+        assertTrue("The star still shows", lighter);
+        BufferedImage edge = new BufferedImage(2, 1, BufferedImage.TYPE_INT_ARGB);
+        edge.setRGB(0, 0, 0xffffffff); // white next to transparent black
+        assertEquals("Colour not darkened by the transparent neighbour", 0xffffff,
+                BedrockGlyphAtlas.areaAverage(edge, 1, 1).getRGB(0, 0) & 0xffffff);
     }
 
     @Test public void integerUpscaledArtIsReducedExactly() {

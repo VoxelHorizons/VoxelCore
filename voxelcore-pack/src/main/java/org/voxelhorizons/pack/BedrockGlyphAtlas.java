@@ -41,8 +41,16 @@ final class BedrockGlyphAtlas {
     /** @param skipped receives one line per glyph that has no Bedrock cell, with the reason */
     static int append(Path contentRoot, Path allocationManifest, Map<String, byte[]> javaAssets,
                       Map<String, byte[]> bedrockAssets, java.util.List<String> skipped) throws IOException {
-        return append(contentRoot, allocationManifest, javaAssets, bedrockAssets, skipped, false);
+        return append(contentRoot, allocationManifest, javaAssets, bedrockAssets, skipped, false, Shrink.AREA);
     }
+
+    /**
+     * How a glyph taller than its Bedrock target is reduced. Bedrock draws a glyph-page pixel at
+     * a fixed size, so a 16px flag shown 10px tall cannot keep every pixel: AREA keeps all detail
+     * softly, NEAREST stays crisp but drops rows and columns, NATIVE never shrinks (crisp, but
+     * larger than on Java, as the Kafal converter does).
+     */
+    enum Shrink { AREA, NEAREST, NATIVE }
 
     /**
      * @param overrideControllerPages also write authored glyphs at U+E000..U+E1FF (Bedrock's
@@ -51,7 +59,7 @@ final class BedrockGlyphAtlas {
      */
     static int append(Path contentRoot, Path allocationManifest, Map<String, byte[]> javaAssets,
                       Map<String, byte[]> bedrockAssets, java.util.List<String> skipped,
-                      boolean overrideControllerPages) throws IOException {
+                      boolean overrideControllerPages, Shrink shrink) throws IOException {
         UiGlyphRegistry glyphs = new UiGlyphLoader().load(contentRoot, allocationManifest, false);
         Map<Integer, Glyph> pending = new TreeMap<Integer, Glyph>();
         int count = 0;
@@ -83,7 +91,7 @@ final class BedrockGlyphAtlas {
         double ratio = pixelRatio(pending.values());
         Map<Integer, BufferedImage> drawn = new TreeMap<Integer, BufferedImage>();
         for (Map.Entry<Integer, Glyph> entry : pending.entrySet())
-            drawn.put(entry.getKey(), sized(entry.getValue().art, entry.getValue().javaHeight, ratio));
+            drawn.put(entry.getKey(), sized(entry.getValue().art, entry.getValue().javaHeight, ratio, shrink));
         writePages(drawn, bedrockAssets);
         return count;
     }
@@ -230,18 +238,52 @@ final class BedrockGlyphAtlas {
      * less than half, and smooth only for genuinely large images.
      */
     static BufferedImage sized(BufferedImage art, int javaHeight, double ratio) {
+        return sized(art, javaHeight, ratio, Shrink.AREA);
+    }
+
+    static BufferedImage sized(BufferedImage art, int javaHeight, double ratio, Shrink shrink) {
         int target = Math.max(1, (int) Math.round(javaHeight * ratio));
         int height = art.getHeight();
         BufferedImage out;
-        if (height == target) out = art;
+        if (height == target || (height > target && height <= target * 2 && shrink == Shrink.NATIVE)) out = art;
         else {
             int width = Math.max(1, (int) Math.round((double) art.getWidth() * target / height));
             if (height < target && target % height == 0) width = art.getWidth() * (target / height);
-            out = height < target || height < target * 2 ? nearest(art, width, target) : scaled(art, width, target);
+            // Growing: nearest keeps pixel art crisp. Shrinking: area averaging (premultiplied
+            // alpha) keeps thin details such as flag stars that nearest would drop (live test).
+            out = height < target || shrink == Shrink.NEAREST ? nearest(art, width, target) : areaAverage(art, width, target);
         }
         if (Math.max(out.getWidth(), out.getHeight()) > MAX_CELL) {
             double fit = (double) MAX_CELL / Math.max(out.getWidth(), out.getHeight());
             out = scaled(out, Math.max(1, (int) (out.getWidth() * fit)), Math.max(1, (int) (out.getHeight() * fit)));
+        }
+        return out;
+    }
+
+    /** Box-filter downscale weighting each source pixel by its covered area, in premultiplied alpha. */
+    static BufferedImage areaAverage(BufferedImage image, int width, int height) {
+        int sw = image.getWidth(), sh = image.getHeight();
+        double fx = (double) sw / width, fy = (double) sh / height;
+        BufferedImage out = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) {
+            double x0 = x * fx, x1 = x0 + fx, y0 = y * fy, y1 = y0 + fy, a = 0, r = 0, g = 0, b = 0, area = 0;
+            for (int sy = (int) y0; sy < Math.min(sh, Math.ceil(y1)); sy++) {
+                double wy = Math.min(y1, sy + 1) - Math.max(y0, sy);
+                for (int sx = (int) x0; sx < Math.min(sw, Math.ceil(x1)); sx++) {
+                    double w = wy * (Math.min(x1, sx + 1) - Math.max(x0, sx));
+                    if (w <= 0) continue;
+                    int argb = image.getRGB(sx, sy);
+                    double alpha = (argb >>> 24) / 255.0;
+                    a += alpha * w;
+                    r += ((argb >> 16) & 255) * alpha * w;
+                    g += ((argb >> 8) & 255) * alpha * w;
+                    b += (argb & 255) * alpha * w;
+                    area += w;
+                }
+            }
+            if (a <= 0) continue;
+            int alpha = (int) Math.round(255 * a / area);
+            out.setRGB(x, y, (alpha << 24) | ((int) Math.round(r / a) << 16) | ((int) Math.round(g / a) << 8) | (int) Math.round(b / a));
         }
         return out;
     }

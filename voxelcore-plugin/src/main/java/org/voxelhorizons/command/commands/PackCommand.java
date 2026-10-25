@@ -498,6 +498,7 @@ public final class PackCommand implements SubCommand {
                                             .withProgress(progress)
                                             .withControllerGlyphPages(plugin.getConfig().getBoolean(
                                                     "bedrock.override_controller_glyph_pages", true))
+                                            .withGlyphShrink(plugin.getConfig().getString("bedrock.glyph_shrink", "area"))
                                             .compile(
                                             plugin.getPackManager().contentRoot(),
                                             plugin.getPackManager().outputRoot().resolve("bedrock"),
