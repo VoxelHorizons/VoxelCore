@@ -3,6 +3,7 @@ package org.voxelhorizons.pack;
 import org.junit.Test;
 
 import java.awt.image.BufferedImage;
+import java.util.Arrays;
 
 import static org.junit.Assert.*;
 
@@ -15,35 +16,38 @@ public class BedrockGlyphAtlasTest {
         return image;
     }
 
-    @Test public void nativePixelArtNearItsJavaHeightIsKeptCrisp() {
-        BufferedImage out = BedrockGlyphAtlas.atJavaSize(tag(1), 9);
-        assertEquals(43, out.getWidth());
-        assertEquals(11, out.getHeight());
-        assertEquals("No smoothing: pixels unchanged", 0xffffffff, out.getRGB(1, 0));
+    private static BufferedImage flag() {
+        BufferedImage flag = new BufferedImage(24, 16, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < 16; y++) for (int x = 0; x < 24; x++) flag.setRGB(x, y, x < 12 ? 0xffc0102e : 0xff00247d);
+        return flag;
+    }
+
+    @Test public void tagsStayPixelExactAndFlagsMatchTheirHeight() {
+        BedrockGlyphAtlas.Glyph tag = new BedrockGlyphAtlas.Glyph(tag(1), 9);
+        BedrockGlyphAtlas.Glyph flag = new BedrockGlyphAtlas.Glyph(flag(), 9);
+        double ratio = BedrockGlyphAtlas.pixelRatio(Arrays.asList(tag, flag, flag, flag));
+        assertEquals("Ratio comes from the text tags even when flags outnumber them", 11.0 / 9, ratio, 1e-9);
+        BufferedImage tagOut = BedrockGlyphAtlas.sized(tag.art, tag.javaHeight, ratio);
+        assertSame("Tag untouched", tag.art, tagOut);
+        BufferedImage flagOut = BedrockGlyphAtlas.sized(flag.art, flag.javaHeight, ratio);
+        assertEquals("Same Java height -> same Bedrock height as the tag", 11, flagOut.getHeight());
+        assertEquals("Nearest-neighbour: no blended colours", 0xffc0102e, flagOut.getRGB(0, 5));
+        assertEquals(0xff00247d, flagOut.getRGB(flagOut.getWidth() - 1, 5));
     }
 
     @Test public void integerUpscaledArtIsReducedExactly() {
-        BufferedImage out = BedrockGlyphAtlas.atJavaSize(tag(4), 9);
+        BufferedImage out = BedrockGlyphAtlas.reduceBlocks(tag(4));
         assertEquals(43, out.getWidth());
         assertEquals(11, out.getHeight());
         assertEquals(0xff1060a0, out.getRGB(0, 0));
         assertEquals(0xffffffff, out.getRGB(1, 0));
     }
 
-    @Test public void nativeFlagAtTwiceJavaHeightStaysCrisp() {
-        BufferedImage flag = new BufferedImage(24, 16, BufferedImage.TYPE_INT_ARGB);
-        for (int y = 0; y < 16; y++) for (int x = 0; x < 24; x++) flag.setRGB(x, y, x % 2 == 0 ? 0xffc0102e : 0xff00247d);
-        BufferedImage out = BedrockGlyphAtlas.atJavaSize(flag, 7);
-        assertEquals(24, out.getWidth());
-        assertEquals(16, out.getHeight());
-        assertEquals(0xff00247d, out.getRGB(1, 0));
-    }
-
     @Test public void smallArtGrowsByWholeMultiples() {
         BufferedImage icon = new BufferedImage(5, 4, BufferedImage.TYPE_INT_ARGB);
         icon.setRGB(0, 0, 0xffff0000);
-        BufferedImage out = BedrockGlyphAtlas.atJavaSize(icon, 9);
-        assertEquals("floor(9/4) = 2", 10, out.getWidth());
+        BufferedImage out = BedrockGlyphAtlas.sized(icon, 8, 1.0);
+        assertEquals(10, out.getWidth());
         assertEquals(8, out.getHeight());
     }
 }
