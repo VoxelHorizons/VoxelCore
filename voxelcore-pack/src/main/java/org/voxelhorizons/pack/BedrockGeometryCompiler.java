@@ -205,10 +205,12 @@ final class BedrockGeometryCompiler {
                     }
                 }
             }
+            // Bedrock model X runs opposite to Java's (as in java2bedrock/Blockbench): mirror X,
+            // otherwise asymmetric models (corner benches) render as their mirror image.
             JsonObject cube = new JsonObject();
-            cube.add("origin", xyz(lo[0]-8,lo[1]-8,lo[2]-8));
+            cube.add("origin", xyz(8-hi[0],lo[1]-8,lo[2]-8));
             cube.add("size", xyz(hi[0]-lo[0],hi[1]-lo[1],hi[2]-lo[2]));
-            minX=Math.min(minX,lo[0]-8); maxX=Math.max(maxX,hi[0]-8);
+            minX=Math.min(minX,8-hi[0]); maxX=Math.max(maxX,8-lo[0]);
             minY=Math.min(minY,lo[1]-8); maxY=Math.max(maxY,hi[1]-8);
             minZ=Math.min(minZ,lo[2]-8); maxZ=Math.max(maxZ,hi[2]-8);
             if (element.has("rotation")) {
@@ -216,8 +218,8 @@ final class BedrockGeometryCompiler {
                 // Bedrock cubes take any x/y/z rotation; Java's legacy form is one axis.
                 double[] rot = BedrockIconRenderer.angles(rotation);
                 double[] pivot = rotation.has("origin") ? vector(rotation,"origin") : new double[]{8,8,8};
-                cube.add("rotation",xyz(rot[0],rot[1],rot[2]));
-                cube.add("pivot",xyz(pivot[0]-8,pivot[1]-8,pivot[2]-8));
+                cube.add("rotation",xyz(-rot[0],-rot[1],rot[2]));
+                cube.add("pivot",xyz(8-pivot[0],pivot[1]-8,pivot[2]-8));
             }
             JsonObject faces = element.has("faces") ? element.getAsJsonObject("faces") : null;
             if (faces == null || faces.size()==0) throw new IOException("Cuboid without faces in "+javaModel);
@@ -301,10 +303,21 @@ final class BedrockGeometryCompiler {
         description.addProperty("visible_bounds_width", Math.max(2,Math.max(maxX-minX,maxZ-minZ)/16.0+1));
         description.addProperty("visible_bounds_height", Math.max(2,(maxY-minY)/16.0+1));
         description.add("visible_bounds_offset",xyz((minX+maxX)/32.0,(minY+maxY)/32.0,(minZ+maxZ)/32.0));
+        // Placed displays (FIXED context) render with the model's display.fixed transform, e.g.
+        // block models inherit scale 0.5; without it Bedrock furniture was twice the Java size.
+        JsonObject display = model.has("display") && model.get("display").isJsonObject()
+                ? model.getAsJsonObject("display") : new JsonObject();
+        JsonObject fixed = display.has("fixed") && display.get("fixed").isJsonObject()
+                ? display.getAsJsonObject("fixed") : new JsonObject();
+        double[] fixedScale = triple(fixed, "scale", new double[]{1,1,1});
+        double[] fixedTranslation = triple(fixed, "translation", new double[]{0,0,0});
+        double[] fixedRotation = triple(fixed, "rotation", new double[]{0,0,0});
         JsonObject bone = new JsonObject();
         bone.addProperty("name","root");
         bone.add("pivot",xyz(0,0,0));
-        bone.add("cubes",cubes);
+        if (fixedRotation[0] != 0 || fixedRotation[1] != 0 || fixedRotation[2] != 0)
+            bone.add("rotation", xyz(-fixedRotation[0], -fixedRotation[1], fixedRotation[2]));
+        bone.add("cubes",fixedPose(cubes, fixedScale, new double[]{-fixedTranslation[0], fixedTranslation[1], fixedTranslation[2]}));
         JsonArray bones = new JsonArray(); bones.add(bone);
         JsonObject geom = new JsonObject();
         geom.add("description",description); geom.add("bones",bones);
@@ -353,8 +366,6 @@ final class BedrockGeometryCompiler {
         // Java display.thirdperson_righthand / firstperson_righthand become constant bone
         // transforms so the model is hand-sized instead of a full block-scale model.
         String heldAnimation = "animation.voxelcore." + shortId + ".held";
-        JsonObject display = model.has("display") && model.get("display").isJsonObject()
-                ? model.getAsJsonObject("display") : new JsonObject();
         JsonObject attachAnimations = new JsonObject();
         attachAnimations.addProperty("third_person", heldAnimation + ".third_person");
         attachAnimations.addProperty("first_person", heldAnimation + ".first_person");
@@ -424,6 +435,30 @@ final class BedrockGeometryCompiler {
         assets.put("textures/voxelcore/g_"+shortId+".png",png.toByteArray());
         assets.put(TRANSFORM_ANIMATION_PATH, transformAnimation());
         return new Output(assets,cubes.size(),tinted);
+    }
+
+    /**
+     * Copy of the (centred) cubes with a Java display transform's scale and translation baked
+     * in, about the model centre: p' = p * scale + translation. Per-face UVs are absolute
+     * atlas cells, so scaling a cube never stretches its texture.
+     */
+    private static JsonArray fixedPose(JsonArray cubes, double[] scale, double[] translation) {
+        if (scale[0] == 1 && scale[1] == 1 && scale[2] == 1
+                && translation[0] == 0 && translation[1] == 0 && translation[2] == 0) return cubes;
+        JsonArray out = cubes.deepCopy();
+        for (JsonElement element : out) {
+            JsonObject cube = element.getAsJsonObject();
+            for (String field : new String[]{"origin", "pivot"}) {
+                if (!cube.has(field)) continue;
+                JsonArray point = cube.getAsJsonArray(field);
+                for (int a = 0; a < 3; a++)
+                    point.set(a, new com.google.gson.JsonPrimitive(point.get(a).getAsDouble() * scale[a] + translation[a]));
+            }
+            JsonArray size = cube.getAsJsonArray("size");
+            for (int a = 0; a < 3; a++)
+                size.set(a, new com.google.gson.JsonPrimitive(size.get(a).getAsDouble() * Math.abs(scale[a])));
+        }
+        return out;
     }
 
     /** Copy of the cubes moved up (Java item space keeps y in 0..16; the entity geometry is centred). */
