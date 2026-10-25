@@ -57,8 +57,14 @@ final class BedrockChestGui {
         final UiGlyphDefinition glyph;
         final String texture;
         final int width, height;
+        /** Source PNG size, for cropping in texture pixels. */
+        final int imageWidth, imageHeight;
         Background(UiGlyphDefinition glyph, String texture, int width, int height) {
+            this(glyph, texture, width, height, width, height);
+        }
+        Background(UiGlyphDefinition glyph, String texture, int width, int height, int imageWidth, int imageHeight) {
             this.glyph = glyph; this.texture = texture; this.width = width; this.height = height;
+            this.imageWidth = imageWidth; this.imageHeight = imageHeight;
         }
         String control() { return "voxelcore_gui_" + Integer.toHexString(glyph.codePoint()); }
     }
@@ -89,7 +95,7 @@ final class BedrockChestGui {
             int width = Math.max(1, (int) Math.round((double) image.getWidth() * height / image.getHeight()));
             String texture = TEXTURE_DIR + Integer.toHexString(glyph.codePoint());
             bedrockAssets.put(texture + ".png", source);
-            backgrounds.add(new Background(glyph, texture, width, height));
+            backgrounds.add(new Background(glyph, texture, width, height, image.getWidth(), image.getHeight()));
         }
         if (backgrounds.isEmpty()) return 0;
         // The Java container art (a pack's retextured generic_54, else vanilla) replaces Bedrock's
@@ -142,7 +148,6 @@ final class BedrockChestGui {
         label.addProperty("visible", "(" + plain + ")");
         root.add("chest_label", label);
 
-        JsonArray controls = new JsonArray();
         for (Background background : backgrounds) {
             JsonObject image = new JsonObject();
             image.addProperty("type", "image");
@@ -156,16 +161,20 @@ final class BedrockChestGui {
             image.addProperty(TITLE, "$container_title");
             image.addProperty("visible", "(not " + lacks(background.glyph) + ")");
             root.add(background.control(), image);
-            JsonObject reference = new JsonObject();
-            reference.add(background.control() + "@" + NAMESPACE + "." + background.control(), new JsonObject());
-            controls.add(reference);
         }
         // Geyser opens 1-3 row menus as a small chest and 4-6 rows as a large one.
-        for (String panel : new String[]{"small_chest_panel_top_half", "large_chest_panel_top_half"}) {
+        for (boolean large : new boolean[]{false, true}) {
+            JsonArray controls = new JsonArray();
+            for (Background background : backgrounds) {
+                JsonObject reference = new JsonObject();
+                reference.add(background.control() + "@" + NAMESPACE + "." + background.control(), cropped(background, large));
+                controls.add(reference);
+            }
+            String panel = large ? "large_chest_panel_top_half" : "small_chest_panel_top_half";
             JsonObject insert = new JsonObject();
             insert.addProperty("array_name", "controls");
             insert.addProperty("operation", "insert_front");
-            insert.add("value", controls.deepCopy());
+            insert.add("value", controls);
             JsonArray modifications = new JsonArray(); modifications.add(insert);
             JsonObject half = new JsonObject(); half.add("modifications", modifications);
             root.add(panel, half);
@@ -178,19 +187,47 @@ final class BedrockChestGui {
         return JSON.toJson(root).getBytes(StandardCharsets.UTF_8);
     }
 
+    /**
+     * Bedrock chest layout (Mojang bedrock-samples ui/chest_screen.json and ui_common.json): the
+     * root panel is 176 x 166 (small) or 176 x 220 (large); the top half starts 12 (small) or 11
+     * (large) down and both chest grids start at y = 21; the 3 inventory rows end 26px above the
+     * panel bottom and the hotbar 5px above it. Its slot cells are opaque and drawn over the
+     * container art, so only the gaps between them show it.
+     */
+    static int panelHeight(boolean large) { return large ? 220 : 166; }
+    static int topHalfY(boolean large) { return large ? 11 : 12; }
+    /** First inventory row's top edge, from the panel top. */
+    static int inventoryTop(boolean large) { return panelHeight(large) - 26 - 54; }
+
+    /**
+     * A menu background ends where Bedrock's inventory starts: Bedrock leaves 7px less between
+     * the chest rows and the inventory than Java, and a background is drawn over the slot cells,
+     * so an uncropped one hid the first inventory row's top edge (live test).
+     */
+    static JsonObject cropped(Background background, boolean large) {
+        JsonObject override = new JsonObject();
+        int top = topHalfY(large) + TOP_BASE - background.glyph.ascent();
+        int visible = inventoryTop(large) - top;
+        if (visible >= background.height) return override;
+        if (visible <= 0) { override.addProperty("visible", false); return override; }
+        override.add("size", pair(background.width, visible));
+        override.add("uv", pair(0, 0));
+        override.add("uv_size", pairD(background.imageWidth,
+                (double) background.imageHeight * visible / background.height));
+        return override;
+    }
+
     static final String CONTAINER_TEXTURE = "assets/minecraft/textures/gui/container/generic_54.png";
     static final String CONTAINER_PANEL = TEXTURE_DIR + "generic_54";
     /**
-     * Java draws generic_54 in two parts: rows * 18 + 17 pixels for the header and chest rows,
-     * then the 96px player inventory from y = 126. Measured in a live test (large chest, 4 screen
-     * px per GUI px): Bedrock's chest slots sit 5px lower than Java's in the panel, its inventory
-     * rows match Java's when the inventory part is anchored to the panel bottom, but its hotbar
-     * has a 1px gap above it instead of Java's 3px. So the top part is drawn 5px down, and the
-     * inventory part is cut in four: the rows (to 2px into the gap), the hotbar strip 2px higher,
-     * 2px of the footer filling the space that leaves, and the 7px footer at the bottom.
+     * Java draws generic_54 in two parts: rows * 18 + 17 pixels for the header and chest rows
+     * (slot edges from y = 17), then the 96px player inventory from y = 126 (inventory slot edges
+     * 139..192, a 4px gap, hotbar 197..214, a 7px footer). Mapped onto the Bedrock layout above:
+     * the top part 4px down (17 -> 21), and the inventory part cut so each piece lands on
+     * Bedrock's: rows 126..193 one pixel down (139 -> 140, leaving Bedrock's 3px hotbar gap),
+     * hotbar 195..214 ending 5px above the bottom, and the last 5 footer rows (217..221).
      */
-    static final int CONTAINER_TOP_SHIFT = 5;
-    static final int HOTBAR_RAISE = 2;
+    static final int CONTAINER_TOP_SHIFT = 4;
 
     private static JsonObject containerPart(int v, int height, boolean top, double scale, String visible) {
         return containerPart(v, height, top, top ? CONTAINER_TOP_SHIFT : 0, top ? 2 : 1, scale, visible);
@@ -231,11 +268,12 @@ final class BedrockChestGui {
         frame.addProperty("visible", plain);
         rootControls.add(named("common_panel@common.common_panel", frame));
         rootControls.add(named("voxelcore_container_top", containerPart(0, rows * 18 + 17, true, scale, menu)));
-        // Inventory part (texture y 126..221): rows 126..194, hotbar strip 195..214, footer 215..221.
-        rootControls.add(named("voxelcore_container_inventory", containerPart(126, 69, false, -27, 1, scale, menu)));
-        rootControls.add(named("voxelcore_container_hotbar", containerPart(195, 20, false, -7 - HOTBAR_RAISE, 2, scale, menu)));
-        rootControls.add(named("voxelcore_container_gap", containerPart(215, HOTBAR_RAISE, false, -7, 1, scale, menu)));
-        rootControls.add(named("voxelcore_container_footer", containerPart(215, 7, false, 0, 1, scale, menu)));
+        // Inventory part, bottom-anchored: rows 126..193 end 25px up (top edge at the inventory
+        // grid's 140 - 13), the hotbar strip 195..214 ends 5px up like Bedrock's hotbar, then
+        // the footer's last 5 rows.
+        rootControls.add(named("voxelcore_container_inventory", containerPart(126, 68, false, -25, 1, scale, menu)));
+        rootControls.add(named("voxelcore_container_hotbar", containerPart(195, 20, false, -5, 1, scale, menu)));
+        rootControls.add(named("voxelcore_container_footer", containerPart(217, 5, false, 0, 1, scale, menu)));
         JsonArray chestControls = new JsonArray();
         chestControls.add(named(half + "@chest." + half, new JsonObject()));
         chestControls.add(named("inventory_panel_bottom_half_with_label@common.inventory_panel_bottom_half_with_label", new JsonObject()));
