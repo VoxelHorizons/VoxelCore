@@ -16,8 +16,8 @@ import java.util.List;
  * A Java animated texture: the PNG holds every frame (a vertical strip, or a grid when
  * animation.width/height say so) and the .png.mcmeta "animation" section lists the frame order
  * and timing in ticks. Bedrock needs the frames separately: icons use the first frame, 3D models
- * flip through atlas copies with a render controller uv_anim (live test: the whole strip was
- * squeezed onto each face).
+ * switch between one atlas per frame with a render controller texture array (live tests: the
+ * whole strip was squeezed onto each face; a custom uv_anim material rendered nothing).
  */
 final class JavaTextureAnimation {
     final List<BufferedImage> frames;
