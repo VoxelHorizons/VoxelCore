@@ -302,6 +302,27 @@ public class BedrockPackCompilerTest {
             }
         }
     }
+    @Test public void menuBackgroundGlyphsBecomeBedrockChestScreenImages() throws Exception {
+        Path root = fixture(), out = temp.newFolder().toPath();
+        write(root.resolve("demo/content/ui.yml"),
+                "ui:\n  shop_menu:\n    path: ui/shop.png\n    scale_ratio: 222\n    y_position: 13\n    gui: true\n");
+        Path file = root.resolve("demo/assets/demo/textures/ui/shop.png");
+        Files.createDirectories(file.getParent());
+        java.awt.image.BufferedImage bitmap = new java.awt.image.BufferedImage(176,222,2);
+        bitmap.setRGB(8,8,0xffcc1111);
+        javax.imageio.ImageIO.write(bitmap,"png",file.toFile());
+        Path allocations = temp.newFolder("gui-state").toPath().resolve("glyph-allocations.yml");
+        UiGlyphDefinition glyph = new UiGlyphLoader().load(root, allocations, true).entries().values().iterator().next();
+        BedrockPackCompiler.Result result = new BedrockPackCompiler().compile(root,out,allocations);
+        assertEquals("A menu background is not a font glyph", 0, result.mappedGlyphs);
+        String hex = Integer.toHexString(glyph.codePoint());
+        try (ZipFile zip = new ZipFile(result.directory.resolve("voxelcore.mcpack").toFile())) {
+            assertNotNull(zip.getEntry("textures/voxelcore/gui/" + hex + ".png"));
+            String screen = new String(readAll(zip.getInputStream(zip.getEntry("ui/chest_screen.json"))), StandardCharsets.UTF_8);
+            assertTrue(screen.contains("\"voxelcore_gui_" + hex + "\""));
+            assertTrue("Keyed by the glyph's title character", screen.contains(glyph.character()));
+        }
+    }
     @Test public void highResolutionManagedGlyphIsScaledAndExtremeTagIsReported() throws Exception {
         Path root = fixture(), out = temp.newFolder().toPath();
         write(root.resolve("demo/content/ui.yml"), "ui:\n  rank_player:\n    path: ui/player.png\n    scale_ratio: 9\n"
@@ -522,5 +543,11 @@ public class BedrockPackCompilerTest {
                 new String(PackAssetOptimizer.optimizeBedrock("a.json", slashInString), StandardCharsets.UTF_8));
         byte[] lang = "a=b c".getBytes(StandardCharsets.UTF_8);
         assertSame(lang, PackAssetOptimizer.optimizeBedrock("texts/en_US.lang", lang));
+    }
+    private static byte[] readAll(java.io.InputStream in) throws java.io.IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        byte[] buffer = new byte[8192]; int n;
+        while ((n = in.read(buffer)) > 0) out.write(buffer, 0, n);
+        return out.toByteArray();
     }
 }
