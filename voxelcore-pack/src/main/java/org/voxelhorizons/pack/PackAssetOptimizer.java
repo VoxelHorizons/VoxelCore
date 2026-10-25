@@ -28,6 +28,41 @@ final class PackAssetOptimizer {
         return content;
     }
 
+    /**
+     * The same lossless optimizations for Bedrock pack entries. Bedrock JSON may carry // and
+     * block comments, which whitespace removal would break (a line comment would swallow the
+     * rest of the file), so commented or malformed JSON is kept as authored.
+     */
+    static byte[] optimizeBedrock(String path, byte[] content) {
+        String lower = path.toLowerCase(Locale.ROOT);
+        if (lower.endsWith(".png")) return optimizePng(content);
+        if (lower.endsWith(".json") || lower.endsWith(".material")) {
+            if (hasComment(content)) return content;
+            try {
+                return minifyJson(content, path);
+            } catch (JavaPackCompileException malformed) {
+                return content;
+            }
+        }
+        return content;
+    }
+
+    /** True when a / appears outside a JSON string (a comment, or invalid JSON). */
+    static boolean hasComment(byte[] content) {
+        String input = new String(content, StandardCharsets.UTF_8);
+        boolean quoted = false, escaped = false;
+        for (int index = 0; index < input.length(); index++) {
+            char character = input.charAt(index);
+            if (quoted) {
+                if (escaped) escaped = false;
+                else if (character == '\\') escaped = true;
+                else if (character == '"') quoted = false;
+            } else if (character == '"') quoted = true;
+            else if (character == '/') return true;
+        }
+        return false;
+    }
+
     static byte[] minifyJson(byte[] content, String path) {
         String input = new String(content, StandardCharsets.UTF_8);
         StringBuilder output = new StringBuilder(input.length());
