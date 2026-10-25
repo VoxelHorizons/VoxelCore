@@ -65,7 +65,12 @@ public class BedrockPackCompilerTest {
             String lang = new String(readAll(pack.getInputStream(pack.getEntry("texts/en_US.lang"))), StandardCharsets.UTF_8);
             assertTrue("Riding hint shows the VoxelCore name, not the raw key: " + lang,
                     lang.matches("(?s)action\\.hint\\.exit\\.voxelcore:entity_i_[0-9a-f]{32}=\u00A76Oak Bench\n"));
-            assertEquals("[\"en_US\"]", new String(readAll(pack.getInputStream(pack.getEntry("texts/languages.json"))), StandardCharsets.UTF_8).replaceAll("\\s", ""));
+            for (String language : BedrockPackCompiler.BEDROCK_LANGUAGES)
+                assertEquals("Every Bedrock language gets the hint: " + language, lang,
+                        new String(readAll(pack.getInputStream(pack.getEntry("texts/" + language + ".lang"))), StandardCharsets.UTF_8));
+            String languages = new String(readAll(pack.getInputStream(pack.getEntry("texts/languages.json"))), StandardCharsets.UTF_8);
+            assertEquals(29, JsonParser.parseString(languages).getAsJsonArray().size());
+            assertTrue(languages.contains("\"ja_JP\"") && languages.contains("\"uk_UA\""));
         }
     }
     @Test public void missingTextureDoesNotReplacePreviousRevision() throws Exception {
