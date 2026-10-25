@@ -40,11 +40,13 @@ final class BedrockChestGui {
      * Java draws a 176px-wide container panel and places the title at (8, 6); the Bedrock chest
      * top half starts one pixel in and seven down from that. With the documented
      * {@code :offset_-8:} prefix a background's left edge sits on the panel's left edge, so it
-     * is centred on the panel's middle (88) here. These two constants match the placement other
-     * Geyser converters tested on Bedrock (image top = 5 - ascent, one pixel right of centre).
+     * is centred on the panel's middle (88) here, and its top is TOP_BASE - ascent. Measured in a
+     * live test (skills menu): the 5 - ascent / centre + 1 placement used by another converter
+     * drew the art one GUI pixel right and one low (doubled left outline, first slot row's top
+     * border covered), so both are one pixel less.
      */
     static final int PANEL_CENTRE = 88;
-    static final int TOP_BASE = 5;
+    static final int TOP_BASE = 4;
 
     /** One background: its title character, Bedrock texture and on-screen size in GUI pixels. */
     static final class Background {
@@ -131,7 +133,7 @@ final class BedrockChestGui {
             image.addProperty("texture", background.texture);
             image.add("size", pair(background.width, background.height));
             image.addProperty("keep_ratio", false);
-            image.add("offset", pair(background.width / 2 - PANEL_CENTRE + 1, TOP_BASE - background.glyph.ascent()));
+            image.add("offset", pair(background.width / 2 - PANEL_CENTRE, TOP_BASE - background.glyph.ascent()));
             image.addProperty("anchor_from", "top_middle");
             image.addProperty("anchor_to", "top_middle");
             image.addProperty("layer", 4);

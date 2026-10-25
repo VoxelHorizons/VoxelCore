@@ -16,7 +16,7 @@ PR #84 merged. Follow-up branch (restarted from main): Java animated textures (.
 PR #85 and PR #86 merged; the user confirmed animated textures and one-sided / inside-out faces work live.
 
 **Menu backgrounds (branch `feat/bedrock-chest-gui`, NOT yet verified live):** `gui: true` UI glyphs (Java menu backgrounds drawn as a title glyph) become Bedrock chest-screen images. This follows the logic of the RiftEngine converter; no code was copied. `BedrockChestGui` copies each background to `textures/voxelcore/gui/<codepoint>.png` and writes `ui/chest_screen.json` (namespace `chest`):
-- one image control per background, sized like Java (`scale_ratio` high) and placed for the documented `:offset_-8:` prefix: top_middle, x = width/2 − 87, y = 5 − y_position;
+- one image control per background, sized like Java (`scale_ratio` high) and placed for the documented `:offset_-8:` prefix: top_middle, x = width/2 − 88, y = 4 − y_position (live test of the first version, which used 5 − y_position and width/2 − 87: art drawn 1px right and 1px low; corrected);
 - each image is visible only while `$container_title` contains that glyph's private-use character;
 - `chest_label` is hidden while any background character is present;
 - the images are inserted into `small_chest_panel_top_half` and `large_chest_panel_top_half`.
