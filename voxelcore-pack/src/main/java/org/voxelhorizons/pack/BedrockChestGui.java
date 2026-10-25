@@ -46,10 +46,11 @@ final class BedrockChestGui {
      * is centred on the panel's middle (88) here, and its top is TOP_BASE - ascent. Measured in a
      * live test (skills menu): the 5 - ascent / centre + 1 placement used by another converter
      * drew the art one GUI pixel right and one low (doubled left outline, first slot row's top
-     * border covered), so both are one pixel less.
+     * border covered), so both are one pixel less. A later live test of a large chest with a
+     * slot-art background showed its slots 2px above Bedrock's, so the top moved 2px down.
      */
     static final int PANEL_CENTRE = 88;
-    static final int TOP_BASE = 4;
+    static final int TOP_BASE = 6;
 
     /** One background: its title character, Bedrock texture and on-screen size in GUI pixels. */
     static final class Background {
@@ -181,13 +182,23 @@ final class BedrockChestGui {
     static final String CONTAINER_PANEL = TEXTURE_DIR + "generic_54";
     /**
      * Java draws generic_54 in two parts: rows * 18 + 17 pixels for the header and chest rows,
-     * then the 96px player inventory from y = 126. Bedrock's chest grid sits 3px lower than Java's
-     * (21 vs 18) and its panel is 1px shorter, so the top part is drawn 3px down and the
-     * inventory part is anchored to the panel bottom; the top part is layered over the 4px overlap.
+     * then the 96px player inventory from y = 126. Measured in a live test (large chest, 4 screen
+     * px per GUI px): Bedrock's chest slots sit 5px lower than Java's in the panel, its inventory
+     * rows match Java's when the inventory part is anchored to the panel bottom, but its hotbar
+     * has a 1px gap above it instead of Java's 3px. So the top part is drawn 5px down, and the
+     * inventory part is cut in four: the rows (to 2px into the gap), the hotbar strip 2px higher,
+     * 2px of the footer filling the space that leaves, and the 7px footer at the bottom.
      */
-    static final int CONTAINER_TOP_SHIFT = 3;
+    static final int CONTAINER_TOP_SHIFT = 5;
+    static final int HOTBAR_RAISE = 2;
 
     private static JsonObject containerPart(int v, int height, boolean top, double scale, String visible) {
+        return containerPart(v, height, top, top ? CONTAINER_TOP_SHIFT : 0, top ? 2 : 1, scale, visible);
+    }
+
+    /** @param offsetY top-anchored: down from the panel top; else up from the panel bottom (negative) */
+    private static JsonObject containerPart(int v, int height, boolean top, int offsetY, int layer,
+                                            double scale, String visible) {
         JsonObject image = new JsonObject();
         image.addProperty("type", "image");
         image.addProperty("texture", CONTAINER_PANEL);
@@ -196,8 +207,8 @@ final class BedrockChestGui {
         image.add("size", pair(176, height));
         image.addProperty("anchor_from", top ? "top_left" : "bottom_left");
         image.addProperty("anchor_to", top ? "top_left" : "bottom_left");
-        image.add("offset", pair(0, top ? CONTAINER_TOP_SHIFT : 0));
-        image.addProperty("layer", top ? 2 : 1);
+        image.add("offset", pair(0, offsetY));
+        image.addProperty("layer", layer);
         image.addProperty(TITLE, "$container_title");
         image.addProperty("visible", visible);
         return image;
@@ -220,7 +231,11 @@ final class BedrockChestGui {
         frame.addProperty("visible", plain);
         rootControls.add(named("common_panel@common.common_panel", frame));
         rootControls.add(named("voxelcore_container_top", containerPart(0, rows * 18 + 17, true, scale, menu)));
-        rootControls.add(named("voxelcore_container_inventory", containerPart(126, 96, false, scale, menu)));
+        // Inventory part (texture y 126..221): rows 126..194, hotbar strip 195..214, footer 215..221.
+        rootControls.add(named("voxelcore_container_inventory", containerPart(126, 69, false, -27, 1, scale, menu)));
+        rootControls.add(named("voxelcore_container_hotbar", containerPart(195, 20, false, -7 - HOTBAR_RAISE, 2, scale, menu)));
+        rootControls.add(named("voxelcore_container_gap", containerPart(215, HOTBAR_RAISE, false, -7, 1, scale, menu)));
+        rootControls.add(named("voxelcore_container_footer", containerPart(215, 7, false, 0, 1, scale, menu)));
         JsonArray chestControls = new JsonArray();
         chestControls.add(named(half + "@chest." + half, new JsonObject()));
         chestControls.add(named("inventory_panel_bottom_half_with_label@common.inventory_panel_bottom_half_with_label", new JsonObject()));
