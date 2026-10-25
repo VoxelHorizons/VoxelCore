@@ -125,6 +125,11 @@ bedrock:
   # client jar for this server version once from Mojang (SHA-1 verified, cached in
   # plugins/VoxelCore/cache/vanilla); 'off' disables; or give a client jar / assets folder path.
   vanilla_assets: auto
+  # Java font glyphs at U+E000..U+E1FF (e.g. locale flags) fall in Bedrock's controller-icon
+  # pages. true (like the Kafal converter) writes them anyway: they render, but Bedrock's own
+  # button icons on those pages are replaced. false skips them (listed in unsupported-items.txt);
+  # then move them with '/voxelcore admin pack glyphs migrate confirm'.
+  override_controller_glyph_pages: true
   # Extra folders (relative to plugins/) scanned by '/voxelcore admin pack glyphs'
   # for literal glyphs in Bedrock's reserved U+E000..U+E1FF controller range.
   # VoxelCore content is always included. Migration rewrites fonts and references together.

@@ -22,7 +22,7 @@ import java.util.TreeMap;
  * unreadable), and trims each glyph's transparent columns. So every glyph is drawn at its
  * Java pixel size (font height) and each page's cell grows to fit its widest glyph, as the
  * Kafal converter does (e.g. 4096px pages, 256px cells for rank tags). Glyphs are centred.
- * Bedrock's vanilla glyph_E0 and glyph_E1 are never touched. This deliberately does
+ * Bedrock's controller pages glyph_E0/E1 are only written when explicitly enabled. This deliberately does
  * not translate Java GUI backgrounds, custom negative-spacing or text transforms.
  */
 final class BedrockGlyphAtlas {
@@ -41,6 +41,17 @@ final class BedrockGlyphAtlas {
     /** @param skipped receives one line per glyph that has no Bedrock cell, with the reason */
     static int append(Path contentRoot, Path allocationManifest, Map<String, byte[]> javaAssets,
                       Map<String, byte[]> bedrockAssets, java.util.List<String> skipped) throws IOException {
+        return append(contentRoot, allocationManifest, javaAssets, bedrockAssets, skipped, false);
+    }
+
+    /**
+     * @param overrideControllerPages also write authored glyphs at U+E000..U+E1FF (Bedrock's
+     *        controller-icon pages glyph_E0/E1), as the Kafal converter does: the glyphs show,
+     *        but Bedrock's own button icons on a written page are replaced for every player
+     */
+    static int append(Path contentRoot, Path allocationManifest, Map<String, byte[]> javaAssets,
+                      Map<String, byte[]> bedrockAssets, java.util.List<String> skipped,
+                      boolean overrideControllerPages) throws IOException {
         UiGlyphRegistry glyphs = new UiGlyphLoader().load(contentRoot, allocationManifest, false);
         Map<Integer, BufferedImage> pending = new TreeMap<Integer, BufferedImage>();
         int count = 0;
@@ -68,7 +79,7 @@ final class BedrockGlyphAtlas {
             pending.put(Integer.valueOf(codePoint), sized);
             count++;
         }
-        count += appendAuthored(contentRoot, javaAssets, pending, bedrockAssets, skipped);
+        count += appendAuthored(contentRoot, javaAssets, pending, bedrockAssets, skipped, overrideControllerPages);
         writePages(pending, bedrockAssets);
         return count;
     }
@@ -81,7 +92,8 @@ final class BedrockGlyphAtlas {
      * glyphs win) are skipped; migrate reserved literals with '/voxelcore admin pack glyphs'.
      */
     static int appendAuthored(Path contentRoot, Map<String, byte[]> javaAssets, Map<Integer, BufferedImage> pending,
-                              Map<String, byte[]> bedrockAssets, java.util.List<String> skipped) throws IOException {
+                              Map<String, byte[]> bedrockAssets, java.util.List<String> skipped,
+                              boolean overrideControllerPages) throws IOException {
         int count = 0;
         for (org.voxelhorizons.content.pack.ContentPack pack : new org.voxelhorizons.content.pack.ContentPackDiscovery().discover(contentRoot)) {
             Path font = pack.root().resolve("assets/minecraft/font/default.json");
@@ -124,7 +136,12 @@ final class BedrockGlyphAtlas {
                     for (int c = 0; c < codePoints.length; c++) {
                         int codePoint = codePoints[c];
                         if (codePoint == 0 || codePoint == ' ' || codePoint > 0xFFFF) continue;
-                        if (codePoint >= 0xE000 && codePoint <= 0xE1FF) continue; // Bedrock controller glyphs.
+                        if (codePoint >= 0xE000 && codePoint <= 0xE1FF && !overrideControllerPages) {
+                            skipped.add("font glyph U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT)
+                                    + " (" + file + "): in Bedrock's controller-icon pages; enable "
+                                    + "bedrock.override_controller_glyph_pages or migrate it with /voxelcore admin pack glyphs");
+                            continue;
+                        }
                         if (codePoint < 0xE000) continue; // Ordinary text keeps Bedrock's own font.
                         if (pending.containsKey(Integer.valueOf(codePoint)) || occupiedByAuthoredPage(bedrockAssets, codePoint)) continue;
                         BufferedImage icon = trim(bitmap.getSubimage(c * cellWidth, r * cellHeight, cellWidth, cellHeight));
@@ -174,7 +191,8 @@ final class BedrockGlyphAtlas {
      * The glyph close to Java's size while keeping pixel art crisp (live test: smoothing an
      * 11px rank tag to its 9px Java height made it unreadable; the Kafal converter keeps native
      * pixels): upscaled art is first reduced exactly to its art pixels, then scaled by whole
-     * multiples; native art up to twice the Java height stays as is; only genuinely large
+     * multiples; native art up to three times the Java height stays as is (Kafal keeps 24x16
+     * flags and 11px tags native; smoothing them made them dark and unreadable); only genuinely large
      * images are smoothly downscaled to the Java height.
      */
     static BufferedImage atJavaSize(BufferedImage icon, int javaHeight) {
@@ -184,7 +202,7 @@ final class BedrockGlyphAtlas {
         if (art.getHeight() <= target) {
             int factor = Math.max(1, target / art.getHeight());
             out = factor == 1 ? art : scaled(art, art.getWidth() * factor, art.getHeight() * factor);
-        } else if (art.getHeight() <= target * 2) {
+        } else if (art.getHeight() <= target * 3) {
             out = art;
         } else {
             int width = Math.max(1, (int) Math.round((double) art.getWidth() * target / art.getHeight()));
