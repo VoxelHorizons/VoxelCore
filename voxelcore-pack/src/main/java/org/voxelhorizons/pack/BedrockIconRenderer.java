@@ -106,7 +106,7 @@ final class BedrockIconRenderer {
                         rotate(point,angles); for(int i=0;i<3;i++)point[i]+=origin[i];
                     }
                     for(int i=0;i<3;i++)point[i]-=8;
-                    rotate(point,rotation);
+                    rotateDisplay(point,rotation);
                     for(int i=0;i<3;i++)point[i]=point[i]*scale[i];
                     minX=Math.min(minX,point[0]);maxX=Math.max(maxX,point[0]);
                     minY=Math.min(minY,point[1]);maxY=Math.max(maxY,point[1]);
@@ -247,6 +247,15 @@ final class BedrockIconRenderer {
     }
     private static String path(String id,String kind,String suffix) { String[] parts=(id.contains(":")?id:"minecraft:"+id).split(":",2); return "assets/"+parts[0]+"/"+kind+"/"+parts[1]+suffix; }
     private static double[] vector(JsonObject o,String key,double[] fallback) { if(!o.has(key))return fallback; JsonArray a=o.getAsJsonArray(key); double[] v=new double[a.size()];for(int i=0;i<v.length;i++)v[i]=a.get(i).getAsDouble();return v; }
+    /**
+     * Java display transforms use rotationXYZ: applied to a point as Z, then Y, then X (live
+     * test: applying X first tilted every Bedrock inventory icon before turning it).
+     */
+    static void rotateDisplay(double[] p, double[] angles) {
+        rotate(p, new double[]{0, 0, angles[2]});
+        rotate(p, new double[]{0, angles[1], 0});
+        rotate(p, new double[]{angles[0], 0, 0});
+    }
     private static void rotate(double[] p,double[] angles) { for(int axis=0;axis<3;axis++){int u=(axis+1)%3,v=(axis+2)%3;double r=Math.toRadians(angles[axis]),x=p[u],y=p[v];p[u]=x*Math.cos(r)-y*Math.sin(r);p[v]=x*Math.sin(r)+y*Math.cos(r);} }
     private static double[][] face(String name,double[] a,double[] b)throws IOException {
         double x=a[0],y=a[1],z=a[2],X=b[0],Y=b[1],Z=b[2];

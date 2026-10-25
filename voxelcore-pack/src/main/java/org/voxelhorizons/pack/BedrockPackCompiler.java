@@ -204,7 +204,7 @@ public final class BedrockPackCompiler {
                     if (png == null) {
                         MessageDigest cacheDigest;
                         try { cacheDigest = MessageDigest.getInstance("SHA-256"); } catch (Exception e) { throw new IllegalStateException(e); }
-                        cacheDigest.update(("renderer-v3-camera:" + cacheKey).getBytes(StandardCharsets.UTF_8));
+                        cacheDigest.update(("renderer-v4-display-order:" + cacheKey).getBytes(StandardCharsets.UTF_8));
                         cacheDigest.update(assetsDigest);
                         Path cache = outputRoot.resolve("icon-cache").resolve(hex(cacheDigest.digest()) + ".png");
                         if (Files.isRegularFile(cache)) png = Files.readAllBytes(cache);
