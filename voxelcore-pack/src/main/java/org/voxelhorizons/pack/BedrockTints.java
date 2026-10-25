@@ -42,11 +42,13 @@ final class BedrockTints {
         return out;
     }
 
-    /** Tinted copy for a face with {@code tintindex}, or an error when no tint was configured. */
+    /**
+     * Tinted copy for a face with {@code tintindex}. Without a configured tint the face is drawn
+     * as Java does: VoxelCore's item definitions default every tint source to -1 (white), and an
+     * item without tint sources renders tintindex faces untinted.
+     */
     static BufferedImage face(BufferedImage source, int tintIndex, Map<Integer, Integer> tints, String model) throws IOException {
         Integer rgb = tints.get(Integer.valueOf(tintIndex));
-        if (rgb == null)
-            throw new IOException("Tinted model needs properties.bedrock.tints." + tintIndex + " or an explicit Bedrock texture: " + model);
-        return apply(source, rgb.intValue());
+        return rgb == null ? source : apply(source, rgb.intValue());
     }
 }

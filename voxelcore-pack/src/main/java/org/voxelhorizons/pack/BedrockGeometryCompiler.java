@@ -179,6 +179,9 @@ final class BedrockGeometryCompiler {
         boolean tinted = false;
         JsonArray cubes = new JsonArray();
         List<BufferedImage> painted = new ArrayList<BufferedImage>();
+        // Animated faces: tile index -> (animation, one sampled tile per frame).
+        Map<Integer, JavaTextureAnimation> animatedTiles = new TreeMap<Integer, JavaTextureAnimation>();
+        Map<Integer, BufferedImage[]> frameTiles = new TreeMap<Integer, BufferedImage[]>();
         double minX = Double.POSITIVE_INFINITY, minY = Double.POSITIVE_INFINITY, minZ = Double.POSITIVE_INFINITY;
         double maxX = Double.NEGATIVE_INFINITY, maxY = Double.NEGATIVE_INFINITY, maxZ = Double.NEGATIVE_INFINITY;
         for (JsonElement entry : elements) {
@@ -242,8 +245,10 @@ final class BedrockGeometryCompiler {
                 String textureRef = face.get("texture").getAsString();
                 BufferedImage image = ImageIO.read(new ByteArrayInputStream(resolver.textureFor(textures,textureRef)));
                 if (image==null) throw new IOException("Unreadable model texture "+textureRef);
-                if (face.has("tintindex")) {
-                    image = BedrockTints.face(image, face.get("tintindex").getAsInt(), tints, javaModel);
+                JavaTextureAnimation animation = resolver.animationFor(textures, textureRef);
+                Integer tintIndex = face.has("tintindex") ? Integer.valueOf(face.get("tintindex").getAsInt()) : null;
+                if (tintIndex != null) {
+                    image = BedrockTints.face(image, tintIndex.intValue(), tints, javaModel);
                     tinted = true;
                 }
                 double[] uv = face.has("uv") ? vector(face,"uv") : BedrockIconRenderer.uv(direction,from,to);
@@ -253,22 +258,19 @@ final class BedrockGeometryCompiler {
                 // to image bounds as in the existing preview renderer. Cropping
                 // the source image using Graphics.drawImage would leave these
                 // oversized cuboids transparent instead.
-                BufferedImage tile = new BufferedImage(16,16,BufferedImage.TYPE_INT_ARGB);
-                for (int ty=0;ty<16;ty++) for (int tx=0;tx<16;tx++) {
-                    double u=(tx+0.5)/16.0, v=(ty+0.5)/16.0;
-                    switch ((turn % 360 + 360) % 360) {
-                        case 90: { double t=u; u=v; v=1-t; break; }
-                        case 180: u=1-u; v=1-v; break;
-                        case 270: { double t=u; u=1-v; v=t; break; }
-                        default: break;
-                    }
-                    double sx=uv[0]+u*(uv[2]-uv[0]), sy=uv[1]+v*(uv[3]-uv[1]);
-                    int pixelX=Math.min(image.getWidth()-1,Math.max(0,(int)Math.floor(sx*image.getWidth()/16.0)));
-                    int pixelY=Math.min(image.getHeight()-1,Math.max(0,(int)Math.floor(sy*image.getHeight()/16.0)));
-                    tile.setRGB(tx,ty,image.getRGB(pixelX,pixelY));
-                }
+                BufferedImage tile = sampleTile(image, uv, turn);
                 int index=painted.size();
                 painted.add(tile);
+                if (animation != null) {
+                    BufferedImage[] perFrame = new BufferedImage[animation.frames.size()];
+                    for (int f = 0; f < perFrame.length; f++) {
+                        BufferedImage frame = animation.frames.get(f);
+                        if (tintIndex != null) frame = BedrockTints.face(frame, tintIndex.intValue(), tints, javaModel);
+                        perFrame[f] = sampleTile(frame, uv, turn);
+                    }
+                    animatedTiles.put(Integer.valueOf(index), animation);
+                    frameTiles.put(Integer.valueOf(index), perFrame);
+                }
                 JsonObject mapped = new JsonObject();
                 mapped.add("uv",xyz2(index,0)); // Absolute atlas placement fixed below.
                 mapped.add("uv_size",xyz2(16,16));
@@ -284,12 +286,26 @@ final class BedrockGeometryCompiler {
         int rows = (painted.size()+columns-1)/columns;
         int textureWidth = columns*16, textureHeight=1;
         while(textureHeight < rows*16) textureHeight*=2;
-        BufferedImage atlas = new BufferedImage(textureWidth,textureHeight,BufferedImage.TYPE_INT_ARGB);
-        Graphics2D graphics = atlas.createGraphics();
-        try {
-            for (int i=0;i<painted.size();i++)
-                graphics.drawImage(painted.get(i),(i%columns)*16,(i/columns)*16,null);
-        } finally { graphics.dispose(); }
+        // Animated textures: one complete atlas per animation step (frame 0 is the default
+        // texture) and a per-model render controller picking one by time with a texture array,
+        // the mechanism the dye controller proved live. Custom materials / uv_anim made the
+        // models invisible on Bedrock (RenderDragon does not load pack materials).
+        int[] steps = animationSteps(animatedTiles.values(), textureWidth, textureHeight);
+        int animationFrames = steps[0], ticksPerFrame = steps[1];
+        BufferedImage[] atlases = new BufferedImage[animationFrames];
+        for (int frame=0;frame<animationFrames;frame++) {
+            BufferedImage atlas = new BufferedImage(textureWidth,textureHeight,BufferedImage.TYPE_INT_ARGB);
+            Graphics2D graphics = atlas.createGraphics();
+            try {
+                for (int i=0;i<painted.size();i++) {
+                    BufferedImage tile = painted.get(i);
+                    JavaTextureAnimation animation = animatedTiles.get(Integer.valueOf(i));
+                    if (animation != null) tile = frameTiles.get(Integer.valueOf(i))[animation.frameIndexAt(frame*ticksPerFrame)];
+                    graphics.drawImage(tile,(i%columns)*16,(i/columns)*16,null);
+                }
+            } finally { graphics.dispose(); }
+            atlases[frame] = atlas;
+        }
 
         // Copy each face UV to its actual native atlas tile, preserving missing faces.
         int next=0;
@@ -357,6 +373,7 @@ final class BedrockGeometryCompiler {
 
         JsonObject attachDescription = new JsonObject();
         attachDescription.addProperty("identifier",bedrockIdentifier);
+        boolean animated = animationFrames > 1;
         JsonObject materials = new JsonObject();
         materials.addProperty("default","entity_alphatest");
         materials.addProperty("enchanted","entity_alphatest_glint");
@@ -364,10 +381,11 @@ final class BedrockGeometryCompiler {
         JsonObject tex = new JsonObject();
         tex.addProperty("default","textures/voxelcore/g_"+shortId);
         tex.addProperty("enchanted","textures/misc/enchanted_item_glint");
+        addFrameTextures(tex, shortId, animationFrames);
         attachDescription.add("textures",tex);
         JsonObject shape = new JsonObject();shape.addProperty("default",heldGeometryId);
         attachDescription.add("geometry",shape);
-        JsonArray controllers = new JsonArray();controllers.add("controller.render.item_default");
+        JsonArray controllers = new JsonArray();controllers.add(animated ? animatedController(shortId) : "controller.render.item_default");
         attachDescription.add("render_controllers",controllers);
         // Java display.thirdperson_righthand / firstperson_righthand become constant bone
         // transforms so the model is hand-sized instead of a full block-scale model.
@@ -409,12 +427,13 @@ final class BedrockGeometryCompiler {
         entityDescription.add("materials", entityMaterials);
         JsonObject entityTextures = new JsonObject();
         entityTextures.addProperty("default", "textures/voxelcore/g_" + shortId);
+        addFrameTextures(entityTextures, shortId, animationFrames);
         entityDescription.add("textures", entityTextures);
         JsonObject entityShape = new JsonObject();
         entityShape.addProperty("default", geometryId);
         entityDescription.add("geometry", entityShape);
         JsonArray entityControllers = new JsonArray();
-        entityControllers.add("controller.render.default");
+        entityControllers.add(animated ? animatedController(shortId) : "controller.render.default");
         entityDescription.add("render_controllers", entityControllers);
         JsonObject entityAnimations = new JsonObject();
         entityAnimations.addProperty("voxelcore_transform", TRANSFORM_ANIMATION);
@@ -429,8 +448,6 @@ final class BedrockGeometryCompiler {
         clientEntityRoot.addProperty("format_version", "1.10.0");
         clientEntityRoot.add("minecraft:client_entity", clientEntity);
 
-        ByteArrayOutputStream png = new ByteArrayOutputStream();
-        if (!ImageIO.write(atlas,"png",png)) throw new IOException("PNG encoder missing");
         Map<String,byte[]> assets = new TreeMap<String,byte[]>();
         assets.put("models/entity/voxelcore/"+shortId+".geo.json",JSON.toJson(geoRoot).getBytes(StandardCharsets.UTF_8));
         assets.put("attachables/"+shortId+".json",JSON.toJson(attachRoot).getBytes(StandardCharsets.UTF_8));
@@ -438,9 +455,114 @@ final class BedrockGeometryCompiler {
                 JSON.toJson(heldAnimationRoot).getBytes(StandardCharsets.UTF_8));
         assets.put("entity/voxelcore/"+shortId+".entity.json",
                 JSON.toJson(clientEntityRoot).getBytes(StandardCharsets.UTF_8));
-        assets.put("textures/voxelcore/g_"+shortId+".png",png.toByteArray());
+        for (int frame=0;frame<animationFrames;frame++) {
+            ByteArrayOutputStream png = new ByteArrayOutputStream();
+            if (!ImageIO.write(atlases[frame],"png",png)) throw new IOException("PNG encoder missing");
+            assets.put(frameTexture(shortId, frame)+".png",png.toByteArray());
+        }
         assets.put(TRANSFORM_ANIMATION_PATH, transformAnimation());
+        if (animated)
+            assets.put("render_controllers/"+shortId+".render_controllers.json",
+                    animatedRenderController(shortId, animationFrames, ticksPerFrame));
         return new Output(assets,cubes.size(),tinted);
+    }
+
+    /** Resample a Java face UV region (with UV rotation) into one 16x16 atlas tile. */
+    private static BufferedImage sampleTile(BufferedImage image, double[] uv, int turn) {
+        // Java models may extend outside the 0..16 cube: clamp source UV to image bounds as in
+        // the preview renderer; cropping with drawImage would leave oversized cuboids transparent.
+        BufferedImage tile = new BufferedImage(16,16,BufferedImage.TYPE_INT_ARGB);
+        for (int ty=0;ty<16;ty++) for (int tx=0;tx<16;tx++) {
+            double u=(tx+0.5)/16.0, v=(ty+0.5)/16.0;
+            switch ((turn % 360 + 360) % 360) {
+                case 90: { double t=u; u=v; v=1-t; break; }
+                case 180: u=1-u; v=1-v; break;
+                case 270: { double t=u; u=1-v; v=t; break; }
+                default: break;
+            }
+            double sx=uv[0]+u*(uv[2]-uv[0]), sy=uv[1]+v*(uv[3]-uv[1]);
+            int pixelX=Math.min(image.getWidth()-1,Math.max(0,(int)Math.floor(sx*image.getWidth()/16.0)));
+            int pixelY=Math.min(image.getHeight()-1,Math.max(0,(int)Math.floor(sy*image.getHeight()/16.0)));
+            tile.setRGB(tx,ty,image.getRGB(pixelX,pixelY));
+        }
+        return tile;
+    }
+
+    /** Most atlas copies an animated model may stack, and the pixel budget for the whole strip. */
+    static final int MAX_ANIMATION_FRAMES = 64;
+    static final long MAX_ANIMATED_ATLAS_PIXELS = 16L * 1024 * 1024;
+
+    /**
+     * {frames, ticksPerFrame} covering one full cycle of every animation on the model: the
+     * least common multiple of their periods, sampled every ticksPerFrame ticks so the strip
+     * stays within MAX_ANIMATION_FRAMES and the pixel budget. {1, 1} when nothing animates.
+     */
+    static int[] animationSteps(java.util.Collection<JavaTextureAnimation> animations, int width, int height) {
+        if (animations.isEmpty()) return new int[]{1, 1};
+        long period = 1, unit = 0;
+        for (JavaTextureAnimation animation : new java.util.LinkedHashSet<JavaTextureAnimation>(animations)) {
+            period = lcm(period, animation.period);
+            for (int tick : animation.ticks) unit = gcd(unit, tick);
+            if (period > 100_000) { period = 100_000; break; }
+        }
+        long budget = Math.max(1, MAX_ANIMATED_ATLAS_PIXELS / Math.max(1L, (long) width * height));
+        int maxFrames = (int) Math.max(1, Math.min(MAX_ANIMATION_FRAMES, budget));
+        // No frame changes between multiples of the shortest common frame duration.
+        long step = Math.max(1, unit);
+        while ((period + step - 1) / step > maxFrames) step += Math.max(1, unit);
+        int ticksPerFrame = (int) step;
+        int frames = (int) Math.max(1, (period + ticksPerFrame - 1) / ticksPerFrame);
+        return new int[]{frames, ticksPerFrame};
+    }
+
+    private static long lcm(long a, long b) {
+        return a / gcd(a, b) * b;
+    }
+
+    private static long gcd(long a, long b) {
+        while (b != 0) { long t = a % b; a = b; b = t; }
+        return Math.abs(a);
+    }
+
+    /** Atlas texture of one animation frame; frame 0 is the model's default texture. */
+    static String frameTexture(String shortId, int frame) {
+        return "textures/voxelcore/g_" + shortId + (frame == 0 ? "" : "_f" + frame);
+    }
+
+    private static void addFrameTextures(JsonObject textures, String shortId, int frames) {
+        for (int frame = 1; frame < frames; frame++) textures.addProperty("frame_" + frame, frameTexture(shortId, frame));
+    }
+
+    static String animatedController(String shortId) {
+        return "controller.render.voxelcore.animated_" + shortId;
+    }
+
+    /**
+     * Render controller showing frame floor(age in ticks / ticksPerFrame) mod frames, chosen from
+     * a texture array like vanilla variant textures. Vanilla materials only: Bedrock ignores
+     * pack-defined materials, so uv_anim with a custom material rendered nothing.
+     */
+    static byte[] animatedRenderController(String shortId, int frames, int ticksPerFrame) {
+        JsonArray textures = new JsonArray();
+        textures.add("Texture.default");
+        for (int frame = 1; frame < frames; frame++) textures.add("Texture.frame_" + frame);
+        JsonObject arrays = new JsonObject(), textureArrays = new JsonObject();
+        textureArrays.add("Array.frames", textures);
+        arrays.add("textures", textureArrays);
+        JsonObject controller = new JsonObject();
+        controller.add("arrays", arrays);
+        controller.addProperty("geometry", "Geometry.default");
+        JsonArray materials = new JsonArray();
+        JsonObject all = new JsonObject(); all.addProperty("*", "Material.default"); materials.add(all);
+        controller.add("materials", materials);
+        JsonArray selected = new JsonArray();
+        selected.add("Array.frames[math.mod(math.floor(q.life_time * " + (20.0 / ticksPerFrame) + "), " + frames + ")]");
+        controller.add("textures", selected);
+        JsonObject controllers = new JsonObject(); controllers.add(animatedController(shortId), controller);
+        JsonObject root = new JsonObject();
+        root.addProperty("format_version", "1.8.0");
+        root.add("render_controllers", controllers);
+        return JSON.toJson(root).getBytes(StandardCharsets.UTF_8);
     }
 
     /**
