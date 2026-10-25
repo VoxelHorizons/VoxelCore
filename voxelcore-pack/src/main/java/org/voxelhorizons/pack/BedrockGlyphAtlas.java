@@ -53,7 +53,7 @@ final class BedrockGlyphAtlas {
                       Map<String, byte[]> bedrockAssets, java.util.List<String> skipped,
                       boolean overrideControllerPages) throws IOException {
         UiGlyphRegistry glyphs = new UiGlyphLoader().load(contentRoot, allocationManifest, false);
-        Map<Integer, BufferedImage> pending = new TreeMap<Integer, BufferedImage>();
+        Map<Integer, Glyph> pending = new TreeMap<Integer, Glyph>();
         int count = 0;
         for (UiGlyphDefinition glyph : glyphs.entries().values()) {
             String label = "glyph " + glyph.id();
@@ -72,7 +72,7 @@ final class BedrockGlyphAtlas {
             String unfit = unfit(icon);
             if (unfit != null) { skipped.add(label + ": " + unfit); continue; }
             // Java scales the whole bitmap to its font height; the trimmed part keeps its share.
-            BufferedImage sized = atJavaSize(icon, visibleHeight(glyph.scaleRatio(), icon.getHeight(), original.getHeight()));
+            Glyph sized = new Glyph(reduceBlocks(icon), visibleHeight(glyph.scaleRatio(), icon.getHeight(), original.getHeight()));
             if (pending.containsKey(Integer.valueOf(codePoint)) || occupiedByAuthoredPage(bedrockAssets, codePoint))
                 throw new IOException("Bedrock font cell U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT)
                         + " is already occupied (managed glyph " + glyph.id() + ")");
@@ -80,7 +80,11 @@ final class BedrockGlyphAtlas {
             count++;
         }
         count += appendAuthored(contentRoot, javaAssets, pending, bedrockAssets, skipped, overrideControllerPages);
-        writePages(pending, bedrockAssets);
+        double ratio = pixelRatio(pending.values());
+        Map<Integer, BufferedImage> drawn = new TreeMap<Integer, BufferedImage>();
+        for (Map.Entry<Integer, Glyph> entry : pending.entrySet())
+            drawn.put(entry.getKey(), sized(entry.getValue().art, entry.getValue().javaHeight, ratio));
+        writePages(drawn, bedrockAssets);
         return count;
     }
 
@@ -91,7 +95,7 @@ final class BedrockGlyphAtlas {
      * Bedrock's reserved U+E000..U+E1FF pages, blank cells and cells already taken (managed
      * glyphs win) are skipped; migrate reserved literals with '/voxelcore admin pack glyphs'.
      */
-    static int appendAuthored(Path contentRoot, Map<String, byte[]> javaAssets, Map<Integer, BufferedImage> pending,
+    static int appendAuthored(Path contentRoot, Map<String, byte[]> javaAssets, Map<Integer, Glyph> pending,
                               Map<String, byte[]> bedrockAssets, java.util.List<String> skipped,
                               boolean overrideControllerPages) throws IOException {
         int count = 0;
@@ -153,7 +157,7 @@ final class BedrockGlyphAtlas {
                             continue;
                         }
                         pending.put(Integer.valueOf(codePoint),
-                                atJavaSize(icon, visibleHeight(javaHeight, icon.getHeight(), cellHeight)));
+                                new Glyph(reduceBlocks(icon), visibleHeight(javaHeight, icon.getHeight(), cellHeight)));
                         count++;
                     }
                 }
@@ -187,31 +191,63 @@ final class BedrockGlyphAtlas {
         return Math.max(1, (int) Math.round((double) javaHeight * trimmedHeight / fullHeight));
     }
 
+    /** A glyph's art (integer upscales undone) and its on-screen Java height. */
+    static final class Glyph {
+        final BufferedImage art;
+        final int javaHeight;
+        Glyph(BufferedImage art, int javaHeight) {
+            this.art = art;
+            this.javaHeight = Math.max(1, javaHeight <= 0 ? 8 : javaHeight);
+        }
+    }
+
     /**
-     * The glyph close to Java's size while keeping pixel art crisp (live test: smoothing an
-     * 11px rank tag to its 9px Java height made it unreadable; the Kafal converter keeps native
-     * pixels): upscaled art is first reduced exactly to its art pixels, then scaled by whole
-     * multiples; native art up to three times the Java height stays as is (Kafal keeps 24x16
-     * flags and 11px tags native; smoothing them made them dark and unreadable); only genuinely large
-     * images are smoothly downscaled to the Java height.
+     * Bedrock page pixels per Java pixel, shared by every glyph so their relative sizes match
+     * Java (live test: a 16px flag next to 11px rank tags of the same Java height looked too big).
+     * Taken from the wide text tags (aspect >= 2), whose lettering suffers most from resampling,
+     * so they stay pixel-exact; otherwise from all pixel-art glyphs. Median, clamped to 1..4.
      */
-    static BufferedImage atJavaSize(BufferedImage icon, int javaHeight) {
-        int target = Math.max(1, javaHeight <= 0 ? 8 : javaHeight);
-        BufferedImage art = reduceBlocks(icon);
+    static double pixelRatio(java.util.Collection<Glyph> glyphs) {
+        java.util.List<Double> tags = new java.util.ArrayList<Double>(), all = new java.util.ArrayList<Double>();
+        for (Glyph glyph : glyphs) {
+            double ratio = (double) glyph.art.getHeight() / glyph.javaHeight;
+            if (ratio > 4) continue; // Large images are resampled anyway.
+            all.add(ratio);
+            if (glyph.art.getWidth() >= glyph.art.getHeight() * 2) tags.add(ratio);
+        }
+        java.util.List<Double> source = tags.isEmpty() ? all : tags;
+        if (source.isEmpty()) return 1.0;
+        java.util.Collections.sort(source);
+        return Math.max(1.0, Math.min(4.0, source.get(source.size() / 2)));
+    }
+
+    /**
+     * The glyph at {@code javaHeight * ratio} page pixels: unchanged when it already is, whole
+     * multiples (else nearest) when growing, nearest (pixel art stays crisp) when shrinking by
+     * less than half, and smooth only for genuinely large images.
+     */
+    static BufferedImage sized(BufferedImage art, int javaHeight, double ratio) {
+        int target = Math.max(1, (int) Math.round(javaHeight * ratio));
+        int height = art.getHeight();
         BufferedImage out;
-        if (art.getHeight() <= target) {
-            int factor = Math.max(1, target / art.getHeight());
-            out = factor == 1 ? art : scaled(art, art.getWidth() * factor, art.getHeight() * factor);
-        } else if (art.getHeight() <= target * 3) {
-            out = art;
-        } else {
-            int width = Math.max(1, (int) Math.round((double) art.getWidth() * target / art.getHeight()));
-            out = scaled(art, width, target);
+        if (height == target) out = art;
+        else {
+            int width = Math.max(1, (int) Math.round((double) art.getWidth() * target / height));
+            if (height < target && target % height == 0) width = art.getWidth() * (target / height);
+            out = height < target || height < target * 2 ? nearest(art, width, target) : scaled(art, width, target);
         }
         if (Math.max(out.getWidth(), out.getHeight()) > MAX_CELL) {
             double fit = (double) MAX_CELL / Math.max(out.getWidth(), out.getHeight());
             out = scaled(out, Math.max(1, (int) (out.getWidth() * fit)), Math.max(1, (int) (out.getHeight() * fit)));
         }
+        return out;
+    }
+
+    private static BufferedImage nearest(BufferedImage image, int width, int height) {
+        BufferedImage out = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < height; y++) for (int x = 0; x < width; x++)
+            out.setRGB(x, y, image.getRGB(Math.min(image.getWidth() - 1, x * image.getWidth() / width),
+                    Math.min(image.getHeight() - 1, y * image.getHeight() / height)));
         return out;
     }
 
