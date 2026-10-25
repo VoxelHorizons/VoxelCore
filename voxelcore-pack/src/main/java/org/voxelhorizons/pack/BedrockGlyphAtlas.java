@@ -205,20 +205,23 @@ final class BedrockGlyphAtlas {
      * Bedrock page pixels per Java pixel, shared by every glyph so their relative sizes match
      * Java (live test: a 16px flag next to 11px rank tags of the same Java height looked too big).
      * Taken from the wide text tags (aspect >= 2), whose lettering suffers most from resampling,
-     * so they stay pixel-exact; otherwise from all pixel-art glyphs. Median, clamped to 1..4.
+     * so they stay pixel-exact; otherwise from all pixel-art glyphs. Median, clamped to 0.25..4.
      */
     static double pixelRatio(java.util.Collection<Glyph> glyphs) {
         java.util.List<Double> tags = new java.util.ArrayList<Double>(), all = new java.util.ArrayList<Double>();
         for (Glyph glyph : glyphs) {
             double ratio = (double) glyph.art.getHeight() / glyph.javaHeight;
             if (ratio > 4) continue; // Large images are resampled anyway.
+            if (glyph.art.getHeight() < 4) continue; // Flat colour reduces to ~1px: says nothing about scale.
             all.add(ratio);
             if (glyph.art.getWidth() >= glyph.art.getHeight() * 2) tags.add(ratio);
         }
         java.util.List<Double> source = tags.isEmpty() ? all : tags;
         if (source.isEmpty()) return 1.0;
         java.util.Collections.sort(source);
-        return Math.max(1.0, Math.min(4.0, source.get(source.size() / 2)));
+        // Below 1 is normal: Java often draws small pixel art larger than native (live test: 11px
+        // tags at Java height ~18 with 16px flags at ~16); a floor of 1 made the flags too big.
+        return Math.max(0.25, Math.min(4.0, source.get(source.size() / 2)));
     }
 
     /**
