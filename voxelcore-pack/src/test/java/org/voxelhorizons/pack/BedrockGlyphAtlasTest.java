@@ -35,6 +35,17 @@ public class BedrockGlyphAtlasTest {
         assertEquals(0xff00247d, flagOut.getRGB(flagOut.getWidth() - 1, 5));
     }
 
+    @Test public void flagsShrinkWhenJavaDrawsTagsLargerThanNative() {
+        // Live test: 11px tag art at Java height 18, 16px flag at Java height 16 (Java shows the
+        // flag ~0.9x the tag). Bedrock must keep the tag native and draw the flag ~10px.
+        BedrockGlyphAtlas.Glyph tag = new BedrockGlyphAtlas.Glyph(tag(1), 18);
+        BedrockGlyphAtlas.Glyph flag = new BedrockGlyphAtlas.Glyph(flag(), 16);
+        double ratio = BedrockGlyphAtlas.pixelRatio(Arrays.asList(tag, flag));
+        assertEquals(11.0 / 18, ratio, 1e-9);
+        assertSame(tag.art, BedrockGlyphAtlas.sized(tag.art, tag.javaHeight, ratio));
+        assertEquals(10, BedrockGlyphAtlas.sized(flag.art, flag.javaHeight, ratio).getHeight());
+    }
+
     @Test public void integerUpscaledArtIsReducedExactly() {
         BufferedImage out = BedrockGlyphAtlas.reduceBlocks(tag(4));
         assertEquals(43, out.getWidth());
