@@ -353,6 +353,9 @@ public final class BedrockPackCompiler {
         digest.update(unsupported.toString().getBytes(StandardCharsets.UTF_8));
         digest.update(unsupportedGeometry.toString().getBytes(StandardCharsets.UTF_8));
         digest.update(mappingBytes);
+        // The zip encoding is part of the published bytes: a new encoding must yield a new revision,
+        // or an existing revision directory (and the clients' cached pack) would be reused.
+        digest.update(PACK_ENCODING.getBytes(StandardCharsets.UTF_8));
         byte[] hash = digest.digest(); String revision = hex(hash);
         JsonArray version = new JsonArray();
         for (int i = 0; i < 3; i++) version.add(((hash[i * 2] & 255) << 8) | (hash[i * 2 + 1] & 255));
@@ -381,9 +384,11 @@ public final class BedrockPackCompiler {
         try {
             BuildProgress.Step zipStep = progress.step("Bedrock: writing voxelcore.mcpack", assets.size());
             try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(staging.resolve("voxelcore.mcpack")))) {
+                // Same lossless treatment as the Java pack: re-encoded PNGs, minified JSON, best deflate.
+                zip.setLevel(Deflater.BEST_COMPRESSION);
                 for (Map.Entry<String, byte[]> entry : assets.entrySet()) {
                     ZipEntry ze = new ZipEntry(entry.getKey()); ze.setTime(0); zip.putNextEntry(ze);
-                    zip.write(entry.getValue()); zip.closeEntry();
+                    zip.write(PackAssetOptimizer.optimizeBedrock(entry.getKey(), entry.getValue())); zip.closeEntry();
                     zipStep.advance(1);
                 }
             }
@@ -401,6 +406,9 @@ public final class BedrockPackCompiler {
             }
         }
     }
+    /** Bump when the .mcpack encoding changes (PackAssetOptimizer, compression level). */
+    static final String PACK_ENCODING = "optimized-deflate9-v1";
+
     /** Undyed colour of a dyeable item (ItemManager semantics: properties.dyeable.color, default white). */
     static Integer dyeDefault(Object raw, String itemId) throws IOException {
         if (!(raw instanceof Map)) return null;
