@@ -25,7 +25,10 @@ import java.util.Map;
  * {@code $container_title}, still holding the glyph's private-use character. The pack therefore
  * overrides the Bedrock chest screen: each background becomes an image control in the chest panel
  * that is only visible while the title contains its character, and the default title label is
- * hidden for those menus (it would print the glyph and spacing characters as boxes).
+ * hidden for those menus (it would print the glyph and spacing characters as boxes). On those
+ * menus Bedrock's grey dialog frame and close button are also replaced by the Java container
+ * texture (generic_54), so a retextured, partly transparent container looks as it does on Java.
+ * Only the Classic UI chest layout is changed; Bedrock's Pocket UI uses its own screens.
  */
 final class BedrockChestGui {
     private BedrockChestGui() {}
@@ -88,7 +91,14 @@ final class BedrockChestGui {
             backgrounds.add(new Background(glyph, texture, width, height));
         }
         if (backgrounds.isEmpty()) return 0;
-        bedrockAssets.put(SCREEN_PATH, chestScreen(backgrounds));
+        // The Java container art (a pack's retextured generic_54, else vanilla) replaces Bedrock's
+        // grey dialog frame on those menus, so transparent parts of it look the same as on Java.
+        byte[] container = javaAssets.get(CONTAINER_TEXTURE);
+        BufferedImage containerImage = container == null ? null : ImageIO.read(new ByteArrayInputStream(container));
+        if (containerImage == null) skipped.add("menu backgrounds: " + CONTAINER_TEXTURE + " not found; Bedrock's own chest frame is kept");
+        else bedrockAssets.put(CONTAINER_PANEL + ".png", container);
+        bedrockAssets.put(SCREEN_PATH, chestScreen(backgrounds,
+                containerImage == null ? 0 : containerImage.getWidth() / 256.0));
         return backgrounds.size();
     }
 
@@ -101,11 +111,16 @@ final class BedrockChestGui {
     }
 
     static byte[] chestScreen(List<Background> backgrounds) {
+        return chestScreen(backgrounds, 0);
+    }
+
+    /** @param containerScale container texture pixels per Java GUI pixel (0 = keep Bedrock's frame) */
+    static byte[] chestScreen(List<Background> backgrounds, double containerScale) {
         JsonObject root = new JsonObject();
         root.addProperty("namespace", NAMESPACE);
 
         // Vanilla chest title, hidden while any background's character is in the title.
-        StringBuilder plain = new StringBuilder();
+        StringBuilder plain = new StringBuilder(); // no background in the title
         for (Background background : backgrounds) {
             if (plain.length() > 0) plain.append(" and ");
             plain.append(lacks(background.glyph));
@@ -154,7 +169,95 @@ final class BedrockChestGui {
             JsonObject half = new JsonObject(); half.add("modifications", modifications);
             root.add(panel, half);
         }
+        if (containerScale > 0) {
+            String visible = "(not (" + plain + "))";
+            root.add("small_chest_panel", chestPanel(3, false, "(" + plain + ")", visible, containerScale));
+            root.add("large_chest_panel", chestPanel(6, true, "(" + plain + ")", visible, containerScale));
+        }
         return JSON.toJson(root).getBytes(StandardCharsets.UTF_8);
+    }
+
+    static final String CONTAINER_TEXTURE = "assets/minecraft/textures/gui/container/generic_54.png";
+    static final String CONTAINER_PANEL = TEXTURE_DIR + "generic_54";
+    /**
+     * Java draws generic_54 in two parts: rows * 18 + 17 pixels for the header and chest rows,
+     * then the 96px player inventory from y = 126. Bedrock's chest grid sits 3px lower than Java's
+     * (21 vs 18) and its panel is 1px shorter, so the top part is drawn 3px down and the
+     * inventory part is anchored to the panel bottom; the top part is layered over the 4px overlap.
+     */
+    static final int CONTAINER_TOP_SHIFT = 3;
+
+    private static JsonObject containerPart(int v, int height, boolean top, double scale, String visible) {
+        JsonObject image = new JsonObject();
+        image.addProperty("type", "image");
+        image.addProperty("texture", CONTAINER_PANEL);
+        image.add("uv", pairD(0, v * scale));
+        image.add("uv_size", pairD(176 * scale, height * scale));
+        image.add("size", pair(176, height));
+        image.addProperty("anchor_from", top ? "top_left" : "bottom_left");
+        image.addProperty("anchor_to", top ? "top_left" : "bottom_left");
+        image.add("offset", pair(0, top ? CONTAINER_TOP_SHIFT : 0));
+        image.addProperty("layer", top ? 2 : 1);
+        image.addProperty(TITLE, "$container_title");
+        image.addProperty("visible", visible);
+        return image;
+    }
+
+    private static JsonObject named(String name, JsonObject value) {
+        JsonObject out = new JsonObject(); out.add(name, value); return out;
+    }
+
+    /**
+     * Vanilla Bedrock small/large chest panel (Mojang bedrock-samples ui/chest_screen.json) with
+     * two changes: the grey dialog frame and close button (common_panel) only show without a
+     * menu background, and with one the Java container texture is drawn instead.
+     */
+    private static JsonObject chestPanel(int rows, boolean large, String plain, String menu, double scale) {
+        String half = large ? "large_chest_panel_top_half" : "small_chest_panel_top_half";
+        JsonArray rootControls = new JsonArray();
+        JsonObject frame = new JsonObject();
+        frame.addProperty(TITLE, "$container_title");
+        frame.addProperty("visible", plain);
+        rootControls.add(named("common_panel@common.common_panel", frame));
+        rootControls.add(named("voxelcore_container_top", containerPart(0, rows * 18 + 17, true, scale, menu)));
+        rootControls.add(named("voxelcore_container_inventory", containerPart(126, 96, false, scale, menu)));
+        JsonArray chestControls = new JsonArray();
+        chestControls.add(named(half + "@chest." + half, new JsonObject()));
+        chestControls.add(named("inventory_panel_bottom_half_with_label@common.inventory_panel_bottom_half_with_label", new JsonObject()));
+        chestControls.add(named("hotbar_grid@common.hotbar_grid_template", new JsonObject()));
+        chestControls.add(named("inventory_take_progress_icon_button@common.inventory_take_progress_icon_button", new JsonObject()));
+        JsonObject flying = new JsonObject(); flying.addProperty("layer", 15);
+        chestControls.add(named("flying_item_renderer@common.flying_item_renderer", flying));
+        JsonObject chest = new JsonObject();
+        chest.addProperty("type", "panel");
+        chest.addProperty("layer", 5);
+        chest.add("controls", chestControls);
+        rootControls.add(named("chest_panel", chest));
+        rootControls.add(named("inventory_selected_icon_button@common.inventory_selected_icon_button", new JsonObject()));
+        rootControls.add(named("gamepad_cursor@common.gamepad_cursor_button", new JsonObject()));
+        JsonObject rootPanel = new JsonObject();
+        if (large) rootPanel.add("size", pair(176, 220));
+        rootPanel.addProperty("layer", 1);
+        rootPanel.add("controls", rootControls);
+
+        JsonArray controls = new JsonArray();
+        controls.add(named("container_gamepad_helpers@common.container_gamepad_helpers", new JsonObject()));
+        JsonObject details = new JsonObject(), lock = new JsonObject();
+        if (large) {
+            details.addProperty("control_name", "@chest.selected_item_details");
+            lock.addProperty("control_name", "@common.item_lock_notification");
+        }
+        controls.add(named("selected_item_details_factory@common.selected_item_details_factory", details));
+        controls.add(named("item_lock_notification_factory@common.item_lock_notification_factory", lock));
+        controls.add(named("root_panel@common.root_panel", rootPanel));
+        JsonObject panel = new JsonObject();
+        panel.addProperty("type", "panel");
+        panel.add("controls", controls);
+        return panel;
+    }
+
+    private static JsonArray pairD(double a, double b) {
+        JsonArray out = new JsonArray(); out.add(a); out.add(b); return out;
     }
 
     private static JsonArray pair(int a, int b) {

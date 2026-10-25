@@ -35,6 +35,7 @@ public class BedrockChestGuiTest {
         Map<String, byte[]> java = new TreeMap<String, byte[]>();
         java.put("assets/voxel/textures/ui/shop.png", png(176, 222));
         java.put("assets/voxel/textures/ui/rank.png", png(30, 9));
+        java.put(BedrockChestGui.CONTAINER_TEXTURE, png(256, 256));
         Map<String, byte[]> bedrock = new TreeMap<String, byte[]>();
         List<String> skipped = new ArrayList<String>();
         UiGlyphDefinition shop = glyph("shop", 111, 13, true, 0xE2A1);
@@ -61,6 +62,7 @@ public class BedrockChestGuiTest {
     @Test public void fullWidthBackgroundIsCentredAndMissingTexturesAreReported() throws Exception {
         Map<String, byte[]> java = new TreeMap<String, byte[]>();
         java.put("assets/voxel/textures/ui/full.png", png(176, 166));
+        java.put(BedrockChestGui.CONTAINER_TEXTURE, png(256, 256));
         Map<String, byte[]> bedrock = new TreeMap<String, byte[]>();
         List<String> skipped = new ArrayList<String>();
         BedrockChestGui.append(Arrays.asList(glyph("full", 166, 13, true, 0xE2B0), glyph("gone", 166, 13, true, 0xE2B1)),
@@ -70,6 +72,48 @@ public class BedrockChestGuiTest {
         assertFalse(screen.has("voxelcore_gui_e2b1"));
         assertEquals(1, skipped.size());
         assertTrue(skipped.get(0).contains("voxel:gone"));
+    }
+
+    @Test public void javaContainerTextureReplacesBedrockFrameOnlyForMenuBackgrounds() throws Exception {
+        Map<String, byte[]> java = new TreeMap<String, byte[]>();
+        java.put("assets/voxel/textures/ui/full.png", png(176, 166));
+        java.put(BedrockChestGui.CONTAINER_TEXTURE, png(512, 512)); // 2x retexture
+        Map<String, byte[]> bedrock = new TreeMap<String, byte[]>();
+        List<String> skipped = new ArrayList<String>();
+        BedrockChestGui.append(Arrays.asList(glyph("full", 166, 13, true, 0xE2B0)), java, bedrock, skipped);
+        assertTrue(skipped.isEmpty());
+        assertNotNull(bedrock.get("textures/voxelcore/gui/generic_54.png"));
+        JsonObject screen = JsonParser.parseString(new String(bedrock.get(BedrockChestGui.SCREEN_PATH), StandardCharsets.UTF_8)).getAsJsonObject();
+        String character = new String(Character.toChars(0xE2B0));
+        String lacks = "(($voxelcore_title - '" + character + "') = $voxelcore_title)";
+        for (String name : new String[]{"small_chest_panel", "large_chest_panel"}) {
+            com.google.gson.JsonArray root = null;
+            for (com.google.gson.JsonElement control : screen.getAsJsonObject(name).getAsJsonArray("controls"))
+                if (control.getAsJsonObject().has("root_panel@common.root_panel"))
+                    root = control.getAsJsonObject().getAsJsonObject("root_panel@common.root_panel").getAsJsonArray("controls");
+            assertNotNull(name, root);
+            JsonObject frame = root.get(0).getAsJsonObject().getAsJsonObject("common_panel@common.common_panel");
+            assertEquals("Bedrock frame only without a background", "(" + lacks + ")", frame.get("visible").getAsString());
+            JsonObject top = root.get(1).getAsJsonObject().getAsJsonObject("voxelcore_container_top");
+            assertEquals("(not (" + lacks + "))", top.get("visible").getAsString());
+            int rows = name.startsWith("large") ? 6 : 3;
+            assertEquals("[176," + (rows * 18 + 17) + "]", top.get("size").toString());
+            assertEquals("UV in texture pixels (2x)", "[352.0," + (rows * 18 + 17) * 2.0 + "]", top.get("uv_size").toString());
+            JsonObject inventory = root.get(2).getAsJsonObject().getAsJsonObject("voxelcore_container_inventory");
+            assertEquals("[0.0,252.0]", inventory.get("uv").toString());
+            assertEquals("bottom_left", inventory.get("anchor_from").getAsString());
+        }
+    }
+
+    @Test public void withoutContainerTextureBedrockFrameIsKept() throws Exception {
+        Map<String, byte[]> java = new TreeMap<String, byte[]>();
+        java.put("assets/voxel/textures/ui/full.png", png(176, 166));
+        Map<String, byte[]> bedrock = new TreeMap<String, byte[]>();
+        List<String> skipped = new ArrayList<String>();
+        BedrockChestGui.append(Arrays.asList(glyph("full", 166, 13, true, 0xE2B0)), java, bedrock, skipped);
+        JsonObject screen = JsonParser.parseString(new String(bedrock.get(BedrockChestGui.SCREEN_PATH), StandardCharsets.UTF_8)).getAsJsonObject();
+        assertFalse(screen.has("small_chest_panel"));
+        assertEquals(1, skipped.size());
     }
 
     @Test public void authoredChestScreenIsNeverOverwritten() throws Exception {
