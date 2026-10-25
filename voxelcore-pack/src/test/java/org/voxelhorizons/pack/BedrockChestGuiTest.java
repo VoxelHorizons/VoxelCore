@@ -48,7 +48,7 @@ public class BedrockChestGuiTest {
         JsonObject image = screen.getAsJsonObject("voxelcore_gui_e2a1");
         assertEquals("textures/voxelcore/gui/e2a1", image.get("texture").getAsString());
         assertEquals("Scaled to scale_ratio like Java", "[88,111]", image.get("size").toString());
-        assertEquals("Left edge on the panel edge (offset -8), top from the ascent", "[-44,-9]", image.get("offset").toString());
+        assertEquals("Left edge on the panel edge (offset -8), top from the ascent", "[-44,-7]", image.get("offset").toString());
         String character = new String(Character.toChars(0xE2A1));
         assertEquals("(not (($voxelcore_title - '" + character + "') = $voxelcore_title))", image.get("visible").getAsString());
         assertEquals("$container_title", image.get("$voxelcore_title").getAsString());
@@ -68,7 +68,7 @@ public class BedrockChestGuiTest {
         BedrockChestGui.append(Arrays.asList(glyph("full", 166, 13, true, 0xE2B0), glyph("gone", 166, 13, true, 0xE2B1)),
                 java, bedrock, skipped);
         JsonObject screen = JsonParser.parseString(new String(bedrock.get(BedrockChestGui.SCREEN_PATH), StandardCharsets.UTF_8)).getAsJsonObject();
-        assertEquals("[0,-9]", screen.getAsJsonObject("voxelcore_gui_e2b0").get("offset").toString());
+        assertEquals("[0,-7]", screen.getAsJsonObject("voxelcore_gui_e2b0").get("offset").toString());
         assertFalse(screen.has("voxelcore_gui_e2b1"));
         assertEquals(1, skipped.size());
         assertTrue(skipped.get(0).contains("voxel:gone"));
@@ -101,6 +101,13 @@ public class BedrockChestGuiTest {
             assertEquals("UV in texture pixels (2x)", "[352.0," + (rows * 18 + 17) * 2.0 + "]", top.get("uv_size").toString());
             JsonObject inventory = root.get(2).getAsJsonObject().getAsJsonObject("voxelcore_container_inventory");
             assertEquals("[0.0,252.0]", inventory.get("uv").toString());
+            assertEquals("Rows part ends 27px above the panel bottom", "[0,-27]", inventory.get("offset").toString());
+            JsonObject hotbar = root.get(3).getAsJsonObject().getAsJsonObject("voxelcore_container_hotbar");
+            assertEquals("[0.0,390.0]", hotbar.get("uv").toString());
+            assertEquals("Hotbar strip 2px higher than Java's", "[0,-9]", hotbar.get("offset").toString());
+            JsonObject footer = root.get(5).getAsJsonObject().getAsJsonObject("voxelcore_container_footer");
+            assertEquals("[0,0]", footer.get("offset").toString());
+            assertEquals("[176,7]", footer.get("size").toString());
             assertEquals("bottom_left", inventory.get("anchor_from").getAsString());
         }
     }
