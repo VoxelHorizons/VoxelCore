@@ -232,6 +232,9 @@ final class BedrockGeometryCompiler {
             }
             JsonObject faces = element.has("faces") ? element.getAsJsonObject("faces") : null;
             if (faces == null || faces.size()==0) throw new IOException("Cuboid without faces in "+javaModel);
+            boolean[] inverted = new boolean[3];
+            boolean insideOut = false;
+            for (int a=0;a<3;a++) { inverted[a] = from[a] > to[a]; insideOut |= inverted[a]; }
             JsonObject mappedFaces = new JsonObject();
             for (Map.Entry<String,JsonElement> side : faces.entrySet()) {
                 String direction = side.getKey();
@@ -258,7 +261,11 @@ final class BedrockGeometryCompiler {
                 // to image bounds as in the existing preview renderer. Cropping
                 // the source image using Graphics.drawImage would leave these
                 // oversized cuboids transparent instead.
-                BufferedImage tile = sampleTile(image, uv, turn);
+                // Inside-out element: its face lies on the opposite side and may face inward,
+                // with the texture mirrored along each reversed in-plane axis.
+                String bedrockFace = insideOut ? insideOutFace(direction, inverted) : direction;
+                boolean[] flip = insideOut ? insideOutFlip(direction, bedrockFace, inverted) : new boolean[2];
+                BufferedImage tile = flipped(sampleTile(image, uv, turn), flip);
                 int index=painted.size();
                 painted.add(tile);
                 if (animation != null) {
@@ -266,7 +273,7 @@ final class BedrockGeometryCompiler {
                     for (int f = 0; f < perFrame.length; f++) {
                         BufferedImage frame = animation.frames.get(f);
                         if (tintIndex != null) frame = BedrockTints.face(frame, tintIndex.intValue(), tints, javaModel);
-                        perFrame[f] = sampleTile(frame, uv, turn);
+                        perFrame[f] = flipped(sampleTile(frame, uv, turn), flip);
                     }
                     animatedTiles.put(Integer.valueOf(index), animation);
                     frameTiles.put(Integer.valueOf(index), perFrame);
@@ -274,10 +281,25 @@ final class BedrockGeometryCompiler {
                 JsonObject mapped = new JsonObject();
                 mapped.add("uv",xyz2(index,0)); // Absolute atlas placement fixed below.
                 mapped.add("uv_size",xyz2(16,16));
-                mappedFaces.add(direction,mapped);
+                if (!insideOut) { mappedFaces.add(direction,mapped); continue; }
+                // Bedrock cubes only face outward: draw the face as a zero-thickness plane at the
+                // position Java puts it (the authored from/to coordinate), facing as Java's winding.
+                int axis = axisOf(direction);
+                boolean negative = "north".equals(direction) || "west".equals(direction) || "down".equals(direction);
+                boolean atHigh = negative == inverted[axis];
+                double[] planeLo = lo.clone(), planeHi = hi.clone();
+                planeLo[axis] = planeHi[axis] = atHigh ? hi[axis] : lo[axis];
+                JsonObject plane = cube.deepCopy();
+                plane.add("origin", xyz(8-planeHi[0],planeLo[1]-8,planeLo[2]-8));
+                plane.add("size", xyz(planeHi[0]-planeLo[0],planeHi[1]-planeLo[1],planeHi[2]-planeLo[2]));
+                JsonObject single = new JsonObject(); single.add(bedrockFace, mapped);
+                plane.add("uv", single);
+                cubes.add(plane);
             }
-            cube.add("uv",mappedFaces);
-            cubes.add(cube);
+            if (!insideOut) {
+                cube.add("uv",mappedFaces);
+                cubes.add(cube);
+            }
         }
         if (painted.size() > 4096)
             throw new IOException("Bedrock face atlas requires too many tiles: "+painted.size());
@@ -375,7 +397,7 @@ final class BedrockGeometryCompiler {
         attachDescription.addProperty("identifier",bedrockIdentifier);
         boolean animated = animationFrames > 1;
         JsonObject materials = new JsonObject();
-        materials.addProperty("default","entity_alphatest");
+        materials.addProperty("default",ONE_SIDED_MATERIAL);
         materials.addProperty("enchanted","entity_alphatest_glint");
         attachDescription.add("materials",materials);
         JsonObject tex = new JsonObject();
@@ -423,7 +445,7 @@ final class BedrockGeometryCompiler {
         JsonObject entityDescription = new JsonObject();
         entityDescription.addProperty("identifier", visualEntityId);
         JsonObject entityMaterials = new JsonObject();
-        entityMaterials.addProperty("default", "entity_alphatest");
+        entityMaterials.addProperty("default", ONE_SIDED_MATERIAL);
         entityDescription.add("materials", entityMaterials);
         JsonObject entityTextures = new JsonObject();
         entityTextures.addProperty("default", "textures/voxelcore/g_" + shortId);
@@ -486,6 +508,78 @@ final class BedrockGeometryCompiler {
             tile.setRGB(tx,ty,image.getRGB(pixelX,pixelY));
         }
         return tile;
+    }
+
+    /**
+     * Java draws every model face one-sided (back faces culled); vanilla entity_alphatest is
+     * double-sided, which showed the outside of inside-out elements (staff mane, help box).
+     */
+    static final String ONE_SIDED_MATERIAL = "entity_alphatest_one_sided";
+
+    static int axisOf(String direction) {
+        if ("east".equals(direction) || "west".equals(direction)) return 0;
+        if ("up".equals(direction) || "down".equals(direction)) return 1;
+        return 2;
+    }
+
+    static String opposite(String direction) {
+        switch (direction) {
+            case "north": return "south";
+            case "south": return "north";
+            case "east": return "west";
+            case "west": return "east";
+            case "up": return "down";
+            default: return "up";
+        }
+    }
+
+    /** Texture u and v world axes of a face. */
+    private static int[] faceAxes(String direction) {
+        switch (axisOf(direction)) {
+            case 0: return new int[]{2, 1};
+            case 1: return new int[]{0, 2};
+            default: return new int[]{0, 1};
+        }
+    }
+
+    /**
+     * World direction (+1/-1 along the axis) in which a face's texture u / v increase on a normal
+     * Java cube, from Java's default face UVs (e.g. north u = 16 - x, south u = x, down v = 16 - z).
+     */
+    private static int[] faceSigns(String direction) {
+        switch (direction) {
+            case "north": return new int[]{-1, -1};
+            case "south": return new int[]{1, -1};
+            case "east": return new int[]{-1, -1};
+            case "west": return new int[]{1, -1};
+            case "up": return new int[]{1, 1};
+            default: return new int[]{1, -1};
+        }
+    }
+
+    /**
+     * Java builds face vertices from the authored from/to, so reversing one in-plane axis
+     * reverses the winding: the face then shows its other side. An odd count turns it inward.
+     */
+    static String insideOutFace(String direction, boolean[] inverted) {
+        int[] axes = faceAxes(direction);
+        return inverted[axes[0]] ^ inverted[axes[1]] ? opposite(direction) : direction;
+    }
+
+    /** Tile {flipU, flipV} so the Bedrock face's texture runs the way Java's mirrored face does. */
+    static boolean[] insideOutFlip(String direction, String bedrockFace, boolean[] inverted) {
+        int[] axes = faceAxes(direction), java = faceSigns(direction), bedrock = faceSigns(bedrockFace);
+        boolean[] flip = new boolean[2];
+        for (int i = 0; i < 2; i++) flip[i] = (inverted[axes[i]] ? -java[i] : java[i]) != bedrock[i];
+        return flip;
+    }
+
+    private static BufferedImage flipped(BufferedImage tile, boolean[] flip) {
+        if (!flip[0] && !flip[1]) return tile;
+        BufferedImage out = new BufferedImage(tile.getWidth(), tile.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < tile.getHeight(); y++) for (int x = 0; x < tile.getWidth(); x++)
+            out.setRGB(x, y, tile.getRGB(flip[0] ? tile.getWidth()-1-x : x, flip[1] ? tile.getHeight()-1-y : y));
+        return out;
     }
 
     /** Most atlas copies an animated model may stack, and the pixel budget for the whole strip. */
