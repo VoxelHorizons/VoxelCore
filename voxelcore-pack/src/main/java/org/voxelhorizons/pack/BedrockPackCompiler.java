@@ -106,6 +106,7 @@ public final class BedrockPackCompiler {
         JsonObject textures = new JsonObject();
         JsonObject entityModels = new JsonObject();
         JsonArray dyeableEntities = new JsonArray();
+        Map<String, String> entityNames = new TreeMap<String, String>();
         Map<String, byte[]> selectors = new HashMap<String, byte[]>();
         List<String> unsupported = new ArrayList<String>();
         List<String> unsupportedGeometry = new ArrayList<String>();
@@ -280,6 +281,7 @@ public final class BedrockPackCompiler {
                 if (threeDimensional != null) {
                     for (Map.Entry<String, byte[]> generated : threeDimensional.assets.entrySet())
                         put(assets, generated.getKey(), generated.getValue());
+                    entityNames.put("voxelcore:entity_" + shortId, entityName(item));
                     // Placed displays carry no custom_model_data in the projection feed: use the
                     // rule's lowest-priority (default) leaf as the item's entity model.
                     if (variant.entityDefault) {
@@ -340,6 +342,7 @@ public final class BedrockPackCompiler {
             put(assets, "entity/voxelcore/display_placeholder.entity.json", bytes(placeholderRoot));
         }
         put(assets, "voxelcore/entity_index.json", bytes(entityIndex));
+        appendEntityTexts(assets, entityNames);
         JsonObject atlas = new JsonObject();
         atlas.addProperty("resource_pack_name", "VoxelCore"); atlas.addProperty("texture_name", "atlas.items");
         atlas.add("texture_data", textures); put(assets, "textures/item_texture.json", bytes(atlas));
@@ -509,11 +512,45 @@ public final class BedrockPackCompiler {
         }
         return result.toString();
     }
+    /**
+     * Riding a native entity makes Bedrock show action.hint.exit.<entity id> on the action bar;
+     * without a translation it printed the raw key (live test, vehicles). Each generated entity
+     * gets its item's VoxelCore name. Lines are appended to an authored texts/en_US.lang, and
+     * texts/languages.json lists en_US.
+     */
+    static void appendEntityTexts(Map<String, byte[]> assets, Map<String, String> entityNames) throws IOException {
+        if (entityNames.isEmpty()) return;
+        String lang = "texts/en_US.lang";
+        byte[] authored = assets.get(lang);
+        StringBuilder text = new StringBuilder(authored == null ? "" : new String(authored, StandardCharsets.UTF_8));
+        if (text.length() > 0 && text.charAt(text.length() - 1) != '\n') text.append('\n');
+        for (Map.Entry<String, String> entity : entityNames.entrySet()) {
+            String key = "action.hint.exit." + entity.getKey() + "=";
+            if (text.indexOf("\n" + key) >= 0 || text.indexOf(key) == 0) continue; // authored wins
+            text.append(key).append(entity.getValue()).append('\n');
+        }
+        assets.put(lang, text.toString().getBytes(StandardCharsets.UTF_8));
+        String languages = "texts/languages.json";
+        JsonArray list = assets.containsKey(languages)
+                ? JsonParser.parseString(new String(assets.get(languages), StandardCharsets.UTF_8)).getAsJsonArray()
+                : new JsonArray();
+        if (!list.contains(new JsonPrimitive("en_US"))) list.add("en_US");
+        assets.put(languages, bytes(list));
+    }
+
+    /** Item display name for Bedrock text: & colour codes as §, one line; the item id when blank. */
+    static String entityName(ItemDefinition item) {
+        String name = item.displayName() == null ? "" : item.displayName();
+        name = name.replaceAll("&([0-9a-fk-orA-FK-OR])", "\u00A7$1").replaceAll("[\\r\\n]+", " ").trim();
+        if (name.replaceAll("\u00A7.", "").trim().isEmpty()) name = item.id().value();
+        return name;
+    }
+
     private static void put(Map<String, byte[]> assets, String name, byte[] value) throws IOException {
         byte[] previous = assets.put(name, value);
         if (previous != null && !Arrays.equals(previous, value)) throw new IOException("Bedrock asset collision: " + name);
     }
-    private static byte[] bytes(JsonObject value) { return JSON.toJson(value).getBytes(StandardCharsets.UTF_8); }
+    private static byte[] bytes(JsonElement value) { return JSON.toJson(value).getBytes(StandardCharsets.UTF_8); }
     private static byte[] sha256(String text) {
         try {
             return MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));
