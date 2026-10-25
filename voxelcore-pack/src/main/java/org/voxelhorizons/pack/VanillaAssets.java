@@ -25,7 +25,7 @@ public final class VanillaAssets {
     /** True for files the Bedrock converters read: vanilla model JSON and PNG textures. */
     static boolean wanted(String name) {
         return (name.startsWith("assets/minecraft/models/") && name.endsWith(".json"))
-                || (name.startsWith("assets/minecraft/textures/") && name.endsWith(".png"));
+                || (name.startsWith("assets/minecraft/textures/") && (name.endsWith(".png") || name.endsWith(".png.mcmeta")));
     }
 
     /** @param source a client .jar/.zip, or a folder containing assets/minecraft/... */

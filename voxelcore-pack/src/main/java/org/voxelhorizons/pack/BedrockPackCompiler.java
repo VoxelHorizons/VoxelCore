@@ -121,7 +121,8 @@ public final class BedrockPackCompiler {
                     String relative = root.relativize(file).toString().replace('\\', '/');
                     // Preview rendering only consumes model JSON and PNG textures. Java fonts,
                     // languages, atlases and blockstates have their own Java merge semantics.
-                    if (relative.matches("[^/]+/models/.+\\.json") || relative.matches("[^/]+/textures/.+\\.png"))
+                    if (relative.matches("[^/]+/models/.+\\.json") || relative.matches("[^/]+/textures/.+\\.png")
+                            || relative.matches("[^/]+/textures/.+\\.png\\.mcmeta"))
                         {
                         String key = "assets/" + relative;
                         byte[] bytes = Files.readAllBytes(file), previous = javaAssets.get(key);

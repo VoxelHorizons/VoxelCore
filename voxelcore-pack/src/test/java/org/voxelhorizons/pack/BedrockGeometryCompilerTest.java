@@ -84,13 +84,17 @@ public final class BedrockGeometryCompilerTest {
         assertNull(new BedrockGeometryCompiler(assets).compile("demo:token","demo:token","token"));
     }
 
-    @Test public void rejectsUntranslatableTintedFacesRatherThanClaimingParity() throws Exception {
+    @Test public void unconfiguredTintRendersUntintedLikeJavaDefault() throws Exception {
+        // Live test: voxel:unicorn_staff (tintindex 0, no tint configured) was rejected. Java's
+        // default tint is -1 (white), so the face keeps its texture colour.
         Map<String,byte[]> assets = modelAssets();
         String parent = new String(assets.get("assets/demo/models/bench.json"),StandardCharsets.UTF_8);
         parent = parent.replace("\"texture\":\"#wood\"","\"texture\":\"#wood\",\"tintindex\":0");
         assets.put("assets/demo/models/bench.json",parent.getBytes(StandardCharsets.UTF_8));
-        try {new BedrockGeometryCompiler(assets).compile("demo:bench","demo:bench","bench");fail("tint is not supported");}
-        catch(IOException expected){assertTrue(expected.getMessage().contains("Tinted"));}
+        String shortId = "i_11112222333344445555666677778888";
+        BedrockGeometryCompiler.Output output = new BedrockGeometryCompiler(assets).compile("demo:bench","voxelcore:"+shortId,shortId);
+        BufferedImage atlas = ImageIO.read(new ByteArrayInputStream(output.assets.get("textures/voxelcore/g_"+shortId+".png")));
+        assertEquals(0xffaa4422, atlas.getRGB(0,0));
     }
 
     @Test public void convertsJavaRescaleIntoExactPerpendicularCuboidStretch() throws Exception {
@@ -135,6 +139,66 @@ public final class BedrockGeometryCompilerTest {
         JsonObject held = geometries.get(1).getAsJsonObject().getAsJsonArray("bones").get(4).getAsJsonObject()
                 .getAsJsonArray("cubes").get(0).getAsJsonObject();
         assertEquals("Held geometry uses the hand transforms, not display.fixed", "[4.0,0.0,-8.0]", held.get("origin").toString());
+    }
+
+    @Test public void animatedTextureWritesOneAtlasPerFrameAndSelectsByTime() throws Exception {
+        Map<String,byte[]> assets = modelAssets();
+        BufferedImage strip = new BufferedImage(16,48,BufferedImage.TYPE_INT_ARGB);
+        int[] colours = {0xffff0000, 0xff00ff00, 0xff0000ff};
+        for (int y=0;y<48;y++) for (int x=0;x<16;x++) strip.setRGB(x,y,colours[y/16]);
+        ByteArrayOutputStream png = new ByteArrayOutputStream(); ImageIO.write(strip,"png",png);
+        assets.put("assets/demo/textures/glow.png", png.toByteArray());
+        assets.put("assets/demo/textures/glow.png.mcmeta", "{\"animation\":{\"frametime\":2}}".getBytes(StandardCharsets.UTF_8));
+        assets.put("assets/demo/models/lamp.json",("{\"textures\":{\"glow\":\"demo:glow\"},\"elements\":["
+                + "{\"from\":[0,0,0],\"to\":[16,16,16],\"faces\":{\"north\":{\"texture\":\"#glow\"}}}]}").getBytes(StandardCharsets.UTF_8));
+        String shortId = "i_11112222333344445555666677778888";
+        BedrockGeometryCompiler.Output output = new BedrockGeometryCompiler(assets).compile("demo:lamp","voxelcore:"+shortId,shortId);
+        String[] frames = {"g_"+shortId, "g_"+shortId+"_f1", "g_"+shortId+"_f2"};
+        for (int f=0;f<3;f++) {
+            BufferedImage atlas = ImageIO.read(new ByteArrayInputStream(output.assets.get("textures/voxelcore/"+frames[f]+".png")));
+            assertEquals("Each frame is a single-frame atlas", 16, atlas.getHeight());
+            assertEquals(colours[f], atlas.getRGB(0,0));
+        }
+        assertFalse(output.assets.containsKey("textures/voxelcore/g_"+shortId+"_f3.png"));
+        JsonObject geometry = JsonParser.parseString(new String(output.assets.get("models/entity/voxelcore/"+shortId+".geo.json"),
+                StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject();
+        assertEquals("Geometry keeps the single-frame height", 16, geometry.getAsJsonObject("description").get("texture_height").getAsInt());
+        JsonObject entity = JsonParser.parseString(new String(output.assets.get("entity/voxelcore/"+shortId+".entity.json"),
+                StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("minecraft:client_entity").getAsJsonObject("description");
+        assertEquals("Vanilla material only", "entity_alphatest", entity.getAsJsonObject("materials").get("default").getAsString());
+        String controllerId = BedrockGeometryCompiler.animatedController(shortId);
+        assertEquals(controllerId, entity.getAsJsonArray("render_controllers").get(0).getAsString());
+        assertEquals("textures/voxelcore/g_"+shortId+"_f2", entity.getAsJsonObject("textures").get("frame_2").getAsString());
+        JsonObject attachable = JsonParser.parseString(new String(output.assets.get("attachables/"+shortId+".json"),
+                StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("minecraft:attachable").getAsJsonObject("description");
+        assertEquals("entity_alphatest", attachable.getAsJsonObject("materials").get("default").getAsString());
+        assertEquals(controllerId, attachable.getAsJsonArray("render_controllers").get(0).getAsString());
+        assertEquals("textures/voxelcore/g_"+shortId+"_f1", attachable.getAsJsonObject("textures").get("frame_1").getAsString());
+        JsonObject controller = JsonParser.parseString(new String(output.assets.get(
+                "render_controllers/"+shortId+".render_controllers.json"), StandardCharsets.UTF_8))
+                .getAsJsonObject().getAsJsonObject("render_controllers").getAsJsonObject(controllerId);
+        assertEquals("[\"Texture.default\",\"Texture.frame_1\",\"Texture.frame_2\"]",
+                controller.getAsJsonObject("arrays").getAsJsonObject("textures").getAsJsonArray("Array.frames").toString());
+        assertEquals("Array.frames[math.mod(math.floor(q.life_time * 10.0), 3)]",
+                controller.getAsJsonArray("textures").get(0).getAsString());
+        assertFalse("No pack-defined materials", output.assets.keySet().toString().contains("materials/"));
+        BufferedImage icon = ImageIO.read(new ByteArrayInputStream(new BedrockIconRenderer(assets).render("demo:lamp", new double[]{0,0,0}, null)));
+        boolean red = false, other = false;
+        for (int y=0;y<64;y++) for (int x=0;x<64;x++) {
+            int argb = icon.getRGB(x,y);
+            if ((argb>>>24)==0) continue;
+            if ((argb & 0xffffff) == 0xff0000) red = true; else other = true;
+        }
+        assertTrue("Icon shows the first frame only", red && !other);
+    }
+
+    @Test public void staticModelsKeepVanillaMaterialsAndOneAtlasFrame() throws Exception {
+        String shortId = "i_11112222333344445555666677778888";
+        BedrockGeometryCompiler.Output output = new BedrockGeometryCompiler(modelAssets()).compile("demo:bench","voxelcore:"+shortId,shortId);
+        assertFalse(output.assets.keySet().toString().contains("render_controllers/"+shortId));
+        assertFalse(output.assets.containsKey("textures/voxelcore/g_"+shortId+"_f1.png"));
+        assertTrue(new String(output.assets.get("entity/voxelcore/"+shortId+".entity.json"), StandardCharsets.UTF_8)
+                .contains("\"entity_alphatest\""));
     }
 
     @Test public void keepsFlatPlaneElementsButRejectsLines() throws Exception {
