@@ -23,7 +23,8 @@ import java.util.TreeMap;
  * Java pixel size (font height) and each page's cell grows to fit its widest glyph, as the
  * Kafal converter does (e.g. 4096px pages, 256px cells for rank tags). Glyphs are centred.
  * Bedrock's controller pages glyph_E0/E1 are only written when explicitly enabled. This deliberately does
- * not translate Java GUI backgrounds, custom negative-spacing or text transforms.
+ * not translate custom negative-spacing or text transforms; GUI backgrounds become chest-screen
+ * images instead (BedrockChestGui).
  */
 final class BedrockGlyphAtlas {
     private BedrockGlyphAtlas() {}
