@@ -147,6 +147,10 @@ public final class BedrockPackCompiler {
                         overrideControllerGlyphPages, glyphShrink);
         progress.report("Bedrock: " + mappedGlyphs + " font glyphs placed"
                 + (unsupported.isEmpty() ? "" : "; " + unsupported.size() + " glyphs skipped (see unsupported-items.txt)"));
+        int menuBackgrounds = glyphAllocationManifest == null ? 0
+                : BedrockChestGui.append(contentRoot, glyphAllocationManifest, javaAssets, assets, unsupported);
+        if (menuBackgrounds > 0)
+            progress.report("Bedrock: " + menuBackgrounds + " menu backgrounds added to the chest screen");
         BedrockIconRenderer renderer = new BedrockIconRenderer(javaAssets);
         // Hashed once: with vanilla assets the map holds thousands of files.
         byte[] assetsDigest;
