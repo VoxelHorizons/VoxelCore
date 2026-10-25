@@ -41,7 +41,7 @@ public class BedrockPackCompilerTest {
     @Test public void vanillaTexturesFromClientJarRenderFurnitureIcons() throws Exception {
         Path root = temp.newFolder().toPath(), out = temp.newFolder().toPath();
         write(root.resolve("demo/pack.yml"), "schema: 1\nnamespace: demo\n");
-        write(root.resolve("demo/content/items.yml"), "items:\n  bench:\n    material: minecraft:paper\n    render:\n      model: demo:item/bench\n");
+        write(root.resolve("demo/content/items.yml"), "items:\n  bench:\n    material: minecraft:paper\n    display_name: '&6Oak Bench'\n    render:\n      model: demo:item/bench\n");
         write(root.resolve("demo/assets/demo/models/item/bench.json"), "{\"textures\":{\"all\":\"minecraft:block/oak_planks\"},"
                 + "\"elements\":[{\"from\":[0,0,0],\"to\":[16,8,16],\"faces\":{\"north\":{\"texture\":\"#all\"},\"up\":{\"texture\":\"#all\"}}}]}");
         BedrockPackCompiler.Result without = null;
@@ -62,6 +62,10 @@ public class BedrockPackCompilerTest {
         assertEquals(1, with.mappedItems);
         try (ZipFile pack = new ZipFile(with.directory.resolve("voxelcore.mcpack").toFile())) {
             assertNull("Vanilla files are inputs, not shipped", pack.getEntry("textures/block/oak_planks.png"));
+            String lang = new String(readAll(pack.getInputStream(pack.getEntry("texts/en_US.lang"))), StandardCharsets.UTF_8);
+            assertTrue("Riding hint shows the VoxelCore name, not the raw key: " + lang,
+                    lang.matches("(?s)action\\.hint\\.exit\\.voxelcore:entity_i_[0-9a-f]{32}=\u00A76Oak Bench\n"));
+            assertEquals("[\"en_US\"]", new String(readAll(pack.getInputStream(pack.getEntry("texts/languages.json"))), StandardCharsets.UTF_8).replaceAll("\\s", ""));
         }
     }
     @Test public void missingTextureDoesNotReplacePreviousRevision() throws Exception {
