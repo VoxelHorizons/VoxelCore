@@ -241,9 +241,25 @@ final class BedrockIconRenderer {
         return JsonParser.parseString("{\"elements\":[{\"from\":[0,0,0],\"to\":[16,16,16],\"faces\":"+faces+"}]}").getAsJsonObject();
     }
     private byte[] texture(JsonObject textures,String key)throws IOException {
+        String resolved=resolveTexture(textures,key);
+        byte[] value=assets.get(path(resolved,"textures",".png")); if(value==null)throw new IOException("Missing or conflicting texture "+resolved);
+        JavaTextureAnimation animation=JavaTextureAnimation.read(value,assets.get(path(resolved,"textures",".png.mcmeta")),resolved);
+        if(animation==null)return value;
+        // Icons and static uses show the first frame instead of the whole frame strip.
+        ByteArrayOutputStream out=new ByteArrayOutputStream();
+        if(!ImageIO.write(animation.first(),"png",out))throw new IOException("PNG encoder missing");
+        return out.toByteArray();
+    }
+    private static String resolveTexture(JsonObject textures,String key)throws IOException {
         Set<String> seen=new HashSet<String>();
         while(key.startsWith("#")) { if(!seen.add(key)||!textures.has(key.substring(1)))throw new IOException("Unresolved texture "+key); key=textures.get(key.substring(1)).getAsString(); }
-        byte[] value=assets.get(path(key,"textures",".png")); if(value==null)throw new IOException("Missing or conflicting texture "+key); return value;
+        return key;
+    }
+    /** The texture's Java animation, or null when it is static. */
+    JavaTextureAnimation animationFor(JsonObject textures,String reference)throws IOException {
+        String resolved=resolveTexture(textures,reference);
+        return JavaTextureAnimation.read(assets.get(path(resolved,"textures",".png")),
+                assets.get(path(resolved,"textures",".png.mcmeta")),resolved);
     }
     private static String path(String id,String kind,String suffix) { String[] parts=(id.contains(":")?id:"minecraft:"+id).split(":",2); return "assets/"+parts[0]+"/"+kind+"/"+parts[1]+suffix; }
     private static double[] vector(JsonObject o,String key,double[] fallback) { if(!o.has(key))return fallback; JsonArray a=o.getAsJsonArray(key); double[] v=new double[a.size()];for(int i=0;i<v.length;i++)v[i]=a.get(i).getAsDouble();return v; }

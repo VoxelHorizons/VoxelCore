@@ -84,13 +84,17 @@ public final class BedrockGeometryCompilerTest {
         assertNull(new BedrockGeometryCompiler(assets).compile("demo:token","demo:token","token"));
     }
 
-    @Test public void rejectsUntranslatableTintedFacesRatherThanClaimingParity() throws Exception {
+    @Test public void unconfiguredTintRendersUntintedLikeJavaDefault() throws Exception {
+        // Live test: voxel:unicorn_staff (tintindex 0, no tint configured) was rejected. Java's
+        // default tint is -1 (white), so the face keeps its texture colour.
         Map<String,byte[]> assets = modelAssets();
         String parent = new String(assets.get("assets/demo/models/bench.json"),StandardCharsets.UTF_8);
         parent = parent.replace("\"texture\":\"#wood\"","\"texture\":\"#wood\",\"tintindex\":0");
         assets.put("assets/demo/models/bench.json",parent.getBytes(StandardCharsets.UTF_8));
-        try {new BedrockGeometryCompiler(assets).compile("demo:bench","demo:bench","bench");fail("tint is not supported");}
-        catch(IOException expected){assertTrue(expected.getMessage().contains("Tinted"));}
+        String shortId = "i_11112222333344445555666677778888";
+        BedrockGeometryCompiler.Output output = new BedrockGeometryCompiler(assets).compile("demo:bench","voxelcore:"+shortId,shortId);
+        BufferedImage atlas = ImageIO.read(new ByteArrayInputStream(output.assets.get("textures/voxelcore/g_"+shortId+".png")));
+        assertEquals(0xffaa4422, atlas.getRGB(0,0));
     }
 
     @Test public void convertsJavaRescaleIntoExactPerpendicularCuboidStretch() throws Exception {
@@ -135,6 +139,51 @@ public final class BedrockGeometryCompilerTest {
         JsonObject held = geometries.get(1).getAsJsonObject().getAsJsonArray("bones").get(4).getAsJsonObject()
                 .getAsJsonArray("cubes").get(0).getAsJsonObject();
         assertEquals("Held geometry uses the hand transforms, not display.fixed", "[4.0,0.0,-8.0]", held.get("origin").toString());
+    }
+
+    @Test public void animatedTextureStacksAtlasFramesAndScrollsWithUvAnim() throws Exception {
+        Map<String,byte[]> assets = modelAssets();
+        BufferedImage strip = new BufferedImage(16,48,BufferedImage.TYPE_INT_ARGB);
+        int[] colours = {0xffff0000, 0xff00ff00, 0xff0000ff};
+        for (int y=0;y<48;y++) for (int x=0;x<16;x++) strip.setRGB(x,y,colours[y/16]);
+        ByteArrayOutputStream png = new ByteArrayOutputStream(); ImageIO.write(strip,"png",png);
+        assets.put("assets/demo/textures/glow.png", png.toByteArray());
+        assets.put("assets/demo/textures/glow.png.mcmeta", "{\"animation\":{\"frametime\":2}}".getBytes(StandardCharsets.UTF_8));
+        assets.put("assets/demo/models/lamp.json",("{\"textures\":{\"glow\":\"demo:glow\"},\"elements\":["
+                + "{\"from\":[0,0,0],\"to\":[16,16,16],\"faces\":{\"north\":{\"texture\":\"#glow\"}}}]}").getBytes(StandardCharsets.UTF_8));
+        String shortId = "i_11112222333344445555666677778888";
+        BedrockGeometryCompiler.Output output = new BedrockGeometryCompiler(assets).compile("demo:lamp","voxelcore:"+shortId,shortId);
+        BufferedImage atlas = ImageIO.read(new ByteArrayInputStream(output.assets.get("textures/voxelcore/g_"+shortId+".png")));
+        assertEquals("Three frames of 2 ticks: one atlas copy per frame", 16*3, atlas.getHeight());
+        assertEquals(0xffff0000, atlas.getRGB(0,0));
+        assertEquals(0xff00ff00, atlas.getRGB(0,16));
+        assertEquals(0xff0000ff, atlas.getRGB(0,32));
+        JsonObject geometry = JsonParser.parseString(new String(output.assets.get("models/entity/voxelcore/"+shortId+".geo.json"),
+                StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject();
+        assertEquals("Geometry keeps the single-frame height", 16, geometry.getAsJsonObject("description").get("texture_height").getAsInt());
+        JsonObject entity = JsonParser.parseString(new String(output.assets.get("entity/voxelcore/"+shortId+".entity.json"),
+                StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("minecraft:client_entity").getAsJsonObject("description");
+        assertEquals(BedrockGeometryCompiler.ANIMATED_MATERIAL, entity.getAsJsonObject("materials").get("default").getAsString());
+        assertEquals(BedrockGeometryCompiler.ANIMATED_CONTROLLER, entity.getAsJsonArray("render_controllers").get(0).getAsString());
+        assertEquals("[\"v.voxelcore_frames = 3;\",\"v.voxelcore_step = 2;\"]",
+                entity.getAsJsonObject("scripts").getAsJsonArray("pre_animation").toString());
+        assertTrue(new String(output.assets.get(BedrockGeometryCompiler.ANIMATED_MATERIAL_PATH), StandardCharsets.UTF_8).contains("USE_UV_ANIM"));
+        BufferedImage icon = ImageIO.read(new ByteArrayInputStream(new BedrockIconRenderer(assets).render("demo:lamp", new double[]{0,0,0}, null)));
+        boolean red = false, other = false;
+        for (int y=0;y<64;y++) for (int x=0;x<64;x++) {
+            int argb = icon.getRGB(x,y);
+            if ((argb>>>24)==0) continue;
+            if ((argb & 0xffffff) == 0xff0000) red = true; else other = true;
+        }
+        assertTrue("Icon shows the first frame only", red && !other);
+    }
+
+    @Test public void staticModelsKeepVanillaMaterialsAndOneAtlasFrame() throws Exception {
+        String shortId = "i_11112222333344445555666677778888";
+        BedrockGeometryCompiler.Output output = new BedrockGeometryCompiler(modelAssets()).compile("demo:bench","voxelcore:"+shortId,shortId);
+        assertFalse(output.assets.containsKey(BedrockGeometryCompiler.ANIMATED_MATERIAL_PATH));
+        assertTrue(new String(output.assets.get("entity/voxelcore/"+shortId+".entity.json"), StandardCharsets.UTF_8)
+                .contains("\"entity_alphatest\""));
     }
 
     @Test public void keepsFlatPlaneElementsButRejectsLines() throws Exception {
