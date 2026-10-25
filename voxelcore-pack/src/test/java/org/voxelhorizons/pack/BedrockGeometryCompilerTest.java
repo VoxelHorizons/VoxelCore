@@ -141,7 +141,7 @@ public final class BedrockGeometryCompilerTest {
         assertEquals("Held geometry uses the hand transforms, not display.fixed", "[4.0,0.0,-8.0]", held.get("origin").toString());
     }
 
-    @Test public void animatedTextureStacksAtlasFramesAndScrollsWithUvAnim() throws Exception {
+    @Test public void animatedTextureWritesOneAtlasPerFrameAndSelectsByTime() throws Exception {
         Map<String,byte[]> assets = modelAssets();
         BufferedImage strip = new BufferedImage(16,48,BufferedImage.TYPE_INT_ARGB);
         int[] colours = {0xffff0000, 0xff00ff00, 0xff0000ff};
@@ -153,21 +153,35 @@ public final class BedrockGeometryCompilerTest {
                 + "{\"from\":[0,0,0],\"to\":[16,16,16],\"faces\":{\"north\":{\"texture\":\"#glow\"}}}]}").getBytes(StandardCharsets.UTF_8));
         String shortId = "i_11112222333344445555666677778888";
         BedrockGeometryCompiler.Output output = new BedrockGeometryCompiler(assets).compile("demo:lamp","voxelcore:"+shortId,shortId);
-        BufferedImage atlas = ImageIO.read(new ByteArrayInputStream(output.assets.get("textures/voxelcore/g_"+shortId+".png")));
-        assertEquals("Three frames of 2 ticks: one atlas copy per frame", 16*3, atlas.getHeight());
-        assertEquals(0xffff0000, atlas.getRGB(0,0));
-        assertEquals(0xff00ff00, atlas.getRGB(0,16));
-        assertEquals(0xff0000ff, atlas.getRGB(0,32));
+        String[] frames = {"g_"+shortId, "g_"+shortId+"_f1", "g_"+shortId+"_f2"};
+        for (int f=0;f<3;f++) {
+            BufferedImage atlas = ImageIO.read(new ByteArrayInputStream(output.assets.get("textures/voxelcore/"+frames[f]+".png")));
+            assertEquals("Each frame is a single-frame atlas", 16, atlas.getHeight());
+            assertEquals(colours[f], atlas.getRGB(0,0));
+        }
+        assertFalse(output.assets.containsKey("textures/voxelcore/g_"+shortId+"_f3.png"));
         JsonObject geometry = JsonParser.parseString(new String(output.assets.get("models/entity/voxelcore/"+shortId+".geo.json"),
                 StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject();
         assertEquals("Geometry keeps the single-frame height", 16, geometry.getAsJsonObject("description").get("texture_height").getAsInt());
         JsonObject entity = JsonParser.parseString(new String(output.assets.get("entity/voxelcore/"+shortId+".entity.json"),
                 StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("minecraft:client_entity").getAsJsonObject("description");
-        assertEquals(BedrockGeometryCompiler.ANIMATED_MATERIAL, entity.getAsJsonObject("materials").get("default").getAsString());
-        assertEquals(BedrockGeometryCompiler.ANIMATED_CONTROLLER, entity.getAsJsonArray("render_controllers").get(0).getAsString());
-        assertEquals("[\"v.voxelcore_frames = 3;\",\"v.voxelcore_step = 2;\"]",
-                entity.getAsJsonObject("scripts").getAsJsonArray("pre_animation").toString());
-        assertTrue(new String(output.assets.get(BedrockGeometryCompiler.ANIMATED_MATERIAL_PATH), StandardCharsets.UTF_8).contains("USE_UV_ANIM"));
+        assertEquals("Vanilla material only", "entity_alphatest", entity.getAsJsonObject("materials").get("default").getAsString());
+        String controllerId = BedrockGeometryCompiler.animatedController(shortId);
+        assertEquals(controllerId, entity.getAsJsonArray("render_controllers").get(0).getAsString());
+        assertEquals("textures/voxelcore/g_"+shortId+"_f2", entity.getAsJsonObject("textures").get("frame_2").getAsString());
+        JsonObject attachable = JsonParser.parseString(new String(output.assets.get("attachables/"+shortId+".json"),
+                StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("minecraft:attachable").getAsJsonObject("description");
+        assertEquals("entity_alphatest", attachable.getAsJsonObject("materials").get("default").getAsString());
+        assertEquals(controllerId, attachable.getAsJsonArray("render_controllers").get(0).getAsString());
+        assertEquals("textures/voxelcore/g_"+shortId+"_f1", attachable.getAsJsonObject("textures").get("frame_1").getAsString());
+        JsonObject controller = JsonParser.parseString(new String(output.assets.get(
+                "render_controllers/"+shortId+".render_controllers.json"), StandardCharsets.UTF_8))
+                .getAsJsonObject().getAsJsonObject("render_controllers").getAsJsonObject(controllerId);
+        assertEquals("[\"Texture.default\",\"Texture.frame_1\",\"Texture.frame_2\"]",
+                controller.getAsJsonObject("arrays").getAsJsonObject("textures").getAsJsonArray("Array.frames").toString());
+        assertEquals("Array.frames[math.mod(math.floor(q.life_time * 10.0), 3)]",
+                controller.getAsJsonArray("textures").get(0).getAsString());
+        assertFalse("No pack-defined materials", output.assets.keySet().toString().contains("materials/"));
         BufferedImage icon = ImageIO.read(new ByteArrayInputStream(new BedrockIconRenderer(assets).render("demo:lamp", new double[]{0,0,0}, null)));
         boolean red = false, other = false;
         for (int y=0;y<64;y++) for (int x=0;x<64;x++) {
@@ -181,7 +195,8 @@ public final class BedrockGeometryCompilerTest {
     @Test public void staticModelsKeepVanillaMaterialsAndOneAtlasFrame() throws Exception {
         String shortId = "i_11112222333344445555666677778888";
         BedrockGeometryCompiler.Output output = new BedrockGeometryCompiler(modelAssets()).compile("demo:bench","voxelcore:"+shortId,shortId);
-        assertFalse(output.assets.containsKey(BedrockGeometryCompiler.ANIMATED_MATERIAL_PATH));
+        assertFalse(output.assets.keySet().toString().contains("render_controllers/"+shortId));
+        assertFalse(output.assets.containsKey("textures/voxelcore/g_"+shortId+"_f1.png"));
         assertTrue(new String(output.assets.get("entity/voxelcore/"+shortId+".entity.json"), StandardCharsets.UTF_8)
                 .contains("\"entity_alphatest\""));
     }
