@@ -20,7 +20,7 @@ public class BedrockIconRendererTest {
   BufferedImage texture=new BufferedImage(16,16,2);for(int y=0;y<16;y++)for(int x=0;x<16;x++)texture.setRGB(x,y,0xff00ff00);
   ByteArrayOutputStream out=new ByteArrayOutputStream();ImageIO.write(texture,"png",out);assets.put("assets/demo/textures/green.png",out.toByteArray());
   assets.put("assets/demo/models/cross.json",("{\"textures\":{\"all\":\"demo:green\"},\"elements\":[{\"from\":[0.8,0,8],\"to\":[15.2,16,8],"
-   +"\"rotation\":{\"origin\":[8,8,8],\"axis\":\"y\",\"angle\":45,\"rescale\":true},"
+   +"\"rotation\":{\"origin\":[8,8,8],\"axis\":\"y\",\"angle\":-45,\"rescale\":true},"
    +"\"faces\":{\"north\":{\"texture\":\"#all\"},\"south\":{\"texture\":\"#all\"}}}]}").getBytes("UTF-8"));
   BufferedImage result=ImageIO.read(new ByteArrayInputStream(new BedrockIconRenderer(assets).render("demo:cross")));
   assertEquals(0xff00ff00,result.getRGB(32,32));
