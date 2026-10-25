@@ -90,6 +90,9 @@ public final class EntityProjectionIndexTest {
         com.google.gson.JsonObject vehicle=com.google.gson.JsonParser.parseString(
                 "{\"seat_offset\":[0.5,1,-2],\"pitch\":10,\"roll\":-5}").getAsJsonObject();
         assertArrayEquals(new float[]{-0.5f,-1f,2f,10f,-5f,1,1,1},EntityProjectionIndex.vehicleTransform(vehicle),0f);
+        assertArrayEquals("Geyser SCALE multiplies the translation, so it is divided by the scale",
+                new float[]{0f,-0.5f,1f,0,0,1,1,1},EntityProjectionIndex.vehicleTransform(com.google.gson.JsonParser.parseString(
+                        "{\"seat_offset\":[0,1,-2],\"scale\":2}").getAsJsonObject()),0f);
         assertNull("Identity vehicle transform is omitted",EntityProjectionIndex.vehicleTransform(
                 com.google.gson.JsonParser.parseString("{\"seat_offset\":[0,0,0]}").getAsJsonObject()));
         assertNull(EntityProjectionIndex.furnitureTransform(com.google.gson.JsonParser.parseString("[2,2,2]")));

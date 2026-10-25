@@ -170,7 +170,9 @@ public final class VoxelCoreGeyserExtension implements Extension {
                     if(visualScale!=null) entity.override(GeyserEntityDataTypes.SCALE,visualScale);
                     // Set before spawn so the AddEntity packet already carries texture and transform.
                     if(dyeProperty!=null && dye!=null) entity.updateProperty(dyeProperty,dye);
-                    if(transformProperty!=null && transform!=null) applyTransform(entity,transformProperty,transform);
+                    // Not immediate: the values must ride in the AddEntity packet (live test: an
+                    // immediate update before spawn was sent ahead of the entity and lost).
+                    if(transformProperty!=null && transform!=null) applyTransform(entity,transformProperty,transform,false);
                 });
             }
         } catch (RuntimeException invalid) {
@@ -296,17 +298,19 @@ public final class VoxelCoreGeyserExtension implements Extension {
                 }
                 @Override public void transform(float[] transform) {
                     GeyserFloatEntityProperty[] properties = transformProperties.get(definitionId());
-                    if (properties != null) applyTransform(entity, properties, transform == null ? IDENTITY_TRANSFORM : transform);
+                    if (properties != null) applyTransform(entity, properties, transform == null ? IDENTITY_TRANSFORM : transform, true);
                 }
             });
         }
         return targets;
     }
 
-    private static void applyTransform(GeyserEntity entity, GeyserFloatEntityProperty[] properties, float[] values) {
+    /** @param immediate false before spawn (sent with AddEntity), true for live updates */
+    private static void applyTransform(GeyserEntity entity, GeyserFloatEntityProperty[] properties, float[] values,
+                                       boolean immediate) {
         entity.updatePropertiesBatched(update -> {
             for (int i = 0; i < properties.length; i++) update.update(properties[i], Float.valueOf(values[i]));
-        }, true);
+        }, immediate);
     }
 
     @Subscribe

@@ -23,6 +23,13 @@ public final class BedrockPackCompiler {
     private static final Gson JSON = new GsonBuilder().setPrettyPrinting().create();
     private Path vanillaAssets;
     private BuildProgress progress = BuildProgress.NONE;
+    private boolean overrideControllerGlyphPages;
+
+    /** Write authored glyphs in Bedrock's controller pages U+E000..U+E1FF (see BedrockGlyphAtlas). */
+    public BedrockPackCompiler withControllerGlyphPages(boolean override) {
+        this.overrideControllerGlyphPages = override;
+        return this;
+    }
 
     /** Stage and percentage messages for server admins (thread-safe sink). */
     public BedrockPackCompiler withProgress(BuildProgress progress) {
@@ -127,7 +134,8 @@ public final class BedrockPackCompiler {
             for (Map.Entry<String, byte[]> vanilla : VanillaAssets.load(vanillaAssets, progress).entrySet())
                 if (!javaAssets.containsKey(vanilla.getKey())) javaAssets.put(vanilla.getKey(), vanilla.getValue());
         int mappedGlyphs = glyphAllocationManifest == null ? 0
-                : BedrockGlyphAtlas.append(contentRoot, glyphAllocationManifest, javaAssets, assets, unsupported);
+                : BedrockGlyphAtlas.append(contentRoot, glyphAllocationManifest, javaAssets, assets, unsupported,
+                        overrideControllerGlyphPages);
         progress.report("Bedrock: " + mappedGlyphs + " font glyphs placed"
                 + (unsupported.isEmpty() ? "" : "; " + unsupported.size() + " glyphs skipped (see unsupported-items.txt)"));
         BedrockIconRenderer renderer = new BedrockIconRenderer(javaAssets);

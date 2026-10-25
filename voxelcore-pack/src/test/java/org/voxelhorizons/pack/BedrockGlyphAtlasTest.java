@@ -30,6 +30,15 @@ public class BedrockGlyphAtlasTest {
         assertEquals(0xffffffff, out.getRGB(1, 0));
     }
 
+    @Test public void nativeFlagAtTwiceJavaHeightStaysCrisp() {
+        BufferedImage flag = new BufferedImage(24, 16, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < 16; y++) for (int x = 0; x < 24; x++) flag.setRGB(x, y, x % 2 == 0 ? 0xffc0102e : 0xff00247d);
+        BufferedImage out = BedrockGlyphAtlas.atJavaSize(flag, 7);
+        assertEquals(24, out.getWidth());
+        assertEquals(16, out.getHeight());
+        assertEquals(0xff00247d, out.getRGB(1, 0));
+    }
+
     @Test public void smallArtGrowsByWholeMultiples() {
         BufferedImage icon = new BufferedImage(5, 4, BufferedImage.TYPE_INT_ARGB);
         icon.setRGB(0, 0, 0xffff0000);

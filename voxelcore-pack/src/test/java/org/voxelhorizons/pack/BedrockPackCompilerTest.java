@@ -259,6 +259,26 @@ public class BedrockPackCompilerTest {
         }
     }
 
+    @Test public void controllerPageGlyphsAreWrittenOnlyWhenEnabled() throws Exception {
+        Path root = fixture(), out = temp.newFolder().toPath();
+        Path icons = root.resolve("demo/assets/demo/textures/font/flags.png");
+        Files.createDirectories(icons.getParent());
+        java.awt.image.BufferedImage flag = new java.awt.image.BufferedImage(8,6,2);
+        for (int y=0;y<6;y++) for (int x=0;x<8;x++) flag.setRGB(x,y,0xff2040c0);
+        javax.imageio.ImageIO.write(flag,"png",icons.toFile());
+        write(root.resolve("demo/assets/minecraft/font/default.json"), "{\"providers\":["
+                + "{\"type\":\"bitmap\",\"file\":\"demo:font/flags.png\",\"ascent\":7,\"height\":6,\"chars\":[\"\\ue105\"]}]}");
+        Path allocations = temp.newFolder("glyph-flags").toPath().resolve("glyph-allocations.yml");
+        BedrockPackCompiler.Result skipped = new BedrockPackCompiler().compile(root,out,allocations);
+        assertTrue(new String(Files.readAllBytes(skipped.directory.resolve("unsupported-items.txt")), StandardCharsets.UTF_8)
+                .contains("U+E105"));
+        BedrockPackCompiler.Result written = new BedrockPackCompiler().withControllerGlyphPages(true).compile(root,out,allocations);
+        try (ZipFile zip = new ZipFile(written.directory.resolve("voxelcore.mcpack").toFile())) {
+            java.awt.image.BufferedImage page = javax.imageio.ImageIO.read(zip.getInputStream(zip.getEntry("font/glyph_E1.png")));
+            int cell = page.getWidth() / 16;
+            assertEquals("U+E105 flag drawn at native size in its cell", 0xff2040c0, page.getRGB(5 * cell + cell / 2, cell / 2));
+        }
+    }
     @Test public void exportsManagedInlineGlyphsToSafeBedrockFontPages() throws Exception {
         Path root = fixture(), out = temp.newFolder().toPath();
         write(root.resolve("demo/content/ui.yml"),

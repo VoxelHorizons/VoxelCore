@@ -247,13 +247,17 @@ public final class EntityProjectionIndex {
     /**
      * VoxelVehicles renders the model at the seat anchor with a display matrix of
      * translate(-seat_offset) * rotateX(-pitch) * rotateZ(roll) * scale; scale is applied
-     * through Geyser SCALE, the rest through the transform animation.
+     * through Geyser SCALE, the rest through the transform animation. Geyser SCALE also
+     * multiplies the bone translation while Java's translation is unscaled, so the
+     * translation is divided by the uniform scale.
      */
     static float[] vehicleTransform(JsonObject row) {
+        Float uniform=scale(row.get("scale"));
+        float divisor=uniform==null?1f:uniform.floatValue();
         float[] t=new float[]{0,0,0,0,0,1,1,1};
         JsonElement seat=row.get("seat_offset");
         if(seat!=null&&seat.isJsonArray()&&seat.getAsJsonArray().size()==3)
-            for(int i=0;i<3;i++)t[i]=-seat.getAsJsonArray().get(i).getAsFloat();
+            for(int i=0;i<3;i++)t[i]=-seat.getAsJsonArray().get(i).getAsFloat()/divisor;
         if(row.has("pitch")&&!row.get("pitch").isJsonNull())t[3]=row.get("pitch").getAsFloat();
         if(row.has("roll")&&!row.get("roll").isJsonNull())t[4]=row.get("roll").getAsFloat();
         for(int i=0;i<5;i++)if(!Float.isFinite(t[i])||Math.abs(t[i])>(i<3?64f:180f))return null;

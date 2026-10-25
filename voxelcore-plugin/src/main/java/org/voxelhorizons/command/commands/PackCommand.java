@@ -495,7 +495,10 @@ public final class PackCommand implements SubCommand {
                             }
                             org.voxelhorizons.pack.BedrockPackCompiler.Result bedrock =
                                     new org.voxelhorizons.pack.BedrockPackCompiler().withVanillaAssets(vanilla)
-                                            .withProgress(progress).compile(
+                                            .withProgress(progress)
+                                            .withControllerGlyphPages(plugin.getConfig().getBoolean(
+                                                    "bedrock.override_controller_glyph_pages", true))
+                                            .compile(
                                             plugin.getPackManager().contentRoot(),
                                             plugin.getPackManager().outputRoot().resolve("bedrock"),
                                             plugin.getPackManager().glyphAllocationManifest(),

@@ -52,16 +52,22 @@ final class BedrockGeometryCompiler {
      * cannot: local translation (blocks), pitch/roll (degrees) and per-axis scale, read from
      * entity properties set by the VoxelCore Geyser extension. Every channel falls back to
      * identity when the property is absent, so an older extension never hides a model.
-     * Axis signs follow the geometry compiler's unmirrored Java coordinates and Java's
-     * rotateX(-pitch)/rotateZ(roll) order; they are not yet confirmed on a Bedrock client.
+     * Properties are Java display-local values. Java's item display renderer turns the item
+     * model 180 degrees about Y after the display transformation, and the geometry is X-mirrored
+     * (java2bedrock), so in bone space the translation is (x, y, -z) and roll is negated;
+     * pitch keeps its sign. Live test: furniture matches Java with this geometry.
      */
     static byte[] transformAnimation() {
         JsonObject root = new JsonObject();
-        root.add("position", channels(new String[]{"voxelcore:tx", "voxelcore:ty", "voxelcore:tz"}, "0", " * 16"));
+        JsonArray position = new JsonArray();
+        position.add(guarded("voxelcore:tx", "0") + " * 16");
+        position.add(guarded("voxelcore:ty", "0") + " * 16");
+        position.add("-" + guarded("voxelcore:tz", "0") + " * 16");
+        root.add("position", position);
         JsonArray rotation = new JsonArray();
         rotation.add("-" + guarded("voxelcore:pitch", "0"));
         rotation.add(0);
-        rotation.add(guarded("voxelcore:roll", "0"));
+        rotation.add("-" + guarded("voxelcore:roll", "0"));
         root.add("rotation", rotation);
         root.add("scale", channels(new String[]{"voxelcore:sx", "voxelcore:sy", "voxelcore:sz"}, "1", ""));
         JsonObject bones = new JsonObject(); bones.add("root", root);
