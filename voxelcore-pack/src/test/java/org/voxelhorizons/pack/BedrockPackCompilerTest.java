@@ -297,30 +297,28 @@ public class BedrockPackCompilerTest {
         Path allocations = temp.newFolder("glyph-hires").toPath().resolve("glyph-allocations.yml");
         new UiGlyphLoader().load(root, allocations, true);
         BedrockPackCompiler.Result result = new BedrockPackCompiler().compile(root,out,allocations);
-        assertEquals("64px icons were skipped before; now scaled into the cell", 2, result.mappedGlyphs);
-        // The 100x10 tag is cut into ten 10x10 tiles at Bedrock-only codepoints.
-        JsonObject tiles = JsonParser.parseString(new String(Files.readAllBytes(
-                result.directory.resolve(BedrockPackCompiler.GLYPH_TILES)), StandardCharsets.UTF_8))
-                .getAsJsonObject().getAsJsonObject("tiles");
-        assertEquals(1, tiles.size());
-        JsonArray sequence = tiles.entrySet().iterator().next().getValue().getAsJsonArray();
-        assertEquals(10, sequence.size());
-        assertEquals("F400", sequence.get(0).getAsString());
-        assertArrayEquals("Stable copy for the plugin", Files.readAllBytes(result.directory.resolve(BedrockPackCompiler.GLYPH_TILES)),
-                Files.readAllBytes(out.resolve(BedrockPackCompiler.GLYPH_TILES)));
+        assertEquals("64px icons were skipped before; now drawn at Java size", 2, result.mappedGlyphs);
+        String unsupported = new String(Files.readAllBytes(result.directory.resolve("unsupported-items.txt")), StandardCharsets.UTF_8);
+        assertFalse("Wide tags are drawn whole, not skipped", unsupported.contains("banner_tag"));
         try (ZipFile zip = new ZipFile(result.directory.resolve("voxelcore.mcpack").toFile())) {
             try (java.io.InputStream image = zip.getInputStream(zip.getEntry("font/glyph_E2.png"))) {
                 java.awt.image.BufferedImage atlas = javax.imageio.ImageIO.read(image);
-                assertEquals(BedrockGlyphAtlas.SHEET_SIZE, atlas.getWidth());
-            }
-            try (java.io.InputStream image = zip.getInputStream(zip.getEntry("font/glyph_F4.png"))) {
-                java.awt.image.BufferedImage atlas = javax.imageio.ImageIO.read(image);
-                // Java height 8 -> each 10x10 source tile is drawn 8x8, left-aligned, rows 4..11 of a 16px cell.
-                assertEquals(BedrockGlyphAtlas.SHEET_SIZE, atlas.getWidth());
-                assertEquals(0xff, atlas.getRGB(0, 7) >>> 24);
-                assertEquals(0xff, atlas.getRGB(7, 7) >>> 24);
-                assertEquals("Tile is no wider than its Java height", 0, atlas.getRGB(8, 7) >>> 24);
-                assertEquals("Centred vertically", 0, atlas.getRGB(3, 2) >>> 24);
+                // The 100x10 tag at Java height 8 is 80x8 page pixels, so the page's cells grow to 80px.
+                assertEquals(80 * 16, atlas.getWidth());
+                int widest = 0;
+                for (int slot = 0; slot < 256; slot++) {
+                    int x0 = (slot % 16) * 80, y0 = (slot / 16) * 80, minX = 80, maxX = -1, minY = 80, maxY = -1;
+                    for (int y = 0; y < 80; y++) for (int x = 0; x < 80; x++)
+                        if ((atlas.getRGB(x0 + x, y0 + y) >>> 24) != 0) {
+                            minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+                        }
+                    if (maxX - minX + 1 > widest) {
+                        widest = maxX - minX + 1;
+                        assertEquals("Tag drawn at its Java height", 8, maxY - minY + 1);
+                        assertEquals("Centred vertically", 36, minY);
+                    }
+                }
+                assertEquals("Tag drawn at its Java width", 80, widest);
             }
         }
     }

@@ -149,6 +149,9 @@ public final class VoxelCoreGeyserExtension implements Extension {
             if (projection!=null) spawnStats.otherType(carrier.namespace() + ":" + carrier.path());
             return;
         }
+        // Only replace our own placeholder, never another extension's item_display entity.
+        if (event.definition()==null
+                || !event.definition().identifier().equals(Identifier.of(ItemDisplayRegistration.PLACEHOLDER))) return;
         if (projection==null) { spawnStats.notInFeed.incrementAndGet(); return; }
         if (!nativeEntityIdentifiers.containsValue(projection.entityType())) {
             spawnStats.unregistered(projection.entityType());
@@ -178,6 +181,25 @@ public final class VoxelCoreGeyserExtension implements Extension {
     }
 
     private final SpawnStats spawnStats = new SpawnStats();
+    private volatile CustomEntityDefinition displayPlaceholder;
+
+    /** Teach Geyser the item_display Java type so placed furniture/vehicles fire spawn events. */
+    private void registerItemDisplayType() {
+        if (displayPlaceholder == null || projectionIndex == null) return;
+        try {
+            String refused = ItemDisplayRegistration.register(displayPlaceholder);
+            if (refused == null) {
+                logger().info("Registered minecraft:item_display with Geyser; VoxelCore furniture/vehicle displays "
+                        + "now spawn as native Bedrock entities (other item displays stay invisible, as before).");
+            } else {
+                logger().warning("VoxelCore display substitution disabled: " + refused
+                        + ". Remove that extension to use VoxelCore's native furniture/vehicle entities.");
+            }
+        } catch (Throwable incompatible) {
+            logger().error("Could not register minecraft:item_display with this Geyser build ("
+                    + incompatible + "); placed furniture/vehicles stay invisible on Bedrock.");
+        }
+    }
     private static final List<Identifier> OTHER_CARRIERS = List.of(Identifier.of("minecraft:armor_stand"),
             Identifier.of("minecraft:block_display"), Identifier.of("minecraft:interaction"));
 
@@ -197,6 +219,13 @@ public final class VoxelCoreGeyserExtension implements Extension {
             return;
         }
         Set<String> types = new TreeSet<String>(catalog.values());
+        try {
+            CustomEntityDefinition placeholder = CustomEntityDefinition.of(Identifier.of(ItemDisplayRegistration.PLACEHOLDER));
+            event.register(placeholder);
+            displayPlaceholder = placeholder;
+        } catch (RuntimeException incompatible) {
+            logger().warning("VoxelCore display placeholder not registered: " + incompatible.getMessage());
+        }
         for(String identifier:types) {
             try {
                 event.register(CustomEntityDefinition.of(Identifier.of(identifier)));
@@ -295,6 +324,7 @@ public final class VoxelCoreGeyserExtension implements Extension {
      */
     @Subscribe
     public void onDefineEntityProperties(GeyserDefineEntityPropertiesEvent event) {
+        registerItemDisplayType();
         if (nativeEntityIdentifiers.isEmpty()) return;
         java.util.Set<String> dyeable;
         try {
