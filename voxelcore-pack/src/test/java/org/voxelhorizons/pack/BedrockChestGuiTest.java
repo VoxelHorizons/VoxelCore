@@ -54,9 +54,13 @@ public class BedrockChestGuiTest {
         assertEquals("$container_title", image.get("$voxelcore_title").getAsString());
         assertEquals("Default title hidden for menu backgrounds", "(($voxelcore_title - '" + character + "') = $voxelcore_title)",
                 screen.getAsJsonObject("chest_label").get("visible").getAsString().replaceAll("^\\((.*)\\)$", "$1"));
-        for (String panel : new String[]{"small_chest_panel_top_half", "large_chest_panel_top_half"})
-            assertEquals("[{\"voxelcore_gui_e2a1@chest.voxelcore_gui_e2a1\":{}}]", screen.getAsJsonObject(panel)
-                    .getAsJsonArray("modifications").get(0).getAsJsonObject().getAsJsonArray("value").toString());
+        // Small chest: top at 12 + 6 - 13 = 5, inventory from 86, so only 81 of 111 rows show.
+        assertEquals("[{\"voxelcore_gui_e2a1@chest.voxelcore_gui_e2a1\":{\"size\":[88,81],\"uv\":[0,0],\"uv_size\":[176.0,162.0]}}]",
+                screen.getAsJsonObject("small_chest_panel_top_half").getAsJsonArray("modifications").get(0)
+                        .getAsJsonObject().getAsJsonArray("value").toString());
+        assertEquals("Large chest: fits above the inventory (from 140), uncropped",
+                "[{\"voxelcore_gui_e2a1@chest.voxelcore_gui_e2a1\":{}}]", screen.getAsJsonObject("large_chest_panel_top_half")
+                        .getAsJsonArray("modifications").get(0).getAsJsonObject().getAsJsonArray("value").toString());
     }
 
     @Test public void fullWidthBackgroundIsCentredAndMissingTexturesAreReported() throws Exception {
@@ -101,13 +105,17 @@ public class BedrockChestGuiTest {
             assertEquals("UV in texture pixels (2x)", "[352.0," + (rows * 18 + 17) * 2.0 + "]", top.get("uv_size").toString());
             JsonObject inventory = root.get(2).getAsJsonObject().getAsJsonObject("voxelcore_container_inventory");
             assertEquals("[0.0,252.0]", inventory.get("uv").toString());
-            assertEquals("Rows part ends 27px above the panel bottom", "[0,-27]", inventory.get("offset").toString());
+            assertEquals("Rows 126..193 end 25px up: Java edge 139 on Bedrock's first row at H - 80",
+                    "[0,-25]", inventory.get("offset").toString());
+            assertEquals("[176,68]", inventory.get("size").toString());
             JsonObject hotbar = root.get(3).getAsJsonObject().getAsJsonObject("voxelcore_container_hotbar");
             assertEquals("[0.0,390.0]", hotbar.get("uv").toString());
-            assertEquals("Hotbar strip 2px higher than Java's", "[0,-9]", hotbar.get("offset").toString());
-            JsonObject footer = root.get(5).getAsJsonObject().getAsJsonObject("voxelcore_container_footer");
+            assertEquals("Hotbar strip ends 5px up like Bedrock's hotbar", "[0,-5]", hotbar.get("offset").toString());
+            JsonObject footer = root.get(4).getAsJsonObject().getAsJsonObject("voxelcore_container_footer");
+            assertEquals("[0.0,434.0]", footer.get("uv").toString());
             assertEquals("[0,0]", footer.get("offset").toString());
-            assertEquals("[176,7]", footer.get("size").toString());
+            assertEquals("[176,5]", footer.get("size").toString());
+            assertEquals("[0,4]", top.get("offset").toString());
             assertEquals("bottom_left", inventory.get("anchor_from").getAsString());
         }
     }
