@@ -510,4 +510,17 @@ public class BedrockPackCompilerTest {
     private static void write(Path path, String text) throws Exception {
         Files.createDirectories(path.getParent()); Files.write(path,text.getBytes(StandardCharsets.UTF_8));
     }
+    @Test public void bedrockEntriesAreOptimizedButCommentedJsonIsKept() {
+        byte[] spaced = "{ \"a\" : [ 1, 2 ],\n  \"b\": \"x y\" }".getBytes(StandardCharsets.UTF_8);
+        assertEquals("{\"a\":[1,2],\"b\":\"x y\"}",
+                new String(PackAssetOptimizer.optimizeBedrock("ui/a.json", spaced), StandardCharsets.UTF_8));
+        byte[] commented = "{\n  // note\n  \"a\": 1\n}".getBytes(StandardCharsets.UTF_8);
+        assertSame("Comments would swallow the rest of a minified file", commented,
+                PackAssetOptimizer.optimizeBedrock("ui/b.json", commented));
+        byte[] slashInString = "{ \"path\": \"textures/ui/x\" }".getBytes(StandardCharsets.UTF_8);
+        assertEquals("{\"path\":\"textures/ui/x\"}",
+                new String(PackAssetOptimizer.optimizeBedrock("a.json", slashInString), StandardCharsets.UTF_8));
+        byte[] lang = "a=b c".getBytes(StandardCharsets.UTF_8);
+        assertSame(lang, PackAssetOptimizer.optimizeBedrock("texts/en_US.lang", lang));
+    }
 }
