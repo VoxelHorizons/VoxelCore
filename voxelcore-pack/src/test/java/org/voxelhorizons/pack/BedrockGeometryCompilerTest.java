@@ -165,13 +165,13 @@ public final class BedrockGeometryCompilerTest {
         assertEquals("Geometry keeps the single-frame height", 16, geometry.getAsJsonObject("description").get("texture_height").getAsInt());
         JsonObject entity = JsonParser.parseString(new String(output.assets.get("entity/voxelcore/"+shortId+".entity.json"),
                 StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("minecraft:client_entity").getAsJsonObject("description");
-        assertEquals("Vanilla material only", "entity_alphatest", entity.getAsJsonObject("materials").get("default").getAsString());
+        assertEquals("Vanilla material only", BedrockGeometryCompiler.ONE_SIDED_MATERIAL, entity.getAsJsonObject("materials").get("default").getAsString());
         String controllerId = BedrockGeometryCompiler.animatedController(shortId);
         assertEquals(controllerId, entity.getAsJsonArray("render_controllers").get(0).getAsString());
         assertEquals("textures/voxelcore/g_"+shortId+"_f2", entity.getAsJsonObject("textures").get("frame_2").getAsString());
         JsonObject attachable = JsonParser.parseString(new String(output.assets.get("attachables/"+shortId+".json"),
                 StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("minecraft:attachable").getAsJsonObject("description");
-        assertEquals("entity_alphatest", attachable.getAsJsonObject("materials").get("default").getAsString());
+        assertEquals(BedrockGeometryCompiler.ONE_SIDED_MATERIAL, attachable.getAsJsonObject("materials").get("default").getAsString());
         assertEquals(controllerId, attachable.getAsJsonArray("render_controllers").get(0).getAsString());
         assertEquals("textures/voxelcore/g_"+shortId+"_f1", attachable.getAsJsonObject("textures").get("frame_1").getAsString());
         JsonObject controller = JsonParser.parseString(new String(output.assets.get(
@@ -198,7 +198,31 @@ public final class BedrockGeometryCompilerTest {
         assertFalse(output.assets.keySet().toString().contains("render_controllers/"+shortId));
         assertFalse(output.assets.containsKey("textures/voxelcore/g_"+shortId+"_f1.png"));
         assertTrue(new String(output.assets.get("entity/voxelcore/"+shortId+".entity.json"), StandardCharsets.UTF_8)
-                .contains("\"entity_alphatest\""));
+                .contains("\"entity_alphatest_one_sided\""));
+    }
+
+    @Test public void insideOutElementsBecomeInwardFacingPlanesLikeJava() throws Exception {
+        Map<String,byte[]> assets = modelAssets();
+        // Authored to < from on every axis: Java draws each face on the opposite side, facing in.
+        assets.put("assets/demo/models/box.json",("{\"textures\":{\"all\":\"demo:oak\"},\"elements\":["
+                + "{\"from\":[16,16,16],\"to\":[0,0,0],\"faces\":{\"north\":{\"texture\":\"#all\"},\"up\":{\"texture\":\"#all\"}}}]}")
+                .getBytes(StandardCharsets.UTF_8));
+        String shortId = "i_11112222333344445555666677778888";
+        BedrockGeometryCompiler.Output output = new BedrockGeometryCompiler(assets).compile("demo:box","voxelcore:"+shortId,shortId);
+        JsonArray cubes = JsonParser.parseString(new String(output.assets.get("models/entity/voxelcore/"+shortId+".geo.json"),
+                StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject()
+                .getAsJsonArray("bones").get(0).getAsJsonObject().getAsJsonArray("cubes");
+        assertEquals("One plane per face", 2, cubes.size());
+        JsonObject north = cubes.get(0).getAsJsonObject(), up = cubes.get(1).getAsJsonObject();
+        assertEquals("North face sits on the south side (z = from = 16)", "[-8.0,-8.0,8.0]", north.get("origin").toString());
+        assertEquals("[16.0,16.0,0.0]", north.get("size").toString());
+        assertTrue("Two reversed in-plane axes keep its facing", north.getAsJsonObject("uv").has("north"));
+        assertEquals("Up face sits at the bottom (y = from = 0)", "[-8.0,-8.0,-8.0]", up.get("origin").toString());
+        assertTrue(up.getAsJsonObject("uv").has("up"));
+        assertEquals("north", BedrockGeometryCompiler.insideOutFace("north", new boolean[]{true,true,true}));
+        assertEquals("Odd reversed in-plane axes turn it inward", "south",
+                BedrockGeometryCompiler.insideOutFace("north", new boolean[]{true,false,false}));
+        assertEquals("[true, true]", Arrays.toString(BedrockGeometryCompiler.insideOutFlip("north", "north", new boolean[]{true,true,true})));
     }
 
     @Test public void keepsFlatPlaneElementsButRejectsLines() throws Exception {
@@ -229,8 +253,9 @@ public final class BedrockGeometryCompilerTest {
         JsonObject cube = JsonParser.parseString(new String(output.assets.get("models/entity/voxelcore/"+shortId+".geo.json"),
                 StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject()
                 .getAsJsonArray("bones").get(0).getAsJsonObject().getAsJsonArray("cubes").get(0).getAsJsonObject();
-        assertEquals("[-4.0,-8.0,-4.0]", cube.get("origin").toString());
-        assertEquals("[8.0,4.0,8.0]", cube.get("size").toString());
+        // Inverted bounds: the north face is a plane at Java's z = from = 12, rotated with the element.
+        assertEquals("[-4.0,-8.0,4.0]", cube.get("origin").toString());
+        assertEquals("[8.0,4.0,0.0]", cube.get("size").toString());
         assertEquals(-10.0, cube.getAsJsonArray("rotation").get(0).getAsDouble(), 0);
         assertEquals(-60.0, cube.getAsJsonArray("rotation").get(1).getAsDouble(), 0);
         assertNotNull(new BedrockIconRenderer(assets).render("demo:tilted", null, null));
