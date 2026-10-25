@@ -54,6 +54,39 @@ jobs:
           verify_api_version 'voxelcore-v26_2/target/VoxelCore-*.jar' '26.2'
           verify_api_version 'voxelcore-v26_3/target/VoxelCore-*.jar' '26.3'
 
+      - name: Verify browser classes in shaded distributions
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A 26.3 runtime crashed on /vc admin item ui because ContentBrowser$1
+          # (an anonymous comparator) was missing. Validate the shipped JAR, not
+          # merely the unshaded voxelcore-plugin module.
+          for module in voxelcore-v1_12 voxelcore-v1_14 voxelcore-v1_19_4 voxelcore-v1_20_5 voxelcore-v1_21_4 voxelcore-v26_2 voxelcore-v26_3; do
+            jar=$(find "$module/target" -maxdepth 1 -name "VoxelCore-*.jar" -print -quit)
+            test -n "$jar"
+            for class in 'ContentBrowser.class' 'ContentBrowser$Type.class' 'ContentBrowser$BrowserHolder.class'; do
+              entry="org/voxelhorizons/command/ui/$class"
+              unzip -Z1 "$jar" | grep -Fx "$entry"
+            done
+          done
+
+      - name: Verify Geyser extension metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          ext=$(find voxelcore-geyser-extension/target -maxdepth 1 -name 'VoxelCore-GeyserExtension-*.jar' -print -quit)
+          test -n "$ext"
+          unzip -p "$ext" extension.yml | grep -Fx 'api: 2.11.0'
+          unzip -p "$ext" extension.yml | grep -Fx 'id: voxelcore'
+          unzip -Z1 "$ext" | grep -Fx 'org/voxelhorizons/geyser/VoxelCoreGeyserExtension.class'
+          unzip -Z1 "$ext" | grep -Fx 'org/voxelhorizons/geyser/PublicationVerifier.class'
+
+      - name: Upload VoxelCore Geyser Extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoxelCore-GeyserExtension
+          path: voxelcore-geyser-extension/target/VoxelCore-GeyserExtension-*.jar
+
       - name: Upload Minecraft 1.12-1.13 artifact
         uses: actions/upload-artifact@v4
         with:

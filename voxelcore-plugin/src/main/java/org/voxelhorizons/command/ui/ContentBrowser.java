@@ -11,6 +11,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
@@ -19,6 +20,7 @@ import org.voxelhorizons.VoxelCore;
 import org.voxelhorizons.content.ContentID;
 import org.voxelhorizons.content.block.BlockDefinition;
 import org.voxelhorizons.content.item.ItemDefinition;
+import org.voxelhorizons.pack.BedrockPlayers;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -76,9 +78,13 @@ public final class ContentBrowser implements Listener {
         long revision = plugin.getContentRuntime().current().revision();
 
         BrowserHolder holder = new BrowserHolder(type, ids, page, revision);
-        Inventory inventory = Bukkit.createInventory(holder, INVENTORY_SIZE,
-                configuredTitle(plugin.getConfig(), type, page, pages, ids.size(),
-                        text -> plugin.getTextPlaceholderService().resolve(text, true, true)));
+        // Java inventory titles may contain full-screen bitmap glyphs and negative offsets.
+        // Those are Java font assets, not Bedrock GUI elements; keep Bedrock titles readable.
+        String title = BedrockPlayers.isBedrock(player.getUniqueId())
+                ? configuredBedrockTitle(plugin.getConfig(), type, page, pages, ids.size())
+                : configuredTitle(plugin.getConfig(), type, page, pages, ids.size(),
+                        text -> plugin.getTextPlaceholderService().resolve(text, true, true));
+        Inventory inventory = Bukkit.createInventory(holder, INVENTORY_SIZE, title);
         holder.inventory = inventory;
 
         int start = page * CONTENT_SLOTS;
@@ -129,6 +135,21 @@ public final class ContentBrowser implements Listener {
                 : config.getString("ui.browser.titles." + type.configKey(),
                         "VC " + type.title() + " {page}/{pages}");
         return formatTitle(template, type, page, pages, totalItems, resolveGlyphs);
+    }
+
+    /**
+     * Bedrock clients cannot interpret Java bitmap-font inventory-title glyph overlays.
+     * These templates are deliberately independent from the Java page-title overrides.
+     */
+    static String configuredBedrockTitle(Configuration config, Type type, int page, int pages, int totalItems) {
+        if (page < 0 || pages < 1 || page >= pages)
+            throw new IllegalArgumentException("Invalid browser page " + page + "/" + pages);
+        String override = config.getString("ui.browser.bedrock_page_titles."
+                + type.configKey() + "." + (page + 1), null);
+        String template = override != null ? override
+                : config.getString("ui.browser.bedrock_titles." + type.configKey(),
+                        "VC " + type.title() + " {page}/{pages}");
+        return formatTitle(template, type, page, pages, totalItems, Function.identity());
     }
 
     static String formatTitle(String template, Type type, int page, int pages,
@@ -184,11 +205,10 @@ public final class ContentBrowser implements Listener {
             }
         }
 
-        Collections.sort(ids, new Comparator<ContentID>() {
-            @Override public int compare(ContentID left, ContentID right) {
-                return left.toString().compareTo(right.toString());
-            }
-        });
+        // Use a comparator method reference rather than an anonymous inner class.
+        // Older distribution artifacts missed ContentBrowser$1.class at runtime on
+        // both Java and Bedrock; a Java 8 lambda compiles without that class file.
+        Collections.sort(ids, Comparator.comparing(ContentID::toString));
         return ids;
     }
 
@@ -208,20 +228,20 @@ public final class ContentBrowser implements Listener {
 
         if (holder.revision != plugin.getContentRuntime().current().revision()) {
             player.sendMessage(ChatColor.YELLOW + "VoxelCore content changed; refreshing browser.");
-            open(player, holder.type, holder.page);
+            pageLater(player, holder, holder.page);
             return;
         }
 
         if (rawSlot == PREVIOUS_SLOT && holder.page > 0) {
-            open(player, holder.type, holder.page - 1);
+            pageLater(player, holder, holder.page - 1);
             return;
         }
         if (rawSlot == NEXT_SLOT && (holder.page + 1) * CONTENT_SLOTS < holder.ids.size()) {
-            open(player, holder.type, holder.page + 1);
+            pageLater(player, holder, holder.page + 1);
             return;
         }
         if (rawSlot == CLOSE_SLOT) {
-            player.closeInventory();
+            plugin.getServer().getScheduler().runTask(plugin, () -> player.closeInventory());
             return;
         }
 
@@ -244,6 +264,18 @@ public final class ContentBrowser implements Listener {
         } catch (IllegalArgumentException exception) {
             player.sendMessage(ChatColor.RED + exception.getMessage());
         }
+    }
+
+    private void pageLater(Player player, BrowserHolder previous, int page) {
+        long ticks = BedrockPlayers.isBedrock(player.getUniqueId()) ? 2L : 1L;
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            if (!player.isOnline()) return;
+            Inventory top = player.getOpenInventory().getTopInventory();
+            // Geyser may already have closed the previous window by this tick.
+            // Reopen from the player's crafting view, but never replace an unrelated GUI.
+            if (top.getHolder() == previous || top.getType() == InventoryType.CRAFTING)
+                open(player, previous.type, page);
+        }, ticks);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)

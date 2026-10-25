@@ -31,6 +31,7 @@ public final class PackCommand implements SubCommand {
         register(new SendCommand());
         register(new ValidateCommand());
         register(new BuildCommand());
+        register(new GlyphsCommand());
     }
 
     private void register(SubCommand command) {
@@ -44,7 +45,7 @@ public final class PackCommand implements SubCommand {
     @Override public boolean playerOnly() { return false; }
     @Override public Map<String, SubCommand> getChildren() { return children; }
     @Override public void execute(CommandSender sender, String[] args) {
-        sender.sendMessage("Usage: /voxelcore admin pack <info|host|send|validate|build> [player|target]");
+        sender.sendMessage("Usage: /voxelcore admin pack <info|host|send|validate|build|glyphs> [player|target]");
     }
 
     private static JavaPackTarget target(CommandSender sender, String[] args) {
@@ -60,6 +61,58 @@ public final class PackCommand implements SubCommand {
         JavaPackTarget selected = JavaPackTarget.byId(args[0]);
         if (selected == null) sender.sendMessage("Unknown pack target '" + args[0] + "'. Known targets: " + knownTargets());
         return selected;
+    }
+
+    /**
+     * Progress sink for async pack builds: always logged (console/log), and echoed to the
+     * player who started the build, on the main thread.
+     */
+    private static org.voxelhorizons.pack.BuildProgress buildProgress(VoxelCore plugin, CommandSender sender) {
+        return message -> {
+            plugin.getLogger().info("[pack build] " + message);
+            if (sender instanceof org.bukkit.entity.Player) {
+                try {
+                    plugin.getServer().getScheduler().runTask(plugin, () -> sender.sendMessage("[VoxelCore] " + message));
+                } catch (RuntimeException disabled) {
+                    // Plugin disabling mid-build: the log line above is enough.
+                }
+            }
+        };
+    }
+
+    /**
+     * bedrock.vanilla_assets: 'auto' downloads and caches the official client jar for this
+     * server's Minecraft version; 'off' disables; anything else is a client jar or extracted
+     * assets folder path. Called from the async build task only.
+     */
+    private static java.nio.file.Path vanillaAssets(VoxelCore plugin, org.voxelhorizons.pack.BuildProgress progress)
+            throws java.io.IOException {
+        String setting = plugin.getConfig().getString("bedrock.vanilla_assets", "auto").trim();
+        if (setting.isEmpty() || setting.equalsIgnoreCase("off")) return null;
+        if (!setting.equalsIgnoreCase("auto")) {
+            java.nio.file.Path path = java.nio.file.Paths.get(setting);
+            if (!java.nio.file.Files.exists(path)) throw new java.io.IOException("bedrock.vanilla_assets not found: " + path);
+            return path;
+        }
+        String version = org.voxelhorizons.platform.MinecraftVersionDetector.detect();
+        return org.voxelhorizons.pack.VanillaClientJar.resolve(
+                plugin.getDataFolder().toPath().resolve("cache").resolve("vanilla"), version, progress);
+    }
+
+    /**
+     * Resolve only a genuinely loaded Bukkit Geyser plugin. Scanning stale folders in
+     * plugins/ would risk silently publishing into an old backend copy when the live
+     * Geyser instance actually runs on a Velocity/Bungee proxy.
+     * Call on the server thread, not from the async pack builder.
+     */
+    private static java.nio.file.Path localGeyserDataDirectory(VoxelCore plugin) {
+        for (org.bukkit.plugin.Plugin installed : plugin.getServer().getPluginManager().getPlugins()) {
+            String name = installed.getName();
+            if ("Geyser-Spigot".equalsIgnoreCase(name) || "Geyser".equalsIgnoreCase(name)) {
+                return installed.getDataFolder().toPath();
+            }
+        }
+        return null;
     }
 
     private static String knownTargets() {
@@ -90,6 +143,34 @@ public final class PackCommand implements SubCommand {
             sender.sendMessage("Hosted file: " + VoxelCore.getInstance().getResourcePackHost().hostedPack()
                     + " (" + hostedFileSize(VoxelCore.getInstance().getResourcePackHost()) + " bytes; SHA-1 "
                     + VoxelCore.getInstance().getResourcePackHost().sha1Hex() + ")");
+            VoxelCore plugin = VoxelCore.getInstance();
+            org.voxelhorizons.pack.GeyserPackPublisher.Destination destination =
+                    org.voxelhorizons.pack.GeyserPackPublisher.resolveDestination(
+                            plugin.getConfig().getString("bedrock.geyser_data_directory", ""),
+                            plugin.getConfig().getBoolean("bedrock.auto_publish_local", true),
+                            localGeyserDataDirectory(plugin));
+            sender.sendMessage("Bedrock builds: " + plugin.getConfig().getBoolean("game.bedrock_support", false)
+                    + "; Geyser publish target: " + destination.explanation);
+            if (destination.root != null) {
+                java.nio.file.Path pack = destination.root.resolve("packs/voxelcore.mcpack");
+                java.nio.file.Path mappings = destination.root.resolve("custom_mappings/voxelcore-items.json");
+                sender.sendMessage("Geyser pack: " + pack + " ("
+                        + (java.nio.file.Files.isRegularFile(pack) ? "present" : "missing")
+                        + "); mappings: " + mappings + " ("
+                        + (java.nio.file.Files.isRegularFile(mappings) ? "present" : "missing")
+                        + "). Geyser restart and Bedrock reconnect required after updating.");
+                try {
+                    org.voxelhorizons.pack.GeyserPackPublisher.PublicationState state =
+                            org.voxelhorizons.pack.GeyserPackPublisher.inspect(destination.root);
+                    sender.sendMessage("Geyser VoxelCore publication: " + state);
+                    if (!"VERIFIED_ON_DISK".equals(state.status))
+                        sender.sendMessage(org.bukkit.ChatColor.YELLOW
+                                + "Geyser files are not verified as a matching VoxelCore revision.");
+                } catch (java.io.IOException inspection) {
+                    sender.sendMessage(org.bukkit.ChatColor.RED
+                            + "Unable to verify Geyser publication: " + inspection.getMessage());
+                }
+            }
             sender.sendMessage("Known targets: " + knownTargets());
         }
     }
@@ -215,6 +296,10 @@ public final class PackCommand implements SubCommand {
                 return;
             }
             VoxelCore plugin = VoxelCore.getInstance();
+            if (org.voxelhorizons.pack.BedrockPlayers.isBedrock(target.getUniqueId())) {
+                sender.sendMessage("Bedrock packs are supplied by Geyser at connection; restart Geyser after publishing and reconnect this player.");
+                return;
+            }
             ResourcePackHost host = plugin.getResourcePackHost();
             if (!host.isRunning()) {
                 sender.sendMessage("Pack not sent: resource-pack HTTP host is stopped. Check /vc admin pack host and startup logs.");
@@ -255,6 +340,97 @@ public final class PackCommand implements SubCommand {
         }
     }
 
+    /**
+     * B14: find (and, with explicit confirmation, rewrite) unmanaged literal glyphs in
+     * Bedrock's reserved U+E000..U+E1FF range across VoxelCore content, DeluxeMenus and
+     * configured extra roots. Font definitions and references move together; originals
+     * are backed up once. File work runs off the server thread.
+     */
+    private static final class GlyphsCommand implements SubCommand {
+        private final AtomicBoolean working = new AtomicBoolean(false);
+
+        @Override public String getName() { return "glyphs"; }
+        @Override public List<String> getAliases() { return Collections.emptyList(); }
+        @Override public String getPermission() { return "voxelcore.admin.pack.glyphs"; }
+        @Override public boolean playerOnly() { return false; }
+        @Override public List<String> onTabComplete(CommandSender sender, String[] args) {
+            return args.length <= 1 ? java.util.Arrays.asList("scan", "migrate") : Collections.<String>emptyList();
+        }
+
+        @Override public void execute(CommandSender sender, String[] args) {
+            String mode = args.length == 0 ? "scan" : args[0].toLowerCase(java.util.Locale.ROOT);
+            final boolean migrate = "migrate".equals(mode);
+            if (!migrate && !"scan".equals(mode)) {
+                sender.sendMessage("Usage: /voxelcore admin pack glyphs <scan|migrate confirm>");
+                return;
+            }
+            if (migrate && (args.length < 2 || !"confirm".equalsIgnoreCase(args[1]))) {
+                sender.sendMessage("This rewrites font JSON and menu/text files in place (originals backed up once). "
+                        + "Run '/voxelcore admin pack glyphs scan' first, then 'glyphs migrate confirm'.");
+                return;
+            }
+            final VoxelCore plugin = VoxelCore.getInstance();
+            final java.nio.file.Path data = plugin.getDataFolder().toPath();
+            final java.nio.file.Path pluginsRoot = data.getParent();
+            final List<java.nio.file.Path> roots = new java.util.ArrayList<java.nio.file.Path>();
+            roots.add(plugin.getPackManager().contentRoot());
+            for (String configured : plugin.getConfig().getStringList("bedrock.glyph_migration_roots")) {
+                if (configured == null || configured.trim().isEmpty()) continue;
+                java.nio.file.Path path = java.nio.file.Paths.get(configured.trim());
+                roots.add((path.isAbsolute() ? path : pluginsRoot.resolve(path)).normalize());
+            }
+            final java.nio.file.Path manifest = plugin.getPackManager().glyphAllocationManifest();
+            if (!working.compareAndSet(false, true)) {
+                sender.sendMessage("A VoxelCore glyph scan/migration is already running.");
+                return;
+            }
+            try {
+                Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+                    String message;
+                    try {
+                        message = run(roots, manifest, data, migrate);
+                    } catch (Exception failure) {
+                        plugin.getLogger().log(Level.WARNING, "Glyph literal " + (migrate ? "migration" : "scan") + " failed", failure);
+                        message = "Glyph literal " + (migrate ? "migration" : "scan") + " FAILED: " + failure.getMessage();
+                    } finally {
+                        working.set(false);
+                    }
+                    final String result = message;
+                    try { Bukkit.getScheduler().runTask(plugin, () -> sender.sendMessage(result)); }
+                    catch (RuntimeException shuttingDown) { plugin.getLogger().info(result); }
+                });
+            } catch (RuntimeException failure) {
+                working.set(false);
+                sender.sendMessage("Unable to start glyph " + mode + ": " + failure.getMessage());
+            }
+        }
+
+        private static String run(List<java.nio.file.Path> roots, java.nio.file.Path manifest,
+                                  java.nio.file.Path data, boolean migrate) throws java.io.IOException {
+            java.nio.file.Path reportFile = data.resolve("glyph-literal-migration.txt");
+            org.voxelhorizons.pack.GlyphLiteralMigration.Result result;
+            if (migrate) {
+                result = org.voxelhorizons.pack.GlyphLiteralMigration.migrate(roots,
+                        org.voxelhorizons.pack.GlyphLiteralMigration.occupied(roots.get(0), manifest),
+                        data.resolve("glyph-literal-backup"));
+            } else {
+                List<org.voxelhorizons.pack.GlyphLiteralMigration.Finding> findings =
+                        org.voxelhorizons.pack.GlyphLiteralMigration.scan(roots);
+                result = org.voxelhorizons.pack.GlyphLiteralMigration.preview(findings,
+                        org.voxelhorizons.pack.GlyphLiteralMigration.occupied(roots.get(0), manifest),
+                        data.resolve("glyph-literal-backup"));
+            }
+            java.nio.file.Files.write(reportFile, org.voxelhorizons.pack.GlyphLiteralMigration.report(result)
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            String summary = result.findings.size() + " Bedrock-reserved glyph occurrences, "
+                    + result.plan.size() + " distinct codepoints across " + roots.size() + " roots. Report: " + reportFile;
+            return migrate
+                    ? "Glyph migration rewrote " + result.rewritten.size() + " files; " + summary
+                      + ". Rebuild the pack and reload DeluxeMenus/other plugins to apply."
+                    : "Glyph scan (no files changed): " + summary;
+        }
+    }
+
     private static final class BuildCommand implements SubCommand {
         private final AtomicBoolean working = new AtomicBoolean(false);
 
@@ -272,6 +448,15 @@ public final class PackCommand implements SubCommand {
             }
 
             final VoxelCore plugin = VoxelCore.getInstance();
+            // Snapshot Bukkit configuration before handing disk work to the async worker.
+            final boolean bedrockEnabled = plugin.getConfig().getBoolean("game.bedrock_support", false);
+            final byte[] remoteSecret = plugin.getConfig().getString("bedrock.remote_sync.secret", "").trim()
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            final org.voxelhorizons.pack.GeyserPackPublisher.Destination geyserDestination =
+                    org.voxelhorizons.pack.GeyserPackPublisher.resolveDestination(
+                            plugin.getConfig().getString("bedrock.geyser_data_directory", ""),
+                            plugin.getConfig().getBoolean("bedrock.auto_publish_local", true),
+                            localGeyserDataDirectory(plugin));
             final long startingRevision = plugin.getContentRuntime().current().revision();
             sender.sendMessage("VoxelCore pack build for " + target.id()
                     + " started asynchronously; the server will remain responsive.");
@@ -280,9 +465,14 @@ public final class PackCommand implements SubCommand {
                 // The compiler and candidate loader operate on disk/immutable Java data,
                 // never touch Bukkit inventories, blocks or live mutable server state.
                 plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+                    final org.voxelhorizons.pack.BuildProgress progress = buildProgress(plugin, sender);
                     final JavaPackBuildResult output;
                     try {
+                        progress.report("Java pack: compiling " + target.id());
+                        long javaStarted = System.nanoTime();
                         output = plugin.getPackManager().build(target);
+                        progress.report("Java pack: done in " + String.format(java.util.Locale.ROOT, "%.1f",
+                                (System.nanoTime() - javaStarted) / 1e9) + "s");
                     } catch (RuntimeException failure) {
                         complete(plugin, () -> sender.sendMessage("VoxelCore pack build failed for "
                                 + target.id() + ": " + failure.getMessage()));
@@ -290,6 +480,68 @@ public final class PackCommand implements SubCommand {
                     }
                     JavaPackTarget serverTarget = plugin.getPackManager().currentTarget();
                     final boolean currentServerTarget = serverTarget != null && serverTarget.id().equals(target.id());
+                    String bedrockStatus = "";
+                    if (currentServerTarget && bedrockEnabled) {
+                        try {
+                            // 1.21.4+: item_model definitions; 1.14-1.21.3: Geyser legacy custom_model_data definitions.
+                            String vanillaNote = "";
+                            java.nio.file.Path vanilla = null;
+                            try {
+                                vanilla = vanillaAssets(plugin, progress);
+                            } catch (Exception unavailable) {
+                                vanillaNote = " Vanilla textures unavailable (" + unavailable.getMessage()
+                                        + "); items using minecraft: textures may lack icons/3D.";
+                                plugin.getLogger().warning("Bedrock vanilla assets unavailable: " + unavailable.getMessage());
+                            }
+                            org.voxelhorizons.pack.BedrockPackCompiler.Result bedrock =
+                                    new org.voxelhorizons.pack.BedrockPackCompiler().withVanillaAssets(vanilla)
+                                            .withProgress(progress)
+                                            .withControllerGlyphPages(plugin.getConfig().getBoolean(
+                                                    "bedrock.override_controller_glyph_pages", true))
+                                            .withGlyphShrink(plugin.getConfig().getString("bedrock.glyph_shrink", "area"))
+                                            .compile(
+                                            plugin.getPackManager().contentRoot(),
+                                            plugin.getPackManager().outputRoot().resolve("bedrock"),
+                                            plugin.getPackManager().glyphAllocationManifest(),
+                                            target.mode());
+                            bedrockStatus = "Bedrock built: " + bedrock.directory + "; " + bedrock.mappedItems
+                                    + " mapped items; " + bedrock.mappedGlyphs + " Bedrock inline glyphs; "
+                                    + bedrock.nativeGeometryCount + " native 3D attachables; "
+                                    + bedrock.unsupportedGeometryCount + " 3D limitations (unsupported-geometry.txt); "
+                                    + bedrock.unsupportedItems + " items unsupported (unsupported-items.txt)."
+                                    + (bedrock.unsupportedReasonSummary.isEmpty() ? ""
+                                    : " Reasons: " + bedrock.unsupportedReasonSummary + ".")
+                                    + vanillaNote;
+                            if (geyserDestination.root != null) {
+                                progress.report("Bedrock: publishing to Geyser at " + geyserDestination.root);
+                                new org.voxelhorizons.pack.GeyserPackPublisher().publish(bedrock, geyserDestination.root);
+                                java.nio.file.Path pack = geyserDestination.root.resolve("packs/voxelcore.mcpack");
+                                java.nio.file.Path mappings = geyserDestination.root.resolve("custom_mappings/voxelcore-items.json");
+                                bedrockStatus += " Published to " + geyserDestination.source
+                                        + ": " + pack + " (" + java.nio.file.Files.size(pack) + " bytes), "
+                                        + mappings + " (" + java.nio.file.Files.size(mappings)
+                                        + " bytes). Publication receipt: "
+                                        + org.voxelhorizons.pack.GeyserPackPublisher.inspect(geyserDestination.root)
+                                        + ". Restart Geyser, then reconnect Bedrock clients.";
+                            } else {
+                                bedrockStatus += " Export only: " + geyserDestination.explanation;
+                            }
+                            if (remoteSecret.length > 0) {
+                                // B17: signed bundle for Geyser on a proxy/other host, served at /bedrock/.
+                                java.nio.file.Path remote = plugin.getPackManager().outputRoot().resolve("bedrock-remote");
+                                org.voxelhorizons.pack.RemoteBedrockBundle.export(bedrock, remoteSecret, remote,
+                                        System.currentTimeMillis());
+                                plugin.getResourcePackHost().setBedrockRemote(remote, remoteSecret);
+                                bedrockStatus += " Signed remote bundle exported"
+                                        + (plugin.getResourcePackHost().isRunning() ? " and served at /bedrock/."
+                                        : "; enable resource_pack.host to serve it.");
+                            }
+                        } catch (Exception failure) {
+                            bedrockStatus = "Bedrock build/publish FAILED: " + failure.getMessage();
+                            plugin.getLogger().log(Level.WARNING, bedrockStatus, failure);
+                        }
+                    }
+                    final String bedrockMessage = bedrockStatus;
                     String hostPublishError = null;
                     if (currentServerTarget) {
                         try {
@@ -310,6 +562,7 @@ public final class PackCommand implements SubCommand {
                     final ContentDefinitions prepared = candidate;
                     final String prepareError = loadError;
                     complete(plugin, () -> {
+                        if (!bedrockMessage.isEmpty()) sender.sendMessage(bedrockMessage);
                         sender.sendMessage("VoxelCore pack built for " + target.id() + ": " + output.output()
                                 + " (" + output.renderedItems() + " rendered items, " + output.renderedBlocks()
                                 + " rendered blocks, " + output.copiedAssets() + " authored assets)");

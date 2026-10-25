@@ -1,0 +1,6 @@
+id: voxelcore
+name: VoxelCoreBedrock
+main: org.voxelhorizons.geyser.VoxelCoreGeyserExtension
+api: 2.11.0
+version: 1.0-SNAPSHOT
+authors: [VoxelHorizons]
