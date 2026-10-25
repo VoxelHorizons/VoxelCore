@@ -164,6 +164,27 @@ public final class VoxelCore extends JavaPlugin {
                     }, blockAllocationStore, modernBlockStates);
             packManager = new PackManager(getDataFolder().toPath(), contentRoot, versionAdapter.version());
             resourcePackHost = new ResourcePackHost(getDataFolder().toPath(), getLogger());
+            String remoteSecret = getConfig().getString("bedrock.remote_sync.secret", "").trim();
+            java.nio.file.Path remoteBundle = packManager.outputRoot().resolve("bedrock-remote");
+            String projectionExport = getConfig().getString("bedrock.remote_sync.projection_directory", "").trim();
+            if (!remoteSecret.isEmpty() && !projectionExport.isEmpty()) {
+                java.nio.file.Path exportFolder = getDataFolder().toPath().getParent().resolve(projectionExport).normalize();
+                try {
+                    // Companions require the folder to exist before they enable publishing into it.
+                    java.nio.file.Files.createDirectories(exportFolder);
+                    resourcePackHost.setProjectionExport(exportFolder);
+                } catch (IOException unusable) {
+                    logger.warning("Bedrock projection export disabled: " + unusable.getMessage());
+                }
+            }
+            if (!remoteSecret.isEmpty()) {
+                try {
+                    // Keep serving the last signed Bedrock bundle to proxy Geysers after a restart.
+                    resourcePackHost.setBedrockRemote(remoteBundle, remoteSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                } catch (IOException weakSecret) {
+                    logger.warning("Bedrock remote sync disabled: " + weakSecret.getMessage());
+                }
+            }
             playerResourcePackService = new PlayerResourcePackService(this, resourcePackHost);
             textPlaceholderService = new TextPlaceholderService(packManager.uiGlyphs(true));
             tooltipRenderer = new TooltipRenderer(textPlaceholderService,

@@ -53,7 +53,7 @@ public class UiGlyphCompilerTest {
         assertEquals(8, glyph.yPosition());
         assertEquals(177, glyph.advance());
         assertTrue(glyph.gui());
-        assertEquals(0xE000, glyph.codePoint());
+        assertEquals(0xE200, glyph.codePoint());
         assertEquals(glyph.character(), registry.resolveAliases(":warps_menu:"));
         assertEquals(glyph.character(), registry.resolveAliases(":voxel/warps_menu:"));
 
@@ -104,16 +104,16 @@ public class UiGlyphCompilerTest {
         UiGlyphLoader loader = new UiGlyphLoader();
         UiGlyphDefinition removed = loader.load(contentRoot.toPath(), allocations, true)
                 .get(ContentID.of("voxel", "skills_background")).get();
-        assertEquals(0xE000, removed.codePoint());
+        assertEquals(0xE200, removed.codePoint());
 
         write(definition, "ui:\n  replacement_background:\n    path: ui/background.png\n");
         UiGlyphDefinition replacement = loader.load(contentRoot.toPath(), allocations, true)
                 .get(ContentID.of("voxel", "replacement_background")).get();
-        assertEquals(0xE001, replacement.codePoint());
+        assertEquals(0xE201, replacement.codePoint());
 
         UiGlyphDefinition stableReplacement = loader.load(contentRoot.toPath(), allocations, false)
                 .get(ContentID.of("voxel", "replacement_background")).get();
-        assertEquals(0xE001, stableReplacement.codePoint());
+        assertEquals(0xE201, stableReplacement.codePoint());
     }
 
     @Test
@@ -132,11 +132,42 @@ public class UiGlyphCompilerTest {
 
         UiGlyphDefinition repaired = new UiGlyphLoader().load(contentRoot.toPath(), allocations, true)
                 .get(ContentID.of("voxel", "replacement_background")).get();
-        assertEquals(0xE001, repaired.codePoint());
+        assertEquals(0xE200, repaired.codePoint());
 
         String manifest = new String(Files.readAllBytes(allocations), StandardCharsets.UTF_8);
-        assertTrue(manifest.contains("'voxel:replacement_background': 57345"));
-        assertTrue(manifest.contains("'voxel:skills_background': 57344"));
+        assertTrue(manifest.contains("'voxel:replacement_background': 57856"));
+        assertTrue(manifest.contains("'voxel:skills_background': 57857"));
+    }
+
+    @Test
+    public void migratesActiveAndInactiveBedrockReservedGlyphsWithBackupAndReport() throws Exception {
+        File contentRoot = temporaryFolder.newFolder("bedrock-migrate-content");
+        File pack = new File(contentRoot, "voxel");
+        assertTrue(new File(pack, "content").mkdirs());
+        File texture = new File(pack, "assets/voxel/textures/ui/icon.png");
+        assertTrue(texture.getParentFile().mkdirs());
+        writePng(texture, 16, 16);
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
+        write(new File(pack, "content/ui.yml"),
+                "ui:\n  rank:\n    path: ui/icon.png\n    symbol: '" + Character.toString((char) 0xE025) + "'\n");
+        Path allocations = temporaryFolder.newFolder("migration-output").toPath().resolve("glyph-allocations.yml");
+        String original = "schema: 1\nglyphs:\n  'voxel:rank': 57381\ninactive:\n  'voxel:retired': 57344\n";
+        write(allocations.toFile(), original);
+        UiGlyphLoader loader = new UiGlyphLoader();
+        UiGlyphDefinition rank = loader.load(contentRoot.toPath(), allocations, true)
+                .get(ContentID.of("voxel", "rank")).get();
+        assertEquals(0xE200, rank.codePoint());
+        String migrated = new String(Files.readAllBytes(allocations), StandardCharsets.UTF_8);
+        assertTrue(migrated.contains("'voxel:rank': 57856"));
+        assertTrue(migrated.contains("'voxel:retired': 57857"));
+        assertEquals(original, new String(Files.readAllBytes(allocations.resolveSibling(
+                "glyph-allocations.yml.before-bedrock-migration")), StandardCharsets.UTF_8));
+        String report = new String(Files.readAllBytes(allocations.resolveSibling(
+                "glyph-bedrock-migration.txt")), StandardCharsets.UTF_8);
+        assertTrue(report.contains("U+E025 -> U+E200"));
+        assertTrue(report.contains("U+E000 -> U+E201"));
+        loader.load(contentRoot.toPath(), allocations, true);
+        assertEquals(migrated, new String(Files.readAllBytes(allocations), StandardCharsets.UTF_8));
     }
 
     @Test
@@ -198,8 +229,8 @@ public class UiGlyphCompilerTest {
         writePng(second, 16, 16);
         write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
         write(new File(pack, "content/ui.yml"),
-                "ui:\n  first:\n    path: ui/first.png\n    symbol: '\uE100'\n" +
-                "  second:\n    path: ui/second.png\n    symbol: '\uE100'\n");
+                "ui:\n  first:\n    path: ui/first.png\n    symbol: '\uE300'\n" +
+                "  second:\n    path: ui/second.png\n    symbol: '\uE300'\n");
         try {
             new UiGlyphLoader().load(contentRoot.toPath(),
                     temporaryFolder.newFolder("collision-build").toPath().resolve("glyphs.yml"), false);

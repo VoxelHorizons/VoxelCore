@@ -24,12 +24,15 @@ import java.util.Set;
 
 /** Parses compact UI font-image content and reconciles stable private-use Unicode allocations. */
 public final class UiGlyphLoader {
-    private static final int FIRST_CODE_POINT = 0xE000;
+    private static final int FIRST_CODE_POINT = 0xE200;
     private static final int LAST_CODE_POINT = 0xF7FF;
 
     public UiGlyphRegistry load(Path contentRoot, Path allocationFile, boolean persist) {
         List<ContentPack> packs = new ContentPackDiscovery().discover(contentRoot);
         Set<Integer> authoredSymbols = AuthoredFontSupport.reservedCodePoints(packs);
+        Set<Integer> authoredBedrockSymbols = new java.util.TreeSet<Integer>();
+        for (Integer symbol : authoredSymbols)
+            if (isBedrockReserved(symbol.intValue())) authoredBedrockSymbols.add(symbol);
         for (Integer spacing : UiSpacingGlyphs.advances().keySet()) {
             if (authoredSymbols.contains(spacing)) {
                 throw new ContentLoadException("Authored font symbol " + codePoint(spacing.intValue())
@@ -47,6 +50,7 @@ public final class UiGlyphLoader {
         Set<Integer> used = new HashSet<Integer>(authoredSymbols);
         used.addAll(TooltipGlyphs.reservedCodePoints());
         Map<ContentID, Integer> active = new LinkedHashMap<ContentID, Integer>();
+        Map<ContentID, Integer> migrated = new LinkedHashMap<ContentID, Integer>();
         List<ContentID> ids = new ArrayList<ContentID>(raw.keySet());
         Collections.sort(ids, byId());
 
@@ -62,13 +66,23 @@ public final class UiGlyphLoader {
         for (ContentID id : ids) {
             RawGlyph glyph = raw.get(id);
             Integer previous = state.active.containsKey(id) ? state.active.get(id) : state.inactive.get(id);
-            if (glyph.explicitCodePoint != null && previous != null && !glyph.explicitCodePoint.equals(previous)) {
+            Integer explicit = glyph.explicitCodePoint;
+            if (explicit != null && isBedrockReserved(explicit.intValue()))
+                migrated.put(id, explicit);
+            // Bedrock reserves E000-E1FF for controller/emoji glyphs. Legacy explicit
+            // symbols in this range must migrate too; the authored definition is a hint
+            // and aliases remain the authoritative way to reference generated glyphs.
+            if (explicit != null && isBedrockReserved(explicit.intValue())) explicit = null;
+            if (explicit != null && previous != null && !isBedrockReserved(previous.intValue())
+                    && !explicit.equals(previous)) {
                 throw new ContentLoadException("UI glyph " + id + " cannot change its stable symbol from "
-                        + codePoint(previous.intValue()) + " to " + codePoint(glyph.explicitCodePoint.intValue()));
+                        + codePoint(previous.intValue()) + " to " + codePoint(explicit.intValue()));
             }
-            Integer allocated = glyph.explicitCodePoint == null ? previous : glyph.explicitCodePoint;
-            // Recover manifests written by older versions that assigned a newly added glyph
-            // a codepoint already tombstoned by a glyph removed in the same load.
+            Integer allocated = explicit == null ? previous : explicit;
+            if (allocated != null && isBedrockReserved(allocated.intValue())) {
+                migrated.put(id, allocated);
+                allocated = null;
+            }
             if (allocated != null && glyph.explicitCodePoint == null) {
                 for (Map.Entry<ContentID, Integer> reserved : inactive.entrySet()) {
                     if (!reserved.getKey().equals(id) && reserved.getValue().equals(allocated)) {
@@ -106,13 +120,35 @@ public final class UiGlyphLoader {
 
         for (ContentID id : active.keySet()) inactive.remove(id);
 
+        // Tombstones also leave the reserved range so a future reactivated glyph
+        // cannot revive a Bedrock controller character. Retain the historical IDs.
+        List<ContentID> retired = new ArrayList<ContentID>(inactive.keySet());
+        Collections.sort(retired, byId());
+        for (ContentID id : retired) {
+            int old = inactive.get(id).intValue();
+            if (!isBedrockReserved(old)) continue;
+            int replacement = FIRST_CODE_POINT;
+            while (replacement <= LAST_CODE_POINT && (used.contains(Integer.valueOf(replacement))
+                    || inactive.containsValue(Integer.valueOf(replacement)))) replacement++;
+            if (replacement > LAST_CODE_POINT)
+                throw new ContentLoadException("No private-use codepoints remain for retired glyph " + id);
+            inactive.put(id, Integer.valueOf(replacement));
+            used.add(Integer.valueOf(replacement));
+            migrated.put(id, Integer.valueOf(old));
+        }
+
         Map<ContentID, UiGlyphDefinition> resolved = new LinkedHashMap<ContentID, UiGlyphDefinition>();
         for (ContentID id : ids) {
             RawGlyph glyph = raw.get(id);
             resolved.put(id, new UiGlyphDefinition(id, glyph.texture, glyph.scaleRatio, glyph.yPosition,
                     glyph.advance, glyph.gui, active.get(id).intValue()));
         }
-        if (persist) writeAllocations(allocationFile, active, inactive);
+        if (persist) {
+            if (!migrated.isEmpty()) backupLegacyAllocations(allocationFile);
+            writeAllocations(allocationFile, active, inactive);
+            if (!migrated.isEmpty() || !authoredBedrockSymbols.isEmpty())
+                writeMigrationReport(allocationFile, migrated, active, inactive, authoredBedrockSymbols);
+        }
         return new UiGlyphRegistry(resolved);
     }
 
@@ -208,6 +244,21 @@ public final class UiGlyphLoader {
         throw new ContentLoadException("UI glyph " + id + " texture is fully transparent");
     }
 
+    /**
+     * Every codepoint a literal-glyph migration must not reuse: authored font symbols,
+     * tooltip/spacing glyphs and active plus retired managed allocations. Read-only.
+     */
+    static Set<Integer> occupiedCodePoints(Path contentRoot, Path allocationFile) {
+        Set<Integer> used = new HashSet<Integer>(
+                AuthoredFontSupport.reservedCodePoints(new ContentPackDiscovery().discover(contentRoot)));
+        used.addAll(TooltipGlyphs.reservedCodePoints());
+        used.addAll(UiSpacingGlyphs.advances().keySet());
+        AllocationState state = readAllocations(allocationFile);
+        used.addAll(state.active.values());
+        used.addAll(state.inactive.values());
+        return used;
+    }
+
     private static AllocationState readAllocations(Path file) {
         AllocationState state = new AllocationState();
         if (!Files.isRegularFile(file)) return state;
@@ -239,6 +290,49 @@ public final class UiGlyphLoader {
             int value = ((Number) entry.getValue()).intValue();
             requirePrivateUse(value, id);
             target.put(id, Integer.valueOf(value));
+        }
+    }
+
+    private static boolean isBedrockReserved(int codepoint) {
+        return codepoint >= 0xE000 && codepoint <= 0xE1FF;
+    }
+
+    private static void backupLegacyAllocations(Path file) {
+        if (!Files.isRegularFile(file)) return;
+        Path backup = file.resolveSibling(file.getFileName().toString() + ".before-bedrock-migration");
+        try {
+            Files.copy(file, backup); // Never overwrite the original migration backup.
+        } catch (java.nio.file.FileAlreadyExistsException ignored) {
+            // First migration already preserved the original file.
+        } catch (IOException failure) {
+            throw new ContentLoadException("Cannot back up old glyph allocations to " + backup, failure);
+        }
+    }
+
+    private static void writeMigrationReport(Path file, Map<ContentID, Integer> old,
+                                             Map<ContentID, Integer> active, Map<ContentID, Integer> inactive,
+                                             Set<Integer> authoredBedrockSymbols) {
+        StringBuilder report = new StringBuilder("Bedrock PUA migration (U+E000..U+E1FF)\n");
+        report.append("Update literal glyph characters in external DeluxeMenus/config files separately.\n");
+        List<ContentID> ids = new ArrayList<ContentID>(old.keySet());
+        Collections.sort(ids, byId());
+        for (ContentID id : ids) {
+            Integer now = active.containsKey(id) ? active.get(id) : inactive.get(id);
+            report.append(id).append(": ").append(codePoint(old.get(id).intValue()))
+                    .append(" -> ").append(codePoint(now.intValue())).append('\n');
+        }
+        if (!authoredBedrockSymbols.isEmpty()) {
+            report.append("Unmanaged authored Java font codepoints are still inside Bedrock's controller range:\n");
+            for (Integer symbol : authoredBedrockSymbols) report.append("  ").append(codePoint(symbol.intValue())).append('\n');
+            report.append("These are defined in content-pack font JSON, not glyph-allocations.yml.\n");
+            report.append("Do not rewrite them automatically: their literal references in other plugin menus,\n");
+            report.append("lore and placeholders must migrate together, or use a Bedrock-specific UI.\n");
+        }
+        try {
+            Files.write(file.resolveSibling("glyph-bedrock-migration.txt"),
+                    report.toString().getBytes(StandardCharsets.UTF_8));
+        } catch (IOException failure) {
+            throw new ContentLoadException("Cannot write glyph migration report", failure);
         }
     }
 
@@ -295,8 +389,8 @@ public final class UiGlyphLoader {
     }
 
     private static void requirePrivateUse(int value, ContentID id) {
-        if (value < FIRST_CODE_POINT || value > LAST_CODE_POINT) {
-            throw new ContentLoadException("UI glyph " + id + " symbol must be in U+E000..U+F7FF");
+        if (value < 0xE000 || value > LAST_CODE_POINT) {
+            throw new ContentLoadException("UI glyph " + id + " symbol must be in U+E000..U+F7FF (U+E000..U+E1FF is remapped for Bedrock)");
         }
     }
 

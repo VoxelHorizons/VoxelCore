@@ -7,13 +7,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /** Resolves the game version without confusing it with the Bukkit API version. */
-final class MinecraftVersionDetector {
+public final class MinecraftVersionDetector {
     private static final Pattern VERSION_AT_START = Pattern.compile("^\\s*(\\d+(?:\\.\\d+){1,2})\\b");
     private static final Pattern MINECRAFT_MARKER = Pattern.compile("\\(MC:\\s*(\\d+(?:\\.\\d+){1,2})\\s*\\)");
 
     private MinecraftVersionDetector() {}
 
-    static String detect() {
+    public static String detect() {
         return detect(paperMinecraftVersion(), Bukkit.getVersion(), Bukkit.getBukkitVersion());
     }
 
