@@ -114,7 +114,27 @@ public final class BedrockGeometryCompilerTest {
         assertEquals((8+(-8-8)*stretch)-8, cube.getAsJsonArray("origin").get(0).getAsDouble(), 1e-6);
         assertEquals(-8, cube.getAsJsonArray("origin").get(1).getAsDouble(), 1e-6);
         assertEquals((8+(0-8)*stretch)-8, cube.getAsJsonArray("origin").get(2).getAsDouble(), 1e-6);
-        assertEquals(45, cube.getAsJsonArray("rotation").get(1).getAsDouble(), 1e-6);
+        assertEquals("Java Y rotation is negated for Bedrock (mirrored X)", -45, cube.getAsJsonArray("rotation").get(1).getAsDouble(), 1e-6);
+    }
+
+    @Test public void mirrorsXAndBakesFixedDisplayScaleIntoPlacedGeometryOnly() throws Exception {
+        Map<String,byte[]> assets = modelAssets();
+        assets.put("assets/demo/models/corner.json",("{\"display\":{\"fixed\":{\"scale\":[0.5,0.5,0.5]}},"
+                + "\"textures\":{\"wood\":\"demo:oak\"},\"elements\":["
+                + "{\"from\":[0,0,0],\"to\":[4,16,16],\"faces\":{\"north\":{\"texture\":\"#wood\"}}}]}")
+                .getBytes(StandardCharsets.UTF_8));
+        String shortId = "i_11112222333344445555666677778888";
+        BedrockGeometryCompiler.Output output = new BedrockGeometryCompiler(assets).compile("demo:corner","voxelcore:"+shortId,shortId);
+        JsonArray geometries = JsonParser.parseString(new String(output.assets.get("models/entity/voxelcore/"+shortId+".geo.json"),
+                StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonArray("minecraft:geometry");
+        JsonObject placed = geometries.get(0).getAsJsonObject().getAsJsonArray("bones").get(0).getAsJsonObject()
+                .getAsJsonArray("cubes").get(0).getAsJsonObject();
+        // Java x 0..4 (west side) is Bedrock x 4..8 before scaling; display.fixed halves it about the centre.
+        assertEquals("[2.0,-4.0,-4.0]", placed.get("origin").toString());
+        assertEquals("[2.0,8.0,8.0]", placed.get("size").toString());
+        JsonObject held = geometries.get(1).getAsJsonObject().getAsJsonArray("bones").get(4).getAsJsonObject()
+                .getAsJsonArray("cubes").get(0).getAsJsonObject();
+        assertEquals("Held geometry uses the hand transforms, not display.fixed", "[4.0,0.0,-8.0]", held.get("origin").toString());
     }
 
     @Test public void keepsFlatPlaneElementsButRejectsLines() throws Exception {
@@ -147,8 +167,8 @@ public final class BedrockGeometryCompilerTest {
                 .getAsJsonArray("bones").get(0).getAsJsonObject().getAsJsonArray("cubes").get(0).getAsJsonObject();
         assertEquals("[-4.0,-8.0,-4.0]", cube.get("origin").toString());
         assertEquals("[8.0,4.0,8.0]", cube.get("size").toString());
-        assertEquals(10.0, cube.getAsJsonArray("rotation").get(0).getAsDouble(), 0);
-        assertEquals(60.0, cube.getAsJsonArray("rotation").get(1).getAsDouble(), 0);
+        assertEquals(-10.0, cube.getAsJsonArray("rotation").get(0).getAsDouble(), 0);
+        assertEquals(-60.0, cube.getAsJsonArray("rotation").get(1).getAsDouble(), 0);
         assertNotNull(new BedrockIconRenderer(assets).render("demo:tilted", null, null));
     }
 

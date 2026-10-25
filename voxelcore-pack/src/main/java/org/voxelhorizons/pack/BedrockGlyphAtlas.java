@@ -170,15 +170,54 @@ final class BedrockGlyphAtlas {
         return Math.max(1, (int) Math.round((double) javaHeight * trimmedHeight / fullHeight));
     }
 
-    /** The glyph as Java draws it: {@code javaHeight} pixels tall, proportional width (at most one max cell). */
+    /**
+     * The glyph close to Java's size while keeping pixel art crisp (live test: smoothing an
+     * 11px rank tag to its 9px Java height made it unreadable; the Kafal converter keeps native
+     * pixels): upscaled art is first reduced exactly to its art pixels, then scaled by whole
+     * multiples; native art up to twice the Java height stays as is; only genuinely large
+     * images are smoothly downscaled to the Java height.
+     */
     static BufferedImage atJavaSize(BufferedImage icon, int javaHeight) {
-        double ratio = (double) Math.max(1, javaHeight <= 0 ? 8 : javaHeight) / icon.getHeight();
-        ratio = Math.min(ratio, (double) MAX_CELL / Math.max(icon.getWidth(), icon.getHeight()));
-        int width = Math.max(1, (int) Math.round(icon.getWidth() * ratio));
-        int height = Math.max(1, (int) Math.round(icon.getHeight() * ratio));
-        if (width == icon.getWidth() && height == icon.getHeight()) return icon;
+        int target = Math.max(1, javaHeight <= 0 ? 8 : javaHeight);
+        BufferedImage art = reduceBlocks(icon);
+        BufferedImage out;
+        if (art.getHeight() <= target) {
+            int factor = Math.max(1, target / art.getHeight());
+            out = factor == 1 ? art : scaled(art, art.getWidth() * factor, art.getHeight() * factor);
+        } else if (art.getHeight() <= target * 2) {
+            out = art;
+        } else {
+            int width = Math.max(1, (int) Math.round((double) art.getWidth() * target / art.getHeight()));
+            out = scaled(art, width, target);
+        }
+        if (Math.max(out.getWidth(), out.getHeight()) > MAX_CELL) {
+            double fit = (double) MAX_CELL / Math.max(out.getWidth(), out.getHeight());
+            out = scaled(out, Math.max(1, (int) (out.getWidth() * fit)), Math.max(1, (int) (out.getHeight() * fit)));
+        }
+        return out;
+    }
+
+    /** Undo an integer upscale: the largest b where the image is made of uniform b x b blocks. */
+    static BufferedImage reduceBlocks(BufferedImage image) {
+        int w = image.getWidth(), h = image.getHeight();
+        for (int b = Math.min(w, h); b > 1; b--) {
+            if (w % b != 0 || h % b != 0 || !uniformBlocks(image, b)) continue;
+            BufferedImage out = new BufferedImage(w / b, h / b, BufferedImage.TYPE_INT_ARGB);
+            for (int y = 0; y < h / b; y++) for (int x = 0; x < w / b; x++) out.setRGB(x, y, image.getRGB(x * b, y * b));
+            return out;
+        }
+        return image;
+    }
+
+    private static boolean uniformBlocks(BufferedImage image, int b) {
+        for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++)
+            if (image.getRGB(x, y) != image.getRGB(x - x % b, y - y % b)) return false;
+        return true;
+    }
+
+    private static BufferedImage scaled(BufferedImage image, int width, int height) {
         BufferedImage out = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-        draw(out, icon, 0, 0, width, height);
+        draw(out, image, 0, 0, width, height);
         return out;
     }
 
