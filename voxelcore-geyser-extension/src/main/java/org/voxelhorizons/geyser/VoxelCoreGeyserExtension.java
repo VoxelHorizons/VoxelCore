@@ -184,6 +184,7 @@ public final class VoxelCoreGeyserExtension implements Extension {
 
     private final SpawnStats spawnStats = new SpawnStats();
     private volatile CustomEntityDefinition displayPlaceholder;
+    private volatile boolean itemDisplayRegistered;
 
     /** Teach Geyser the item_display Java type so placed furniture/vehicles fire spawn events. */
     private void registerItemDisplayType() {
@@ -191,6 +192,7 @@ public final class VoxelCoreGeyserExtension implements Extension {
         try {
             String refused = ItemDisplayRegistration.register(displayPlaceholder);
             if (refused == null) {
+                itemDisplayRegistered = true;
                 logger().info("Registered minecraft:item_display with Geyser; VoxelCore furniture/vehicle displays "
                         + "now spawn as native Bedrock entities (other item displays stay invisible, as before).");
             } else {
@@ -410,6 +412,15 @@ public final class VoxelCoreGeyserExtension implements Extension {
     @Subscribe
     public void onPostInitialize(GeyserPostInitializeEvent event) {
         report("post-initialize");
+        if (itemDisplayRegistered) {
+            try {
+                VehicleTeleportRelay.install();
+            } catch (Throwable incompatible) {
+                logger().warning("Could not relay VoxelCore vehicle teleports with this Geyser build ("
+                        + incompatible + "); Paper may log 'expected to be controlling vehicle' while Bedrock "
+                        + "players ride, which is harmless.");
+            }
+        }
     }
 
     private void report(String phase) {
