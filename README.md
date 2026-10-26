@@ -2,11 +2,11 @@
 
 VoxelCore is the version-aware content foundation for Voxel Horizons. It owns deterministic YAML pack discovery and inheritance, immutable runtime content, item identity/creation, Java resource-pack and UI glyph compilation, basic actions, and carrier-backed custom blocks. Higher-level placed furniture and drivable vehicles are implemented as separate [VoxelFurniture](https://github.com/VoxelHorizons/VoxelFurniture) and [VoxelVehicles](https://github.com/VoxelHorizons/VoxelVehicles) addons; VoxelCore does not own their world placement or simulation.
 
-Crops, skills, generic session-driven menus, full Bedrock/Geyser conversion, legacy HavenCore data conversion and network inventory remain distinct follow-up work. See [Migration-Roadmap.md](Migration-Roadmap.md) for the October 2026 status and integration priorities.
+Crops, skills, generic session-driven menus, complete Bedrock/Geyser parity, historical HavenCore conversion and network inventory remain distinct future decisions. See the **[sole current development roadmap](ROADMAP.md)** for the release milestones and evidence-based completion criteria.
 
 ## Current implementation status
 
-The repository has completed the roadmap's foundation, content/item, Java pack, UI font, basic action and custom-block MVP milestones (phases 0, 1, 2a, 2c, parts of 3a and 5a):
+The repository has implemented its core foundation, content/item runtime, Java pack, UI fonts, basic actions and custom-block MVP:
 
 - multi-module Maven build with per-version shaded distributions
 - automatic Paper capability detection with a Bukkit-compatible fallback
@@ -22,9 +22,10 @@ The repository has completed the roadmap's foundation, content/item, Java pack, 
 - carrier-backed custom blocks with placeable items, harvesting/tool rules, selected native hardness support and Creative pick-block
 - configurable item/block browser inventory titles, GUI glyphs and runtime tooltip overlays
 - model/atlas compatibility repair for mixed block, item and entity textures
+- Bedrock packs and Geyser v2 item mappings, supported native geometry/attachables, and a separate Geyser projection extension (live parity remains unverified; [operator guide](docs/bedrock.md))
 - optional ShopGUIPlus integrations and VaultUnlocked-backed token currency support (independent of the unmerged custom-ledger proposal)
 
-VoxelFurniture and VoxelVehicles provide their own working gameplay MVPs against VoxelCore content; their full compatibility, old-world migration and complex edge-case acceptance remain separate addon responsibilities. Generic player-owned menu sessions, broad rich item/legacy HavenCore behavior parity, Bedrock mappings and shared network persistence are **not** complete.
+VoxelFurniture and VoxelVehicles provide their gameplay MVPs against VoxelCore content, but state recovery, protection, legacy import and full-version acceptance remain separate addon responsibilities. Generic cross-plugin menu sessions, broad rich-item/legacy HavenCore behavior, **complete Bedrock parity** and network persistence are **not** complete. Initial Bedrock mappings, packs and Geyser projection work **are** implemented; track exact acceptance in [ROADMAP.md](ROADMAP.md).
 
 ## Java UI font content
 
@@ -139,11 +140,9 @@ Player-specific lore that ShopGUI+ generates while opening a menu (including cal
 
 ## Next development milestone
 
-The former phase-3a plan has been partly delivered via VoxelCore's reusable item and block actions. The next highest-value work is **cross-plugin integration and durability validation**, rather than reimplementing actions or the existing VoxelFurniture and VoxelVehicles foundations.
+Focus on **Paper 26.3 + Java 25 cross-plugin durability, Bedrock real-client acceptance and item/economy safety**, not rebuilding the item/block foundation already in place. Run matching VoxelCore, VoxelFurniture, VoxelVehicles and VoxelFurnitureShop builds through chunk/restart recovery, protection, cargo and client-pack testing. Verify Bedrock display projection, forms and rollback on a pinned Geyser/Floodgate/Bedrock client stack. Profile real content with spark and `/vv perf`.
 
-Start with a single combined **Paper 26.3 + Java 25** integration test installation of matching VoxelCore, VoxelFurniture and VoxelVehicles builds; include VoxelFurnitureShop snapshot/edit recovery checks. Verify restart, chunk lifecycle, owner permissions, vehicle chest/cargo conservation, client resource-pack loading and addon reloads. Profile the workload with spark and `/vv perf`. Then complete [VoxelVehicles adapter and migration issues](https://github.com/VoxelHorizons/VoxelVehicles/issues) and the presentation-independent menu session contract. Bedrock/legacy Haven data migration are separate gated milestones.
-
-See [Migration-Roadmap.md](Migration-Roadmap.md#13-next-implementation-units--october-2026-execution-plan) for the detailed acceptance criteria, support boundaries and subsequent phases.
+The **[single current roadmap](ROADMAP.md)** lists ordered release gates R1–R5 and the B01–B20 Bedrock acceptance register. [Bedrock operations](docs/bedrock.md) describes setup, limitations and reproducible tests. A passing build or merged PR does **not** imply real client acceptance.
 
 ## Item MVP
 
@@ -744,7 +743,7 @@ These are **not fully provided by VoxelCore itself**, or remain later roadmap ph
 - vehicle driving/simulation and stored cargo (**provided by VoxelVehicles addon on validated modern targets**)
 - old HavenCore/HavenFurniture/HavenVehicles conversion and alias imports
 - generic session-driven menu framework and Bedrock presentation
-- Geyser/Floodgate item and entity mappings, Bedrock resource packs
+- **complete** Geyser/Floodgate item/entity mapping, arbitrary Java-model/shader parity and fully verified Bedrock gameplay (initial Bedrock pack, mapping, geometry and projection code exists)
 - crops, skills, NPC and games systems
 - true Minecraft attribute modifiers and additional rich potion/skull/book/map/firework metadata
 - full bound-item enforcement across inventory, death, containers and cross-server transfers
@@ -753,6 +752,6 @@ These are **not fully provided by VoxelCore itself**, or remain later roadmap ph
 
 **Already provided by VoxelCore itself:** basic item/block actions and carrier-backed custom blocks. Do not classify them as future MVP work. Full legacy parity and edge-case validation are still outstanding.
 
-See `Migration-Roadmap.md` for the broader rebuild plan and architectural rationale. Its repository review appendices describe the original audited snapshots; the implementation-status section in this README is the canonical description of current VoxelCore functionality.
+See [ROADMAP.md](ROADMAP.md) for the **single active development backlog**, cross-plugin milestones, B01–B20 Bedrock acceptance register and explicit deferred scope. Old migration audits are accessible through Git history; this README documents current VoxelCore interfaces.
 
-Bedrock publishing foundations: see [Bedrock setup and limitations](docs/bedrock.md) for explicit item icons, Geyser v2 mappings, build-time publication and the remaining conversion roadmap.
+For current setup, diagnostics and client testing see [Bedrock operations](docs/bedrock.md); track all remaining work exclusively in [ROADMAP.md](ROADMAP.md).
