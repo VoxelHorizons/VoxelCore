@@ -10,6 +10,19 @@ public interface BuildProgress {
 
     void report(String message);
 
+    /**
+     * Cancellation checkpoint, called for every counted unit (item, zip entry, download chunk)
+     * as well as before each report. A stoppable build's sink throws {@link Cancelled}; the
+     * compilers only write their output at the end, so an interrupted build leaves the previous
+     * result in place.
+     */
+    default void checkCancelled() { }
+
+    /** Thrown by a sink to stop the build at the current checkpoint. */
+    final class Cancelled extends RuntimeException {
+        public Cancelled(String message) { super(message); }
+    }
+
     /** Starts a counted step; {@code total <= 0} means unknown (bytes are then shown, not %). */
     default Step step(String label, long total) {
         return new Step(this, label, total, false, System.nanoTime());
@@ -37,6 +50,7 @@ public interface BuildProgress {
         public synchronized void advance(long amount) { advance(amount, System.nanoTime()); }
 
         synchronized void advance(long amount, long now) {
+            sink.checkCancelled();
             done += amount;
             int decile = total > 0 ? (int) Math.min(10, done * 10 / total) : -1;
             if ((total > 0 && decile > lastDecile && decile < 10) || now - lastReport >= INTERVAL_NANOS) {
