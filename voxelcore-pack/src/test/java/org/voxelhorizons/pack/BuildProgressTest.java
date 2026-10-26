@@ -35,4 +35,19 @@ public class BuildProgressTest {
         step.advance(5_242_880, 1L);
         assertEquals("Jar: 50% (5.0 MB of 10.0 MB)", lines.get(0));
     }
+
+    @Test public void stopRequestEndsTheBuildAtTheNextCountedUnit() {
+        final boolean[] stop = {false};
+        final List<String> lines = new ArrayList<String>();
+        BuildProgress sink = new BuildProgress() {
+            @Override public void report(String message) { checkCancelled(); lines.add(message); }
+            @Override public void checkCancelled() { if (stop[0]) throw new Cancelled("stopped by admin"); }
+        };
+        BuildProgress.Step step = sink.step("Items", 100);
+        step.advance(1);
+        stop[0] = true;
+        try { step.advance(1); fail("A stop request must end the build"); }
+        catch (BuildProgress.Cancelled expected) { assertEquals("stopped by admin", expected.getMessage()); }
+        assertTrue("Nothing reported after the stop", lines.isEmpty());
+    }
 }

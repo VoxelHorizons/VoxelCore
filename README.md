@@ -641,12 +641,15 @@ plugins/VoxelCore/build/resource-packs/<target>.zip
 /voxelcore admin pack host [status|test]
 /voxelcore admin pack send <online-player>
 /voxelcore admin pack validate [target]
-/voxelcore admin pack build [target]
+/voxelcore admin pack build [java|bedrock|all] [target]
+/voxelcore admin pack stop
 ```
 
 When `[target]` is omitted, VoxelCore uses the current server version only when an exact validated pack profile exists. Otherwise specify a target explicitly.
 
 `pack build` publishes the completed ZIP atomically, preserving the previous successful artifact when compilation fails. After a successful build it also performs the safe content reload below, so new items and `:name:` UI placeholders become active without a second command. If live reload validation fails, the built ZIP is retained while the previous runtime revision stays active and the command reports both outcomes.
+
+`pack build` with no scope (or `all`) builds both packs as before. `pack build java` builds, hosts and reloads only the Java pack, skipping the slower Bedrock conversion; `pack build bedrock` only converts and publishes the Bedrock pack for the running server's version (run `java` first after content changes, so render allocations are current). Only one pack build runs at a time: starting another reports the running one. `pack stop` (alias `cancel`) ends the running build at its next checkpoint (each converted item, zip entry or download chunk) without publishing anything; a Java compile already in progress finishes first, and a build that has started publishing completes instead.
 
 `pack host` reports the bind address, active socket, advertised URL, hosted file size, and SHA-1. `pack send <online-player>` (alias `pack push`) sends the current pack request immediately, independent of the join setting; the global required/prompt settings still apply. A successful command means the request was issued, while the host request log shows whether the client connected to download it. `pack host test` downloads the file through the local listener and verifies its byte count and SHA-1; this confirms the host inside the Minecraft process/container, but does not test Docker/Pterodactyl port exposure or a public tunnel. Startup logs report the same details and include bind exceptions. With `resource_pack.host.debug: true`, each HTTP request is logged with its remote address, method, path, response status, and bytes sent.
 
