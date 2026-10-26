@@ -31,6 +31,7 @@ public final class PackCommand implements SubCommand {
         register(new SendCommand());
         register(new ValidateCommand());
         register(new BuildCommand());
+        register(new StopCommand());
         register(new GlyphsCommand());
     }
 
@@ -45,7 +46,8 @@ public final class PackCommand implements SubCommand {
     @Override public boolean playerOnly() { return false; }
     @Override public Map<String, SubCommand> getChildren() { return children; }
     @Override public void execute(CommandSender sender, String[] args) {
-        sender.sendMessage("Usage: /voxelcore admin pack <info|host|send|validate|build|glyphs> [player|target]");
+        sender.sendMessage("Usage: /voxelcore admin pack <info|host|send|validate|build|stop|glyphs> [player|target]"
+                + " (build [java|bedrock|all] [target])");
     }
 
     private static JavaPackTarget target(CommandSender sender, String[] args) {
@@ -67,14 +69,19 @@ public final class PackCommand implements SubCommand {
      * Progress sink for async pack builds: always logged (console/log), and echoed to the
      * player who started the build, on the main thread.
      */
-    private static org.voxelhorizons.pack.BuildProgress buildProgress(VoxelCore plugin, CommandSender sender) {
-        return message -> {
-            plugin.getLogger().info("[pack build] " + message);
-            if (sender instanceof org.bukkit.entity.Player) {
-                try {
-                    plugin.getServer().getScheduler().runTask(plugin, () -> sender.sendMessage("[VoxelCore] " + message));
-                } catch (RuntimeException disabled) {
-                    // Plugin disabling mid-build: the log line above is enough.
+    private static org.voxelhorizons.pack.BuildProgress buildProgress(VoxelCore plugin, CommandSender sender, BuildJob job) {
+        return new org.voxelhorizons.pack.BuildProgress() {
+            @Override public void checkCancelled() { job.checkStopped(); }
+
+            @Override public void report(String message) {
+                job.checkStopped();
+                plugin.getLogger().info("[pack build] " + message);
+                if (sender instanceof org.bukkit.entity.Player) {
+                    try {
+                        plugin.getServer().getScheduler().runTask(plugin, () -> sender.sendMessage("[VoxelCore] " + message));
+                    } catch (RuntimeException disabled) {
+                        // Plugin disabling mid-build: the log line above is enough.
+                    }
                 }
             }
         };
@@ -431,25 +438,136 @@ public final class PackCommand implements SubCommand {
         }
     }
 
-    private static final class BuildCommand implements SubCommand {
-        private final AtomicBoolean working = new AtomicBoolean(false);
+    /** What a pack build produces: both packs (default), or only one for faster iteration. */
+    enum BuildScope {
+        ALL, JAVA, BEDROCK;
 
+        boolean java() { return this != BEDROCK; }
+        boolean bedrock() { return this != JAVA; }
+        String label() { return this == ALL ? "Java + Bedrock" : this == JAVA ? "Java" : "Bedrock"; }
+
+        static BuildScope parse(String argument) {
+            if (argument == null) return null;
+            switch (argument.toLowerCase(java.util.Locale.ROOT)) {
+                case "all": return ALL;
+                case "java": return JAVA;
+                case "bedrock": return BEDROCK;
+                default: return null;
+            }
+        }
+    }
+
+    /**
+     * The one pack build that may run at a time. Shared by build (refuses to start a second)
+     * and stop (asks the running one to end at its next checkpoint).
+     */
+    static final class BuildJob {
+        final BuildScope scope;
+        final String target;
+        final String startedBy;
+        final long startedNanos = System.nanoTime();
+        private volatile boolean stopRequested;
+        private volatile String stoppedBy;
+
+        BuildJob(BuildScope scope, String target, String startedBy) {
+            this.scope = scope; this.target = target; this.startedBy = startedBy;
+        }
+
+        void requestStop(String by) { stoppedBy = by; stopRequested = true; }
+        boolean stopRequested() { return stopRequested; }
+
+        void checkStopped() {
+            if (stopRequested) throw new org.voxelhorizons.pack.BuildProgress.Cancelled(
+                    "stopped by " + (stoppedBy == null ? "an admin" : stoppedBy));
+        }
+
+        String describe() {
+            return scope.label() + " build for " + target + " started by " + startedBy + " "
+                    + Math.max(0, (System.nanoTime() - startedNanos) / 1_000_000_000L) + "s ago";
+        }
+    }
+
+    static final java.util.concurrent.atomic.AtomicReference<BuildJob> RUNNING =
+            new java.util.concurrent.atomic.AtomicReference<BuildJob>();
+
+    private static final class StopCommand implements SubCommand {
+        @Override public String getName() { return "stop"; }
+        @Override public List<String> getAliases() { return java.util.Arrays.asList("cancel"); }
+        @Override public String getPermission() { return "voxelcore.admin.pack.build"; }
+        @Override public boolean playerOnly() { return false; }
+
+        @Override public void execute(CommandSender sender, String[] args) {
+            BuildJob job = RUNNING.get();
+            if (job == null) {
+                sender.sendMessage("No VoxelCore pack build is running.");
+                return;
+            }
+            if (job.stopRequested()) {
+                sender.sendMessage("Stop already requested for the " + job.describe() + "; it ends at its next checkpoint.");
+                return;
+            }
+            job.requestStop(sender.getName());
+            VoxelCore.getInstance().getLogger().info("[pack build] Stop requested by " + sender.getName() + ": " + job.describe());
+            sender.sendMessage("Stopping the " + job.describe() + ". It ends at its next checkpoint "
+                    + "(a Java pack compile in progress finishes first) without publishing anything; if it has "
+                    + "already started publishing, it completes instead. Start a new build once it reports.");
+        }
+    }
+
+    private static final class BuildCommand implements SubCommand {
         @Override public String getName() { return "build"; }
         @Override public List<String> getAliases() { return Collections.emptyList(); }
         @Override public String getPermission() { return "voxelcore.admin.pack.build"; }
         @Override public boolean playerOnly() { return false; }
 
+        @Override public List<String> onTabComplete(CommandSender sender, String[] args) {
+            List<String> options = new java.util.ArrayList<String>();
+            if (args.length == 1) { options.add("java"); options.add("bedrock"); options.add("all"); }
+            if (args.length == 1 || (args.length == 2 && BuildScope.parse(args[0]) != null))
+                for (JavaPackTarget target : JavaPackTarget.knownTargets()) options.add(target.id());
+            String prefix = args.length == 0 ? "" : args[args.length - 1].toLowerCase(java.util.Locale.ROOT);
+            List<String> matches = new java.util.ArrayList<String>();
+            for (String option : options) if (option.startsWith(prefix)) matches.add(option);
+            return matches;
+        }
+
+        /** /vc admin pack build [java|bedrock|all] [target] */
         @Override public void execute(CommandSender sender, String[] args) {
-            JavaPackTarget target = target(sender, args);
+            BuildScope scope = args.length == 0 ? null : BuildScope.parse(args[0]);
+            String[] targetArgs = scope == null ? args : java.util.Arrays.copyOfRange(args, 1, args.length);
+            if (scope == null) scope = BuildScope.ALL;
+            if (targetArgs.length > 1) {
+                sender.sendMessage("Usage: /voxelcore admin pack build [java|bedrock|all] [target]");
+                return;
+            }
+            JavaPackTarget target = target(sender, targetArgs);
             if (target == null) return;
-            if (!working.compareAndSet(false, true)) {
-                sender.sendMessage("VoxelCore pack build/reload is already running.");
+
+            final VoxelCore plugin = VoxelCore.getInstance();
+            JavaPackTarget serverTarget = plugin.getPackManager().currentTarget();
+            final boolean currentServerTarget = serverTarget != null && serverTarget.id().equals(target.id());
+            // Snapshot Bukkit configuration before handing disk work to the async worker.
+            final boolean bedrockEnabled = plugin.getConfig().getBoolean("game.bedrock_support", false);
+            if (scope == BuildScope.BEDROCK && !bedrockEnabled) {
+                sender.sendMessage("Bedrock builds are disabled (game.bedrock_support: false).");
+                return;
+            }
+            if (scope == BuildScope.BEDROCK && !currentServerTarget) {
+                sender.sendMessage("Bedrock packs are only built for this server's own version ("
+                        + (serverTarget == null ? "none registered" : serverTarget.id()) + "), not " + target.id() + ".");
                 return;
             }
 
-            final VoxelCore plugin = VoxelCore.getInstance();
-            // Snapshot Bukkit configuration before handing disk work to the async worker.
-            final boolean bedrockEnabled = plugin.getConfig().getBoolean("game.bedrock_support", false);
+            final BuildJob job = new BuildJob(scope, target.id(), sender.getName());
+            if (!RUNNING.compareAndSet(null, job)) {
+                BuildJob running = RUNNING.get();
+                sender.sendMessage("A VoxelCore pack build is already running"
+                        + (running == null ? "" : ": " + running.describe())
+                        + ". Wait for it, or stop it with /vc admin pack stop.");
+                return;
+            }
+
+            final BuildScope buildScope = scope;
             final byte[] remoteSecret = plugin.getConfig().getString("bedrock.remote_sync.secret", "").trim()
                     .getBytes(java.nio.charset.StandardCharsets.UTF_8);
             final org.voxelhorizons.pack.GeyserPackPublisher.Destination geyserDestination =
@@ -457,153 +575,193 @@ public final class PackCommand implements SubCommand {
                             plugin.getConfig().getString("bedrock.geyser_data_directory", ""),
                             plugin.getConfig().getBoolean("bedrock.auto_publish_local", true),
                             localGeyserDataDirectory(plugin));
+            final boolean controllerGlyphPages = plugin.getConfig().getBoolean("bedrock.override_controller_glyph_pages", true);
+            final String glyphShrink = plugin.getConfig().getString("bedrock.glyph_shrink", "area");
             final long startingRevision = plugin.getContentRuntime().current().revision();
-            sender.sendMessage("VoxelCore pack build for " + target.id()
-                    + " started asynchronously; the server will remain responsive.");
+            sender.sendMessage("VoxelCore " + scope.label() + " pack build for " + target.id()
+                    + " started asynchronously; the server will remain responsive. Stop it with /vc admin pack stop.");
 
             try {
-                // The compiler and candidate loader operate on disk/immutable Java data,
+                // The compilers and candidate loader operate on disk/immutable Java data,
                 // never touch Bukkit inventories, blocks or live mutable server state.
                 plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
-                    final org.voxelhorizons.pack.BuildProgress progress = buildProgress(plugin, sender);
-                    final JavaPackBuildResult output;
+                    final org.voxelhorizons.pack.BuildProgress progress = buildProgress(plugin, sender, job);
                     try {
-                        progress.report("Java pack: compiling " + target.id());
-                        long javaStarted = System.nanoTime();
-                        output = plugin.getPackManager().build(target);
-                        progress.report("Java pack: done in " + String.format(java.util.Locale.ROOT, "%.1f",
-                                (System.nanoTime() - javaStarted) / 1e9) + "s");
+                        run(plugin, sender, job, buildScope, target, currentServerTarget, bedrockEnabled, remoteSecret,
+                                geyserDestination, controllerGlyphPages, glyphShrink, startingRevision, progress);
+                    } catch (org.voxelhorizons.pack.BuildProgress.Cancelled stopped) {
+                        plugin.getLogger().info("[pack build] Stopped (" + stopped.getMessage() + "); nothing was published.");
+                        complete(plugin, () -> sender.sendMessage("VoxelCore " + buildScope.label() + " pack build for "
+                                + target.id() + " stopped (" + stopped.getMessage() + "). Nothing from it was published; "
+                                + "the previous packs stay active."));
                     } catch (RuntimeException failure) {
+                        plugin.getLogger().log(Level.WARNING, "VoxelCore pack build failed", failure);
                         complete(plugin, () -> sender.sendMessage("VoxelCore pack build failed for "
                                 + target.id() + ": " + failure.getMessage()));
-                        return;
                     }
-                    JavaPackTarget serverTarget = plugin.getPackManager().currentTarget();
-                    final boolean currentServerTarget = serverTarget != null && serverTarget.id().equals(target.id());
-                    String bedrockStatus = "";
-                    if (currentServerTarget && bedrockEnabled) {
-                        try {
-                            // 1.21.4+: item_model definitions; 1.14-1.21.3: Geyser legacy custom_model_data definitions.
-                            String vanillaNote = "";
-                            java.nio.file.Path vanilla = null;
-                            try {
-                                vanilla = vanillaAssets(plugin, progress);
-                            } catch (Exception unavailable) {
-                                vanillaNote = " Vanilla textures unavailable (" + unavailable.getMessage()
-                                        + "); items using minecraft: textures may lack icons/3D.";
-                                plugin.getLogger().warning("Bedrock vanilla assets unavailable: " + unavailable.getMessage());
-                            }
-                            org.voxelhorizons.pack.BedrockPackCompiler.Result bedrock =
-                                    new org.voxelhorizons.pack.BedrockPackCompiler().withVanillaAssets(vanilla)
-                                            .withProgress(progress)
-                                            .withControllerGlyphPages(plugin.getConfig().getBoolean(
-                                                    "bedrock.override_controller_glyph_pages", true))
-                                            .withGlyphShrink(plugin.getConfig().getString("bedrock.glyph_shrink", "area"))
-                                            .compile(
-                                            plugin.getPackManager().contentRoot(),
-                                            plugin.getPackManager().outputRoot().resolve("bedrock"),
-                                            plugin.getPackManager().glyphAllocationManifest(),
-                                            target.mode());
-                            bedrockStatus = "Bedrock built: " + bedrock.directory + "; " + bedrock.mappedItems
-                                    + " mapped items; " + bedrock.mappedGlyphs + " Bedrock inline glyphs; "
-                                    + bedrock.nativeGeometryCount + " native 3D attachables; "
-                                    + bedrock.unsupportedGeometryCount + " 3D limitations (unsupported-geometry.txt); "
-                                    + bedrock.unsupportedItems + " items unsupported (unsupported-items.txt)."
-                                    + (bedrock.unsupportedReasonSummary.isEmpty() ? ""
-                                    : " Reasons: " + bedrock.unsupportedReasonSummary + ".")
-                                    + vanillaNote;
-                            if (geyserDestination.root != null) {
-                                progress.report("Bedrock: publishing to Geyser at " + geyserDestination.root);
-                                new org.voxelhorizons.pack.GeyserPackPublisher().publish(bedrock, geyserDestination.root);
-                                java.nio.file.Path pack = geyserDestination.root.resolve("packs/voxelcore.mcpack");
-                                java.nio.file.Path mappings = geyserDestination.root.resolve("custom_mappings/voxelcore-items.json");
-                                bedrockStatus += " Published to " + geyserDestination.source
-                                        + ": " + pack + " (" + java.nio.file.Files.size(pack) + " bytes), "
-                                        + mappings + " (" + java.nio.file.Files.size(mappings)
-                                        + " bytes). Publication receipt: "
-                                        + org.voxelhorizons.pack.GeyserPackPublisher.inspect(geyserDestination.root)
-                                        + ". Restart Geyser, then reconnect Bedrock clients.";
-                            } else {
-                                bedrockStatus += " Export only: " + geyserDestination.explanation;
-                            }
-                            if (remoteSecret.length > 0) {
-                                // B17: signed bundle for Geyser on a proxy/other host, served at /bedrock/.
-                                java.nio.file.Path remote = plugin.getPackManager().outputRoot().resolve("bedrock-remote");
-                                org.voxelhorizons.pack.RemoteBedrockBundle.export(bedrock, remoteSecret, remote,
-                                        System.currentTimeMillis());
-                                plugin.getResourcePackHost().setBedrockRemote(remote, remoteSecret);
-                                bedrockStatus += " Signed remote bundle exported"
-                                        + (plugin.getResourcePackHost().isRunning() ? " and served at /bedrock/."
-                                        : "; enable resource_pack.host to serve it.");
-                            }
-                        } catch (Exception failure) {
-                            bedrockStatus = "Bedrock build/publish FAILED: " + failure.getMessage();
-                            plugin.getLogger().log(Level.WARNING, bedrockStatus, failure);
-                        }
-                    }
-                    final String bedrockMessage = bedrockStatus;
-                    String hostPublishError = null;
-                    if (currentServerTarget) {
-                        try {
-                            plugin.getResourcePackHost().publish(output.output());
-                        } catch (Exception failure) {
-                            hostPublishError = failure.getMessage();
-                        }
-                    }
-                    final String publishError = hostPublishError;
-
-                    ContentDefinitions candidate = null;
-                    String loadError = null;
-                    try {
-                        candidate = plugin.prepareContentReload();
-                    } catch (RuntimeException failure) {
-                        loadError = failure.getMessage();
-                    }
-                    final ContentDefinitions prepared = candidate;
-                    final String prepareError = loadError;
-                    complete(plugin, () -> {
-                        if (!bedrockMessage.isEmpty()) sender.sendMessage(bedrockMessage);
-                        sender.sendMessage("VoxelCore pack built for " + target.id() + ": " + output.output()
-                                + " (" + output.renderedItems() + " rendered items, " + output.renderedBlocks()
-                                + " rendered blocks, " + output.copiedAssets() + " authored assets)");
-                        if (!currentServerTarget) {
-                            sender.sendMessage("This target differs from the running server version; it was not published to players.");
-                        } else if (publishError != null) {
-                            sender.sendMessage("Pack built, but self-hosted pack file was not updated: " + publishError);
-                        } else {
-                            sender.sendMessage("Updated self-hosted pack file: " + plugin.getResourcePackHost().hostedPack());
-                        }
-                        if (currentServerTarget && publishError == null && plugin.getResourcePackHost().isRunning()) {
-                            plugin.getPlayerResourcePackService().sendUpdatedPackToOnlinePlayers();
-                        }
-                        if (prepared == null) {
-                            sender.sendMessage("Pack built, but live content reload failed; revision "
-                                    + plugin.getContentRuntime().current().revision()
-                                    + " remains active: " + prepareError);
-                            return;
-                        }
-                        if (plugin.getContentRuntime().current().revision() != startingRevision) {
-                            sender.sendMessage("Pack built, but content changed during the build; "
-                                    + "skipped publishing an outdated snapshot. Run /vc admin content reload.");
-                            return;
-                        }
-
-                        // Runtime configuration, world/platform validation, allocation persistence,
-                        // glyph publishing and event/plugin visibility stay on the primary thread.
-                        ContentReloadResult reload = plugin.onReloadPrepared(prepared);
-                        if (reload.success()) {
-                            sender.sendMessage("Published content revision " + reload.activeRevision() + " with "
-                                    + reload.itemCount() + " items and " + reload.blockCount()
-                                    + " blocks; UI placeholders are now active.");
-                        } else {
-                            sender.sendMessage("Pack built, but live content reload failed; revision "
-                                    + reload.activeRevision() + " remains active: " + reload.message());
-                        }
-                    });
                 });
             } catch (RuntimeException failure) {
-                working.set(false);
+                RUNNING.compareAndSet(job, null);
                 sender.sendMessage("Unable to start VoxelCore pack build: " + failure.getMessage());
+            }
+        }
+
+        /** The async build body; throws BuildProgress.Cancelled at any checkpoint once stopped. */
+        private void run(VoxelCore plugin, CommandSender sender, BuildJob job, BuildScope scope, JavaPackTarget target,
+                         boolean currentServerTarget, boolean bedrockEnabled, byte[] remoteSecret,
+                         org.voxelhorizons.pack.GeyserPackPublisher.Destination geyserDestination,
+                         boolean controllerGlyphPages, String glyphShrink, long startingRevision,
+                         org.voxelhorizons.pack.BuildProgress progress) {
+            JavaPackBuildResult output = null;
+            if (scope.java()) {
+                progress.report("Java pack: compiling " + target.id());
+                long javaStarted = System.nanoTime();
+                output = plugin.getPackManager().build(target);
+                progress.report("Java pack: done in " + String.format(java.util.Locale.ROOT, "%.1f",
+                        (System.nanoTime() - javaStarted) / 1e9) + "s");
+            }
+            String bedrockStatus = "";
+            if (scope.bedrock() && currentServerTarget && bedrockEnabled) {
+                bedrockStatus = buildBedrock(plugin, target, progress, geyserDestination, remoteSecret,
+                        controllerGlyphPages, glyphShrink);
+            }
+            // No checkpoint past here: once Bedrock publishing has started the build completes, so
+            // the Java and Bedrock packs never end up from different runs.
+            final String bedrockMessage = bedrockStatus;
+            if (!scope.java()) {
+                complete(plugin, () -> sender.sendMessage(bedrockMessage.isEmpty()
+                        ? "VoxelCore Bedrock pack build finished." : bedrockMessage));
+                return;
+            }
+
+            final JavaPackBuildResult javaOutput = output;
+            String hostPublishError = null;
+            if (currentServerTarget) {
+                try {
+                    plugin.getResourcePackHost().publish(javaOutput.output());
+                } catch (Exception failure) {
+                    hostPublishError = failure.getMessage();
+                }
+            }
+            final String publishError = hostPublishError;
+
+            ContentDefinitions candidate = null;
+            String loadError = null;
+            try {
+                candidate = plugin.prepareContentReload();
+            } catch (RuntimeException failure) {
+                loadError = failure.getMessage();
+            }
+            final ContentDefinitions prepared = candidate;
+            final String prepareError = loadError;
+            complete(plugin, () -> {
+                if (!bedrockMessage.isEmpty()) sender.sendMessage(bedrockMessage);
+                sender.sendMessage("VoxelCore pack built for " + target.id() + ": " + javaOutput.output()
+                        + " (" + javaOutput.renderedItems() + " rendered items, " + javaOutput.renderedBlocks()
+                        + " rendered blocks, " + javaOutput.copiedAssets() + " authored assets)");
+                if (!currentServerTarget) {
+                    sender.sendMessage("This target differs from the running server version; it was not published to players.");
+                } else if (publishError != null) {
+                    sender.sendMessage("Pack built, but self-hosted pack file was not updated: " + publishError);
+                } else {
+                    sender.sendMessage("Updated self-hosted pack file: " + plugin.getResourcePackHost().hostedPack());
+                }
+                if (currentServerTarget && publishError == null && plugin.getResourcePackHost().isRunning()) {
+                    plugin.getPlayerResourcePackService().sendUpdatedPackToOnlinePlayers();
+                }
+                if (prepared == null) {
+                    sender.sendMessage("Pack built, but live content reload failed; revision "
+                            + plugin.getContentRuntime().current().revision()
+                            + " remains active: " + prepareError);
+                    return;
+                }
+                if (plugin.getContentRuntime().current().revision() != startingRevision) {
+                    sender.sendMessage("Pack built, but content changed during the build; "
+                            + "skipped publishing an outdated snapshot. Run /vc admin content reload.");
+                    return;
+                }
+
+                // Runtime configuration, world/platform validation, allocation persistence,
+                // glyph publishing and event/plugin visibility stay on the primary thread.
+                ContentReloadResult reload = plugin.onReloadPrepared(prepared);
+                if (reload.success()) {
+                    sender.sendMessage("Published content revision " + reload.activeRevision() + " with "
+                            + reload.itemCount() + " items and " + reload.blockCount()
+                            + " blocks; UI placeholders are now active.");
+                } else {
+                    sender.sendMessage("Pack built, but live content reload failed; revision "
+                            + reload.activeRevision() + " remains active: " + reload.message());
+                }
+            });
+        }
+
+        /** Builds and publishes the Bedrock pack; returns the status line. A stop request propagates. */
+        private String buildBedrock(VoxelCore plugin, JavaPackTarget target, org.voxelhorizons.pack.BuildProgress progress,
+                                    org.voxelhorizons.pack.GeyserPackPublisher.Destination geyserDestination,
+                                    byte[] remoteSecret, boolean controllerGlyphPages, String glyphShrink) {
+            try {
+                // 1.21.4+: item_model definitions; 1.14-1.21.3: Geyser legacy custom_model_data definitions.
+                String vanillaNote = "";
+                java.nio.file.Path vanilla = null;
+                try {
+                    vanilla = vanillaAssets(plugin, progress);
+                } catch (org.voxelhorizons.pack.BuildProgress.Cancelled stopped) {
+                    throw stopped;
+                } catch (Exception unavailable) {
+                    vanillaNote = " Vanilla textures unavailable (" + unavailable.getMessage()
+                            + "); items using minecraft: textures may lack icons/3D.";
+                    plugin.getLogger().warning("Bedrock vanilla assets unavailable: " + unavailable.getMessage());
+                }
+                org.voxelhorizons.pack.BedrockPackCompiler.Result bedrock =
+                        new org.voxelhorizons.pack.BedrockPackCompiler().withVanillaAssets(vanilla)
+                                .withProgress(progress)
+                                .withControllerGlyphPages(controllerGlyphPages)
+                                .withGlyphShrink(glyphShrink)
+                                .compile(
+                                plugin.getPackManager().contentRoot(),
+                                plugin.getPackManager().outputRoot().resolve("bedrock"),
+                                plugin.getPackManager().glyphAllocationManifest(),
+                                target.mode());
+                String bedrockStatus = "Bedrock built: " + bedrock.directory + "; " + bedrock.mappedItems
+                        + " mapped items; " + bedrock.mappedGlyphs + " Bedrock inline glyphs; "
+                        + bedrock.nativeGeometryCount + " native 3D attachables; "
+                        + bedrock.unsupportedGeometryCount + " 3D limitations (unsupported-geometry.txt); "
+                        + bedrock.unsupportedItems + " items unsupported (unsupported-items.txt)."
+                        + (bedrock.unsupportedReasonSummary.isEmpty() ? ""
+                        : " Reasons: " + bedrock.unsupportedReasonSummary + ".")
+                        + vanillaNote;
+                if (geyserDestination.root != null) {
+                    // Last stop checkpoint: once publishing starts it completes.
+                    progress.report("Bedrock: publishing to Geyser at " + geyserDestination.root);
+                    new org.voxelhorizons.pack.GeyserPackPublisher().publish(bedrock, geyserDestination.root);
+                    java.nio.file.Path pack = geyserDestination.root.resolve("packs/voxelcore.mcpack");
+                    java.nio.file.Path mappings = geyserDestination.root.resolve("custom_mappings/voxelcore-items.json");
+                    bedrockStatus += " Published to " + geyserDestination.source
+                            + ": " + pack + " (" + java.nio.file.Files.size(pack) + " bytes), "
+                            + mappings + " (" + java.nio.file.Files.size(mappings)
+                            + " bytes). Publication receipt: "
+                            + org.voxelhorizons.pack.GeyserPackPublisher.inspect(geyserDestination.root)
+                            + ". Restart Geyser, then reconnect Bedrock clients.";
+                } else {
+                    bedrockStatus += " Export only: " + geyserDestination.explanation;
+                }
+                if (remoteSecret.length > 0) {
+                    // B17: signed bundle for Geyser on a proxy/other host, served at /bedrock/.
+                    java.nio.file.Path remote = plugin.getPackManager().outputRoot().resolve("bedrock-remote");
+                    org.voxelhorizons.pack.RemoteBedrockBundle.export(bedrock, remoteSecret, remote,
+                            System.currentTimeMillis());
+                    plugin.getResourcePackHost().setBedrockRemote(remote, remoteSecret);
+                    bedrockStatus += " Signed remote bundle exported"
+                            + (plugin.getResourcePackHost().isRunning() ? " and served at /bedrock/."
+                            : "; enable resource_pack.host to serve it.");
+                }
+                return bedrockStatus;
+            } catch (org.voxelhorizons.pack.BuildProgress.Cancelled stopped) {
+                throw stopped;
+            } catch (Exception failure) {
+                String status = "Bedrock build/publish FAILED: " + failure.getMessage();
+                plugin.getLogger().log(Level.WARNING, status, failure);
+                return status;
             }
         }
 
@@ -616,11 +774,11 @@ public final class PackCommand implements SubCommand {
                         plugin.getLogger().log(Level.SEVERE,
                                 "Unable to finish asynchronous resource-pack reload", failure);
                     } finally {
-                        working.set(false);
+                        RUNNING.set(null);
                     }
                 });
             } catch (RuntimeException failure) {
-                working.set(false);
+                RUNNING.set(null);
                 plugin.getLogger().log(Level.WARNING,
                         "Resource-pack completion could not be scheduled (plugin shutting down?)", failure);
             }
