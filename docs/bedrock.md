@@ -78,7 +78,7 @@ VoxelCore's Java resource-pack `required` setting does not enforce Geyser's Bedr
 
 ## Live owner acceptance and known limitations (27 October 2026)
 
-The 85-question owner audit confirms a useful live Bedrock feature subset on Paper 26.3 / Java 25, **not complete Bedrock parity or release certification**. Exact deployed Bedrock/Geyser/Floodgate/addon revisions and reproducible logs still need recording. Use the [central acceptance register](../ROADMAP.md#owner-reported-issue-register--27-october-2026) for issue ownership and priority.
+The 85-question owner audit confirms a useful live Bedrock feature subset on Paper 26.3 / Java 25, **not complete Bedrock parity or release certification**. Exact deployed Bedrock/Geyser/Floodgate/addon revisions and reproducible logs still need recording. Use the [central acceptance register](../ROADMAP.md) for issue ownership and priority.
 
 | Behavior | Owner-reported outcome | Tracking |
 | --- | --- | --- |
