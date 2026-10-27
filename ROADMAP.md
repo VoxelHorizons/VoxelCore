@@ -1,6 +1,6 @@
 # Voxel Horizons — Authoritative Development Roadmap
 
-> **Updated 26 October 2026 · VoxelCore `main` baseline `1700f6d1`**
+> **Updated 27 October 2026 · initial VoxelCore code-audit baseline `1700f6d1` · live results separately attributed**
 >
 > **This is the only active VoxelCore development roadmap.** The [README](README.md) describes current APIs, [Bedrock operations](docs/bedrock.md) explains setup and validation, and the [tooltip](docs/configurable-tooltips.md) and [currency](docs/vaultunlocked-currencies.md) guides document configuration. None is a separate feature backlog. Previous planning/handoff files have been retired from the working tree and are available through Git history.
 
@@ -42,7 +42,8 @@ Core smoke targets: **1.12.2, 1.13.2, 1.14.4, 1.19.4, 1.20.5, 1.21.4, 26.2, 26.3
 
 Owner: VoxelCore + Furniture + Vehicles + FurnitureShop.
 
-- [ ] Install matching distributions on the selected Paper 26.3 stack, verify startup order and optional integrations when absent.
+- [x] **Owner-verified startup (27 October 2026):** VoxelCore, VoxelFurniture, VoxelVehicles and VoxelFurnitureShop are installed together and all load without startup errors after server restart. **Evidence:** server owner's direct in-game/server observation; exact JAR revisions and startup logs not supplied. This verifies startup only, not integration behavior.
+- [ ] Record the exact Paper/Java and four plugin build versions, confirm expected enable/load order and verify optional integrations degrade safely when absent.
 - [ ] Verify WorldGuard/Lands controls for furniture/vehicle place, break, interact, storage, dye and driving; audit custom hitboxes and all bypass paths. Review open [Furniture PR #44](https://github.com/VoxelHorizons/VoxelFurniture/pull/44) and [Vehicles PR #19](https://github.com/VoxelHorizons/VoxelVehicles/pull/19).
 - [ ] Place/use/remove custom items, blocks, furniture and vehicles; verify reload, chunk unload/load, world change, restart, orphan cleanup, failed placement rollback and ownership retention.
 - [ ] Check vehicle chest accessories/cargo with real inventory metadata through every attach/remove, owner, logout, failed save and restart path. No loss or duplication.
