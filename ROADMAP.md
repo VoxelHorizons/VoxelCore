@@ -166,6 +166,27 @@ Geyser version/build capabilities must match the extension's experimental APIs. 
 
 **Cancelled:** VoxelCore-hosted SQLite multi-currency ledger/wallet ([PR #66 closed unmerged](https://github.com/VoxelHorizons/VoxelCore/pull/66), [issue #65 closed](https://github.com/VoxelHorizons/VoxelCore/issues/65)). Use VaultUnlocked and a compatible economy provider; implement safe actual transactions in VoxelShop instead.
 
+## Owner-reported issue register — 27 October 2026
+
+The 85-question acceptance discussion is a **manual owner-reported test audit**, not 85 independently automated checks. The owner confirmed behavior on Paper 26.3 / Java 25, but did not supply every addon/Geyser/Bedrock client revision or all logs. Use **Owner-confirmed**, not formally **Verified**, until the evidence criteria above are met. Links below are primary issue owners, not evidence of implemented fixes.
+
+| Priority | Primary tracker | Acceptance failure |
+| --- | --- | --- |
+| **P0** | [Furniture #49](https://github.com/VoxelHorizons/VoxelFurniture/issues/49) | Non-OP furniture placement/break not denied in Hub; seat/interact must remain permitted. |
+| **P0** | [Vehicles #22](https://github.com/VoxelHorizons/VoxelVehicles/issues/22) | Non-owner private vehicle ride/modify/remove and cargo access bypass. |
+| **P0** | [Vehicles #23](https://github.com/VoxelHorizons/VoxelVehicles/issues/23) | Hub region vehicle placement and flag enforcement fail. |
+| **P0** | [Furniture #48](https://github.com/VoxelHorizons/VoxelFurniture/issues/48) | Bedrock cupboard bench right-click drops item / sometimes persistent ghost, inventory items tested recoverable. |
+| **P1** | [Core #94](https://github.com/VoxelHorizons/VoxelCore/issues/94) | Bedrock custom block carrier state renders vanilla. |
+| **P1** | [Core #95](https://github.com/VoxelHorizons/VoxelCore/issues/95) | Required Java resource-pack decline/load failure does not disconnect. |
+| **P1** | [Core #96](https://github.com/VoxelHorizons/VoxelCore/issues/96) | Invalid startup content disables plugin despite working live-reload rollback. |
+| **P1** | [Furniture #46](https://github.com/VoxelHorizons/VoxelFurniture/issues/46) | Bedrock furniture rotation / model-change spinning. |
+| **P1** | [Vehicles #24](https://github.com/VoxelHorizons/VoxelVehicles/issues/24) | Bedrock vehicle chest accessory model invisible although storage works. |
+| **P2** | [Core #97](https://github.com/VoxelHorizons/VoxelCore/issues/97) | Bedrock ChestGUI intermittently closes on page/menu switches; Geyser suspected only. |
+| **P2** | [Core #98](https://github.com/VoxelHorizons/VoxelCore/issues/98) | Selected Bedrock glyphs and generated 3D model textures render poorly. |
+| **P2** | [FurnitureShop #14](https://github.com/VoxelHorizons/VoxelFurnitureShop/issues/14) | Extra empty box above Bedrock showroom tooltip. |
+
+**Not a confirmed defect:** untested backup restoration, crash recovery, concurrent furniture inventory viewing, GUI exploit resistance, Bedrock required-pack refusal, old-version full ecosystem parity and large-scale Spark profiling. Do not file these as breakages without reproductions. **Not yet implemented or operational:** showroom purchases, production VoxelShop/ContentManager, multi-currency EssentialsX fork, vehicle dye crafting recipes and Bedrock shader portraits. Track scope under R3/R4 or the owning project's development plan rather than falsely reporting live failures.
+
 ## Maintenance
 
 Update this document when significant work merges: record repository, PR/commit and new remaining acceptance evidence. Use GitHub issues for individual defects and external plugin roadmaps for addon-specific detail. **Do not recreate extra `ROADMAP.md`, `PROGRESS.md`, `HANDOFF.md`, `KNOWN-ISSUES.md`, or dated migration progress files in this repository.** Only this roadmap governs active status; retired historical snapshots remain accessible through Git history.
