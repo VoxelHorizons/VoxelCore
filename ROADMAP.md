@@ -1,6 +1,6 @@
 # Voxel Horizons — Authoritative Development Roadmap
 
-> **Updated 27 October 2026 · initial VoxelCore code-audit baseline `1700f6d1` · live results separately attributed**
+> **Updated 27 October 2026 · initial VoxelCore code-audit baseline `1700f6d1` · 85-question production owner audit incorporated; owner reports remain distinct from certified builds**
 >
 > **This is the only active VoxelCore development roadmap.** The [README](README.md) describes current APIs, [Bedrock operations](docs/bedrock.md) explains setup and validation, and the [tooltip](docs/configurable-tooltips.md) and [currency](docs/vaultunlocked-currencies.md) guides document configuration. None is a separate feature backlog. Previous planning/handoff files have been retired from the working tree and are available through Git history.
 
@@ -14,6 +14,7 @@
 | **Branch only** | Work is in an unmerged branch/PR, not a released default-branch feature |
 | **Open** | Required implementation or evidence remains |
 | **Verified** | Reproduced on pinned real server/client builds, with logs/screenshots and observable acceptance |
+| **Owner-confirmed** | Owner's direct live-server observation; not by itself a substitute for pinned addon/client build IDs, logs and repeatable acceptance evidence |
 | **Deferred/cancelled** | Explicitly outside the current release commitment |
 
 A merged PR alone is not a release certificate. Do not infer percentage complete from task counts. Recheck current HEAD and tests when updating any status.
@@ -81,7 +82,7 @@ Owner: [VoxelShop](https://github.com/VoxelHorizons/VoxelShop) / VaultUnlocked i
 
 ### R4. Menus, authoring and pack operations
 
-- [ ] Define one route per live menu: Java DeluxeMenus plus Bedrock form/CrossplatForms. Preserve `<player>` and `<npc>` arguments, click requirements, placeholders, navigation and permission checks. The DeluxeMenus `feat/bedrock-forms` implementation is **branch only**, not considered released.
+- [x] **Owner-confirmed frontend decision:** Java uses DeluxeMenus; Bedrock uses **VoxelCore ChestGUI** with native Classic chest-screen backgrounds. CrossplatForms was abandoned. The DeluxeMenus forms branch is historical and not required by this active approach. Target-player and Citizens NPC profile arguments work on both editions; offline player profiles remain limited. [ ] Retest inventory click-exploit safety and menu-transition reliability ([Core #97](https://github.com/VoxelHorizons/VoxelCore/issues/97)).
 - [ ] Finish high-value [ContentManager issues #1–#9](https://github.com/VoxelHorizons/ContentManager/issues): reference graph, safe editor, furniture/vehicle/block metadata, glyphs and dependent assets, validated pack build, transactional publish/rollback. [PR #13](https://github.com/VoxelHorizons/ContentManager/pull/13) is open.
 - [ ] Exercise `pack build java`, `pack build bedrock`, `pack build all`, `pack stop`, pack host, stale allocation migration, unsuccessful reload preservation and paired-publish integrity.
 - [ ] Test config upgrades, dependency absence, client rendering on both editions and asset rollback.
@@ -109,21 +110,21 @@ IDs are intentionally preserved from the earlier Bedrock ledger to keep existing
 | B03 | Paired files, receipt, rollback and digest checks | **Implemented/tested components** | Geyser activation, interrupted publish, live rollback |
 | B04 | Unmapped/unsupported reports | **Implemented** | Fresh production corpus and regression fixtures |
 | B05 | Parent/model/predicate/variant Java conversion | **Partial** | Dynamic/unsupported model types and visual fidelity |
-| B06 | Native geometry, attachables and UVs | **Partial** | Real held transforms, animations, UV/cull test |
-| B07 | Block states, static/dynamic tint and animation | **Partial** | Native block variants, live tints and state parity |
+| B06 | Native geometry, attachables and UVs | **Partial — 3D geometry owner-confirmed** | Held 3D item geometry works on Bedrock; some generated 3D textures degrade. Validate atlas/UV/transform visual fidelity ([Core #98](https://github.com/VoxelHorizons/VoxelCore/issues/98)). |
+| B07 | Block states, static/dynamic tint and animation | **Partial — custom block model fails live Bedrock test** | VoxelCore custom carrier-backed blocks display as vanilla note-block states rather than Java's custom block models ([Core #94](https://github.com/VoxelHorizons/VoxelCore/issues/94)). |
 | B08 | Companion model/variant registration | **Partial** | Runtime addon variants, shared identity and revision |
 | B09 | Furniture visual state feed | **Implemented** ([#47 merged](https://github.com/VoxelHorizons/VoxelFurniture/pull/47)) | Real Geyser/client consumption and lifecycle |
-| B10 | World furniture/custom-entity projection | **Partial — owner-confirmed visual defect (27 Oct 2026)** | Bedrock furniture models render in some scenarios but **spin/rotate unexpectedly during spawn and animation-model changes**; reproduce and fix orientation/model-swap transitions, then test multipart, nonuniform transforms, chunk/reconnect and dye. See [VoxelFurniture #46](https://github.com/VoxelHorizons/VoxelFurniture/issues/46). |
-| B11 | Vehicle projection, seats, movement and accessories | **Partial** ([#21 merged](https://github.com/VoxelHorizons/VoxelVehicles/pull/21)) | Real steering/seat/offset, cargo visuals and re-entry |
-| B12 | Bedrock-safe browser pagination | **Implemented** | In-game page progression and no item loss |
-| B13 | Managed glyph allocation and controller range | **Automated tested** | Native rendered icon and language/client parity |
+| B10 | World furniture/custom-entity projection | **Partial — live visual and interaction bugs** | Bedrock furniture renders, seats and stores items, but spins/rotates on spawn/model swap ([Furniture #46](https://github.com/VoxelHorizons/VoxelFurniture/issues/46)); right-clicking bamboo cupboard benches can drop furniture or leave restart-persistent ghosts ([Furniture #48](https://github.com/VoxelHorizons/VoxelFurniture/issues/48)). |
+| B11 | Vehicle projection, seats, movement and accessories | **Partial — driving owner-confirmed** | Bedrock vehicles render and drive/steer/dismount; cargo works and survives reload, but attached chest visual is invisible ([Vehicles #24](https://github.com/VoxelHorizons/VoxelVehicles/issues/24)). |
+| B12 | Bedrock-safe browser pagination | **Partial — transitions unreliable** | Items and browser icons work, but some Bedrock menu/page switches open and immediately close ([Core #97](https://github.com/VoxelHorizons/VoxelCore/issues/97)); item-extraction exploit tests remain open. |
+| B13 | Managed glyph allocation and controller range | **Partial — live font glyph differences** | Some Bedrock glyphs including a branding icon render incorrectly ([Core #98](https://github.com/VoxelHorizons/VoxelCore/issues/98)); collect exact client/codepoint corpus. |
 | B14 | Unmanaged font/literal scan and rewrite | **Implemented** | Run on live configs; audit DB-backed ranks/tags |
-| B15 | DeluxeMenus Bedrock forms | **Branch only** (`feat/bedrock-forms`) | Merge and verify args, conditions, safe clicks |
-| B16 | Profiles, avatars, statistics and tooltip fallback | **Partial** | Full readable profile/forms, no shader assumption |
+| B15 | Bedrock menu frontend (formerly forms) | **Superseded — ChestGUI owner-confirmed** | **CrossplatForms abandoned**; VoxelCore ChestGUI with Bedrock Classic UI replaces forms; Java remains DeluxeMenus. Validate click requirements, menu transitions and inventory safety. |
+| B16 | Profiles, avatars, statistics and tooltip fallback | **Partial — profiles owner-confirmed** | Self/target/NPC information works on Java and Bedrock. Java shader portrait is not supported on Bedrock; previously joined offline profiles currently fail menu existence requirements. |
 | B17 | Signed remote bundle and projection feeds | **Implemented/tested components** | Remote proxy/active revision/replay/failure test |
 | B18 | Versioned backend and client boundary | **Partial** | Per-feature legacy support claims and test builds |
-| B19 | End-to-end real Bedrock acceptance | **Open** | Pinned client/server, screenshot/log test corpus |
-| B20 | Cross-plugin regression and release signoff | **Open** | B01–B19 evidence, support statement, no critical issues |
+| B19 | End-to-end real Bedrock acceptance | **Partial — owner-tested subset** | Live pack, furniture, vehicle, menu and showroom behavior tested, but defects remain and exact Bedrock/Geyser client-version corpus is missing. |
+| B20 | Cross-plugin regression and release signoff | **Open — protection and Bedrock blockers** | Address live protection bypass, persistent furniture ghost, custom-block rendering and documented asset/UI gaps or explicitly narrow launch claims; retain evidence. |
 
 Geyser version/build capabilities must match the extension's experimental APIs. Java fonts/full-screen negative-spacing UI, Java-only shaders and arbitrary model rules are **not** automatically transferable to Bedrock.
 
@@ -135,7 +136,7 @@ Geyser version/build capabilities must match the extension's experimental APIs. 
 | **BEDROCK-LIVE** | Many native/projection features compile but still lack representative client proof. Treat them as implemented or partial, not Verified. |
 | **BEDROCK-FURNITURE-ROTATION** | Owner's Bedrock test (27 Oct 2026) shows visible placed furniture with unexpected rotation/spinning upon spawn and animation model swaps. Reported visually in-game, with a still screenshot provided; exact Geyser/extension/plugin revisions and video not yet captured. Track [VoxelFurniture #46](https://github.com/VoxelHorizons/VoxelFurniture/issues/46). |
 | **STATE-SAFETY** | Furniture, vehicles, showroom inventory and shop payments have distinct persistent state owners. Certify failure/restart paths, not just happy-path startup. |
-| **FRONTEND** | Bedrock DeluxeMenus form work is still on an unmerged branch; external CrossplatForms migration remains a separate repository concern. |
+| **FRONTEND** | Owner chose VoxelCore ChestGUI on Bedrock and DeluxeMenus on Java; CrossplatForms is abandoned. Older form-frontend work is no longer the active plan. Bedrock transitions can close immediately ([Core #97](https://github.com/VoxelHorizons/VoxelCore/issues/97)). |
 
 ### Deferred feature families (not VoxelCore 1.0 blockers unless separately approved)
 
