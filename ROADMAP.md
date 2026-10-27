@@ -43,7 +43,8 @@ Core smoke targets: **1.12.2, 1.13.2, 1.14.4, 1.19.4, 1.20.5, 1.21.4, 26.2, 26.3
 Owner: VoxelCore + Furniture + Vehicles + FurnitureShop.
 
 - [x] **Owner-verified startup (27 October 2026):** VoxelCore, VoxelFurniture, VoxelVehicles and VoxelFurnitureShop are installed together and all load without startup errors after server restart. **Evidence:** server owner's direct in-game/server observation; exact JAR revisions and startup logs not supplied. This verifies startup only, not integration behavior.
-- [ ] Record the exact Paper/Java and four plugin build versions, confirm expected enable/load order and verify optional integrations degrade safely when absent.
+- [x] **Owner-confirmed Paper build (27 October 2026):** `Paper 26.3-209-main@03af8b4` (built 2026-10-20T21:49:44Z; API `26.3.build.209-stable`), from the running server's version output.
+- [ ] Record the Java runtime and four plugin build versions, confirm expected enable/load order and verify optional integrations degrade safely when absent.
 - [ ] Verify WorldGuard/Lands controls for furniture/vehicle place, break, interact, storage, dye and driving; audit custom hitboxes and all bypass paths. Review open [Furniture PR #44](https://github.com/VoxelHorizons/VoxelFurniture/pull/44) and [Vehicles PR #19](https://github.com/VoxelHorizons/VoxelVehicles/pull/19).
 - [ ] Place/use/remove custom items, blocks, furniture and vehicles; verify reload, chunk unload/load, world change, restart, orphan cleanup, failed placement rollback and ownership retention.
 - [ ] Check vehicle chest accessories/cargo with real inventory metadata through every attach/remove, owner, logout, failed save and restart path. No loss or duplication.
