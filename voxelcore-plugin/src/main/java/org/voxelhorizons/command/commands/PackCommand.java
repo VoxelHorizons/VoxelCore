@@ -577,6 +577,7 @@ public final class PackCommand implements SubCommand {
                             localGeyserDataDirectory(plugin));
             final boolean controllerGlyphPages = plugin.getConfig().getBoolean("bedrock.override_controller_glyph_pages", true);
             final String glyphShrink = plugin.getConfig().getString("bedrock.glyph_shrink", "area");
+            final int bedrockRetainedRevisions = plugin.getConfig().getInt("bedrock.generated_pack_retention", 2);
             final long startingRevision = plugin.getContentRuntime().current().revision();
             sender.sendMessage("VoxelCore " + scope.label() + " pack build for " + target.id()
                     + " started asynchronously; the server will remain responsive. Stop it with /vc admin pack stop.");
@@ -588,7 +589,8 @@ public final class PackCommand implements SubCommand {
                     final org.voxelhorizons.pack.BuildProgress progress = buildProgress(plugin, sender, job);
                     try {
                         run(plugin, sender, job, buildScope, target, currentServerTarget, bedrockEnabled, remoteSecret,
-                                geyserDestination, controllerGlyphPages, glyphShrink, startingRevision, progress);
+                                geyserDestination, controllerGlyphPages, glyphShrink, bedrockRetainedRevisions,
+                                startingRevision, progress);
                     } catch (org.voxelhorizons.pack.BuildProgress.Cancelled stopped) {
                         plugin.getLogger().info("[pack build] Stopped (" + stopped.getMessage() + "); nothing was published.");
                         complete(plugin, () -> sender.sendMessage("VoxelCore " + buildScope.label() + " pack build for "
@@ -610,7 +612,8 @@ public final class PackCommand implements SubCommand {
         private void run(VoxelCore plugin, CommandSender sender, BuildJob job, BuildScope scope, JavaPackTarget target,
                          boolean currentServerTarget, boolean bedrockEnabled, byte[] remoteSecret,
                          org.voxelhorizons.pack.GeyserPackPublisher.Destination geyserDestination,
-                         boolean controllerGlyphPages, String glyphShrink, long startingRevision,
+                         boolean controllerGlyphPages, String glyphShrink, int bedrockRetainedRevisions,
+                         long startingRevision,
                          org.voxelhorizons.pack.BuildProgress progress) {
             JavaPackBuildResult output = null;
             if (scope.java()) {
@@ -623,7 +626,7 @@ public final class PackCommand implements SubCommand {
             String bedrockStatus = "";
             if (scope.bedrock() && currentServerTarget && bedrockEnabled) {
                 bedrockStatus = buildBedrock(plugin, target, progress, geyserDestination, remoteSecret,
-                        controllerGlyphPages, glyphShrink);
+                        controllerGlyphPages, glyphShrink, bedrockRetainedRevisions);
             }
             // No checkpoint past here: once Bedrock publishing has started the build completes, so
             // the Java and Bedrock packs never end up from different runs.
@@ -698,7 +701,8 @@ public final class PackCommand implements SubCommand {
         /** Builds and publishes the Bedrock pack; returns the status line. A stop request propagates. */
         private String buildBedrock(VoxelCore plugin, JavaPackTarget target, org.voxelhorizons.pack.BuildProgress progress,
                                     org.voxelhorizons.pack.GeyserPackPublisher.Destination geyserDestination,
-                                    byte[] remoteSecret, boolean controllerGlyphPages, String glyphShrink) {
+                                    byte[] remoteSecret, boolean controllerGlyphPages, String glyphShrink,
+                                    int bedrockRetainedRevisions) {
             try {
                 // 1.21.4+: item_model definitions; 1.14-1.21.3: Geyser legacy custom_model_data definitions.
                 String vanillaNote = "";
@@ -730,7 +734,19 @@ public final class PackCommand implements SubCommand {
                         + (bedrock.unsupportedReasonSummary.isEmpty() ? ""
                         : " Reasons: " + bedrock.unsupportedReasonSummary + ".")
                         + vanillaNote;
+                String previousPublishedRevision = null;
                 if (geyserDestination.root != null) {
+                    // Pin the previous verified publication for a safe local rollback, even
+                    // if more recently built but unpublished revision folders exist.
+                    try {
+                        org.voxelhorizons.pack.GeyserPackPublisher.PublicationState previous =
+                                org.voxelhorizons.pack.GeyserPackPublisher.inspect(geyserDestination.root);
+                        if ("VERIFIED_ON_DISK".equals(previous.status))
+                            previousPublishedRevision = previous.revision;
+                    } catch (java.io.IOException inspectFailure) {
+                        plugin.getLogger().warning("Unable to inspect previous Bedrock publication for retention: "
+                                + inspectFailure.getMessage());
+                    }
                     // Last stop checkpoint: once publishing starts it completes.
                     progress.report("Bedrock: publishing to Geyser at " + geyserDestination.root);
                     new org.voxelhorizons.pack.GeyserPackPublisher().publish(bedrock, geyserDestination.root);
@@ -754,6 +770,24 @@ public final class PackCommand implements SubCommand {
                     bedrockStatus += " Signed remote bundle exported"
                             + (plugin.getResourcePackHost().isRunning() ? " and served at /bedrock/."
                             : "; enable resource_pack.host to serve it.");
+                }
+                // Only prune after local publication and any signed remote bundle export
+                // succeed. Failed or cancelled builds leave previous revision exports intact.
+                if (bedrockRetainedRevisions > 0) {
+                    try {
+                        int removed = org.voxelhorizons.pack.BedrockPackRetention.prune(
+                                plugin.getPackManager().outputRoot().resolve("bedrock"),
+                                bedrock.revision, previousPublishedRevision, bedrockRetainedRevisions);
+                        if (removed > 0) {
+                            plugin.getLogger().info("Bedrock: removed " + removed + " older generated pack revision(s).");
+                            bedrockStatus += " Cleaned " + removed + " old Bedrock pack revision(s).";
+                        }
+                    } catch (java.io.IOException cleanupFailure) {
+                        // A completed pack build must not be reported as failed just because
+                        // removing an old export was denied by the filesystem.
+                        plugin.getLogger().log(Level.WARNING, "Bedrock pack revision cleanup failed", cleanupFailure);
+                        bedrockStatus += " Old pack cleanup skipped: " + cleanupFailure.getMessage();
+                    }
                 }
                 return bedrockStatus;
             } catch (org.voxelhorizons.pack.BuildProgress.Cancelled stopped) {
