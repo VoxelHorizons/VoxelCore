@@ -64,6 +64,19 @@ Inspect `plugins/VoxelCore/build/resource-packs/bedrock/<revision>/`:
 - `unsupported-items.txt` — items lacking a valid mapping/preview, with reasons
 - `unsupported-geometry.txt` — icon produced, but native geometry/attachable export unsupported
 
+**Local build cleanup:** After a successful Bedrock build and any configured Geyser/remote
+publication, VoxelCore prunes older revision folders in
+`build/resource-packs/bedrock/`. The `bedrock.generated_pack_retention` setting
+defaults to `2` (current plus one recent revision); set it to `0` to disable
+automatic cleanup or increase it for longer rollback history. The current revision
+and the previously verified local Geyser publication are always protected, even
+if this temporarily exceeds the configured count. Failed or cancelled builds
+do not trigger cleanup. Only complete, SHA-256-named VoxelCore export directories
+with known generated files are removed. `icon-cache/`, `glyph-tiles.json`,
+unrecognised or modified folders, and packs already installed in Geyser are
+not affected. Back up revisions you wish to keep indefinitely outside this build
+output directory.
+
 Configured publication writes `packs/voxelcore.mcpack` and `custom_mappings/voxelcore-items.json` under Geyser, followed by `voxelcore-publication.json` (revision + SHA-256 digests). `pack info` shows publication status. **VERIFIED_ON_DISK does not prove Geyser loaded the revision or that a Bedrock player accepted it.** Restart Geyser after changing mapping/entity registration, and reconnect Bedrock clients. For rollback, stop the owning Geyser, restore **both** files from the same previously exported revision, restart, reconnect and check the receipt. Never restore only one half.
 
 VoxelCore's Java resource-pack `required` setting does not enforce Geyser's Bedrock pack policy. Configure required-pack behavior on Geyser itself. If Floodgate is installed only on a proxy, correctly configure backend Floodgate and key transfer; otherwise the backend may not recognize a Bedrock session.
