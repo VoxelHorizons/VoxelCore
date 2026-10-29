@@ -38,7 +38,7 @@ public class UiGlyphCompilerTest {
         write(new File(pack, "content/ui.yml"),
                 "ui:\n  warps_menu:\n    path: ui/npc/warps_menu.png\n" +
                 "    scale_ratio: 18\n    y_position: 8\n    gui: true\n" +
-                "  z_smile:\n    path: ui/smile.png\n    scale_ratio: 18\n");
+                "  z_smile:\n    path: ui/smile.png\n    scale_ratio: 18\n    bedrock_scale: 0.5\n");
 
         Path build = temporaryFolder.newFolder("build").toPath();
         Path renderAllocations = build.resolve("render-allocations.yml");
@@ -53,6 +53,7 @@ public class UiGlyphCompilerTest {
         assertEquals(8, glyph.yPosition());
         assertEquals(177, glyph.advance());
         assertTrue(glyph.gui());
+        assertEquals(1.0D, glyph.bedrockScale(), 0.0D);
         assertEquals(0xE200, glyph.codePoint());
         assertEquals(glyph.character(), registry.resolveAliases(":warps_menu:"));
         assertEquals(glyph.character(), registry.resolveAliases(":voxel/warps_menu:"));
@@ -67,6 +68,7 @@ public class UiGlyphCompilerTest {
 
         UiGlyphDefinition inline = registry.get(ContentID.of("voxel", "z_smile")).get();
         assertTrue(!inline.gui());
+        assertEquals(0.5D, inline.bedrockScale(), 0.0D);
         String permissionSample = ":z_smile::warps_menu::offset_-16:";
         assertEquals("\u00A7f" + inline.character() + ":warps_menu::offset_-16:",
                 resolver.resolve(permissionSample, true, false));
