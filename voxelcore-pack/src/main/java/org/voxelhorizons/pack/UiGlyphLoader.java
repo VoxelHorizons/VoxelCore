@@ -141,7 +141,7 @@ public final class UiGlyphLoader {
         for (ContentID id : ids) {
             RawGlyph glyph = raw.get(id);
             resolved.put(id, new UiGlyphDefinition(id, glyph.texture, glyph.scaleRatio, glyph.yPosition,
-                    glyph.advance, glyph.gui, active.get(id).intValue(), glyph.bedrockScaleRatio));
+                    glyph.advance, glyph.gui, active.get(id).intValue()));
         }
         if (persist) {
             if (!migrated.isEmpty()) backupLegacyAllocations(allocationFile);
@@ -180,7 +180,7 @@ public final class UiGlyphLoader {
     }
 
     private static RawGlyph parseGlyph(ContentPack pack, Path file, ContentID id, Map<?, ?> map) {
-        rejectUnknown(map, file, id.toString(), "path", "scale_ratio", "bedrock_scale_ratio", "y_position", "symbol", "gui");
+        rejectUnknown(map, file, id.toString(), "path", "scale_ratio", "y_position", "symbol", "gui");
         String authoredPath = requireString(map.get("path"), "path", id, file).replace('\\', '/');
         if (authoredPath.startsWith("/") || authoredPath.contains("..")
                 || !authoredPath.toLowerCase(java.util.Locale.ROOT).endsWith(".png")
@@ -212,15 +212,6 @@ public final class UiGlyphLoader {
         if (scaleRatio < 1 || scaleRatio > 256) {
             throw new ContentLoadException("scale_ratio must be between 1 and 256 for " + id);
         }
-        // A world text display can render Bedrock glyph pages at a different apparent
-        // size than Java's bitmap font. Allow an opt-in Bedrock height without changing
-        // the Java provider, codepoint, layout advance, or other glyphs.
-        int bedrockScaleRatio = map.containsKey("bedrock_scale_ratio")
-                ? requireInteger(map.get("bedrock_scale_ratio"), "bedrock_scale_ratio", id, file)
-                : scaleRatio;
-        if (bedrockScaleRatio < 1 || bedrockScaleRatio > 256) {
-            throw new ContentLoadException("bedrock_scale_ratio must be between 1 and 256 for " + id);
-        }
         int yPosition = map.containsKey("y_position")
                 ? requireInteger(map.get("y_position"), "y_position", id, file)
                 : Math.min(8, scaleRatio);
@@ -241,7 +232,7 @@ public final class UiGlyphLoader {
             requirePrivateUse(explicit.intValue(), id);
         }
         return new RawGlyph(pack.manifest().namespace() + ":" + resourcePath, scaleRatio, yPosition,
-                advance, gui, explicit, bedrockScaleRatio);
+                advance, gui, explicit);
     }
 
     private static void ensureVisible(BufferedImage image, ContentID id) {
@@ -440,16 +431,14 @@ public final class UiGlyphLoader {
     private static final class RawGlyph {
         private final String texture;
         private final int scaleRatio;
-        private final int bedrockScaleRatio;
         private final int yPosition;
         private final int advance;
         private final boolean gui;
         private final Integer explicitCodePoint;
         private RawGlyph(String texture, int scaleRatio, int yPosition, int advance,
-                         boolean gui, Integer explicitCodePoint, int bedrockScaleRatio) {
+                         boolean gui, Integer explicitCodePoint) {
             this.texture = texture; this.scaleRatio = scaleRatio; this.yPosition = yPosition;
             this.advance = advance; this.gui = gui; this.explicitCodePoint = explicitCodePoint;
-            this.bedrockScaleRatio = bedrockScaleRatio;
         }
     }
 
