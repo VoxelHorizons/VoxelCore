@@ -7,7 +7,6 @@ public final class UiGlyphDefinition {
     private final ContentID id;
     private final String texture;
     private final int scaleRatio;
-    private final int bedrockScaleRatio;
     private final int yPosition;
     private final int advance;
     private final boolean gui;
@@ -15,15 +14,9 @@ public final class UiGlyphDefinition {
 
     UiGlyphDefinition(ContentID id, String texture, int scaleRatio, int yPosition,
                       int advance, boolean gui, int codePoint) {
-        this(id, texture, scaleRatio, yPosition, advance, gui, codePoint, scaleRatio);
-    }
-
-    UiGlyphDefinition(ContentID id, String texture, int scaleRatio, int yPosition,
-                      int advance, boolean gui, int codePoint, int bedrockScaleRatio) {
         this.id = id;
         this.texture = texture;
         this.scaleRatio = scaleRatio;
-        this.bedrockScaleRatio = bedrockScaleRatio;
         this.yPosition = yPosition;
         this.advance = advance;
         this.gui = gui;
@@ -33,8 +26,6 @@ public final class UiGlyphDefinition {
     public ContentID id() { return id; }
     public String texture() { return texture; }
     public int scaleRatio() { return scaleRatio; }
-    /** Bedrock-only bitmap height before the atlas' calibrated pixel-density scaling. */
-    public int bedrockScaleRatio() { return bedrockScaleRatio; }
     public int yPosition() { return yPosition; }
     public int advance() { return advance; }
     public boolean gui() { return gui; }
