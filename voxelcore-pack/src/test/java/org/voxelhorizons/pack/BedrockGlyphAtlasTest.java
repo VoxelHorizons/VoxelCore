@@ -68,6 +68,19 @@ public class BedrockGlyphAtlasTest {
         assertEquals(0xffffffff, out.getRGB(1, 0));
     }
 
+    @Test public void perGlyphScaleShrinksOnlySelectedBedrockGlyphEvenInNativeMode() {
+        BufferedImage question = new BufferedImage(9, 12, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < 12; y++) for (int x = 0; x < 9; x++)
+            question.setRGB(x, y, (x + y) % 2 == 0 ? 0xffffffff : 0xff404040);
+        BedrockGlyphAtlas.Glyph normal = new BedrockGlyphAtlas.Glyph(question, 12);
+        BedrockGlyphAtlas.Glyph help = new BedrockGlyphAtlas.Glyph(question, 12, 0.5D);
+        double ratio = BedrockGlyphAtlas.pixelRatio(Arrays.asList(normal, help));
+        assertEquals(1.0D, ratio, 0.0D);
+        assertEquals(12, BedrockGlyphAtlas.sized(normal, ratio, BedrockGlyphAtlas.Shrink.NATIVE).getHeight());
+        assertEquals(6, BedrockGlyphAtlas.sized(help, ratio, BedrockGlyphAtlas.Shrink.NATIVE).getHeight());
+        assertEquals(5, BedrockGlyphAtlas.sized(help, ratio, BedrockGlyphAtlas.Shrink.AREA).getWidth());
+    }
+
     @Test public void smallArtGrowsByWholeMultiples() {
         BufferedImage icon = new BufferedImage(5, 4, BufferedImage.TYPE_INT_ARGB);
         icon.setRGB(0, 0, 0xffff0000);
