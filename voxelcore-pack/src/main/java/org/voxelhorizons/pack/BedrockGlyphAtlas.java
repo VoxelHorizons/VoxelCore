@@ -33,6 +33,8 @@ final class BedrockGlyphAtlas {
     static final int MIN_CELL = 16;
     /** Largest generated cell: 4096px pages, as the Kafal converter uses for rank tags. */
     static final int MAX_CELL = 256;
+    /** Vanilla bitmap glyphs are 8px; twice that height counts as large inline artwork. */
+    static final int LARGE_GLYPH_HEIGHT = 16;
 
     static int append(Path contentRoot, Path allocationManifest, Map<String, byte[]> javaAssets,
                       Map<String, byte[]> bedrockAssets) throws IOException {
@@ -69,7 +71,6 @@ final class BedrockGlyphAtlas {
             // GUI overlays (menu backgrounds) and tall pictures are Java screen art, not inline text.
             if (glyph.gui()) continue;
             if (glyph.scaleRatio() > 32) { skipped.add(label + ": Java height " + glyph.scaleRatio() + " is too tall for a Bedrock text glyph"); continue; }
-            if (glyph.bedrockScaleRatio() > 32) { skipped.add(label + ": Bedrock height " + glyph.bedrockScaleRatio() + " is too tall for a Bedrock text glyph"); continue; }
             int codePoint = glyph.codePoint();
             if (codePoint < 0xE200 || codePoint > 0xF3FF) { skipped.add(label + ": codepoint outside U+E200..U+F3FF"); continue; }
             String[] ref = glyph.texture().split(":", 2);
@@ -81,12 +82,12 @@ final class BedrockGlyphAtlas {
             if (icon == null) { skipped.add(label + ": empty or unreadable bitmap"); continue; }
             String unfit = unfit(icon);
             if (unfit != null) { skipped.add(label + ": " + unfit); continue; }
-            // Scale to the effective Bedrock bitmap height, preserving the visible fraction
-            // when the source has transparent padding. By default this equals Java height;
-            // an explicit bedrock_scale_ratio changes only this one generated glyph.
+            // Use the untrimmed source height to distinguish native-resolution large
+            // glyphs from font bitmaps that Java explicitly downscales. Cropping must not
+            // affect this decision.
             Glyph sized = new Glyph(reduceBlocks(icon),
                     visibleHeight(glyph.scaleRatio(), icon.getHeight(), original.getHeight()),
-                    visibleHeight(glyph.bedrockScaleRatio(), icon.getHeight(), original.getHeight()));
+                    (double) original.getHeight() / glyph.scaleRatio(), glyph.scaleRatio());
             if (pending.containsKey(Integer.valueOf(codePoint)) || occupiedByAuthoredPage(bedrockAssets, codePoint))
                 throw new IOException("Bedrock font cell U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT)
                         + " is already occupied (managed glyph " + glyph.id() + ")");
@@ -97,7 +98,8 @@ final class BedrockGlyphAtlas {
         double ratio = pixelRatio(pending.values());
         Map<Integer, BufferedImage> drawn = new TreeMap<Integer, BufferedImage>();
         for (Map.Entry<Integer, Glyph> entry : pending.entrySet())
-            drawn.put(entry.getKey(), sized(entry.getValue().art, entry.getValue().bedrockHeight, ratio, shrink));
+            drawn.put(entry.getKey(), sized(entry.getValue().art, entry.getValue().javaHeight,
+                    effectiveRatio(entry.getValue(), ratio), shrink));
         writePages(drawn, bedrockAssets);
         return count;
     }
@@ -171,7 +173,8 @@ final class BedrockGlyphAtlas {
                             continue;
                         }
                         pending.put(Integer.valueOf(codePoint),
-                                new Glyph(reduceBlocks(icon), visibleHeight(javaHeight, icon.getHeight(), cellHeight)));
+                                new Glyph(reduceBlocks(icon), visibleHeight(javaHeight, icon.getHeight(), cellHeight),
+                                        (double) cellHeight / javaHeight, javaHeight));
                         count++;
                     }
                 }
@@ -205,25 +208,39 @@ final class BedrockGlyphAtlas {
         return Math.max(1, (int) Math.round((double) javaHeight * trimmedHeight / fullHeight));
     }
 
-    /** Original Java height anchors the shared ratio; Bedrock height controls only this cell. */
+    /** Java's actual bitmap height and the source art's untrimmed pixel density. */
     static final class Glyph {
         final BufferedImage art;
         final int javaHeight;
-        final int bedrockHeight;
+        final double sourcePixelsPerJavaPixel;
+        final int providerHeight;
         Glyph(BufferedImage art, int javaHeight) {
-            this(art, javaHeight, javaHeight);
+            this(art, javaHeight, Double.POSITIVE_INFINITY, javaHeight);
         }
-        Glyph(BufferedImage art, int javaHeight, int bedrockHeight) {
+        Glyph(BufferedImage art, int javaHeight, double sourcePixelsPerJavaPixel, int providerHeight) {
             this.art = art;
             this.javaHeight = Math.max(1, javaHeight <= 0 ? 8 : javaHeight);
-            this.bedrockHeight = Math.max(1, bedrockHeight <= 0 ? 8 : bedrockHeight);
+            this.sourcePixelsPerJavaPixel = sourcePixelsPerJavaPixel;
+            this.providerHeight = providerHeight;
         }
     }
 
     /**
-     * Bedrock page pixels per Java pixel, calculated from original Java dimensions so
-     * per-glyph Bedrock height overrides never alter the scaling of unrelated glyphs.
-     * Shared by every glyph so their relative default sizes match
+     * Rank tags and other normal-height font glyphs need the shared Bedrock correction.
+     * A larger bitmap already authored at its native Java height must not get an extra
+     * enlargement on top: Bedrock text displays otherwise show it oversized. Limit that
+     * *additional* upscale by the source's actual pixels per Java font pixel; never
+     * downscale beyond what the Java font definition requests, or change smaller icons.
+     */
+    static double effectiveRatio(Glyph glyph, double sharedRatio) {
+        if (glyph.providerHeight < LARGE_GLYPH_HEIGHT) return sharedRatio;
+        return Math.min(sharedRatio, Math.max(1.0, glyph.sourcePixelsPerJavaPixel));
+    }
+
+    /**
+     * Bedrock page pixels per Java pixel, calculated from Java bitmap dimensions.
+     * Shared by normal-height glyphs; native-resolution large glyphs cap only their
+     * own extra enlargement so unrelated ranks and HUDs remain unchanged.
      * Java (live test: a 16px flag next to 11px rank tags of the same Java height looked too big).
      * Taken from the wide text tags (aspect >= 2), whose lettering suffers most from resampling,
      * so they stay pixel-exact; otherwise from all pixel-art glyphs. Median, clamped to 0.25..4.
