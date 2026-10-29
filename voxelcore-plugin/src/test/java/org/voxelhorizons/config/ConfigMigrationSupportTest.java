@@ -47,6 +47,28 @@ public class ConfigMigrationSupportTest {
         assertTrue(!current.contains("ui.tooltip"));
     }
     @Test
+    public void addsPhysicalContainerTitlesWhileKeepingLegacyChestConfiguration() throws Exception {
+        YamlConfiguration current = new YamlConfiguration();
+        current.loadFromString("version: 9\nui:\n  chest_titles:\n"
+                + "    enabled: true\n    single: '&f:custom_chest:'\n    double: '&f:custom_large:'\n");
+        YamlConfiguration defaults = new YamlConfiguration();
+        defaults.loadFromString("version: 10\nui:\n  chest_titles:\n"
+                + "    enabled: false\n    single: ''\n    double: ''\n"
+                + "  container_titles:\n    enabled: false\n"
+                + "    chest:\n      single: ''\n      double: ''\n    barrel: ''\n");
+
+        ConfigMigrationSupport.merge(current, defaults, 10);
+
+        assertEquals(10, current.getInt("version"));
+        assertTrue(current.getBoolean("ui.chest_titles.enabled"));
+        assertEquals("&f:custom_chest:", current.getString("ui.chest_titles.single"));
+        assertEquals("&f:custom_large:", current.getString("ui.chest_titles.double"));
+        assertTrue(current.contains("ui.container_titles.barrel"));
+        assertEquals("", current.getString("ui.container_titles.barrel"));
+        assertTrue(!current.getBoolean("ui.container_titles.enabled"));
+    }
+
+    @Test
     public void addsBrowserTitleDefaultsWhilePreservingExistingUiSettings() throws Exception {
         YamlConfiguration current = new YamlConfiguration();
         current.loadFromString("version: 6\nui:\n  chest_titles:\n    single: '&eExisting title'\n"
