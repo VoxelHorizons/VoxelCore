@@ -44,6 +44,19 @@ ui:
 
 `path` is relative to `assets/<pack namespace>/textures/`. `scale_ratio` becomes the bitmap provider height and defaults to the PNG height. `y_position` becomes its ascent, defaults to `min(8, scale_ratio)`, may be negative, and cannot exceed `scale_ratio`. `gui` defaults to `false`; when `true`, the placeholder automatically appends the exact negative rendered advance so following title text returns to its original horizontal position. PNG dimensions and the scale ratio are limited to 256. An optional `symbol` may assign one private-use Unicode character; otherwise VoxelCore allocates a stable character and preserves the allocation in `glyph-allocations.yml`.
 
+For an inline glyph that appears at a different size in a **Bedrock text display** than in Java, the optional `bedrock_scale_ratio` overrides that glyph's bitmap height **only in the generated Bedrock font atlas**. It defaults to `scale_ratio`, so existing ranks, tags, HUDs, and other glyphs are unchanged. The Java font provider, glyph codepoint, ascent, and Java advance are not modified. This is a compiler-side setting: rebuild the normal Java and Bedrock packs rather than editing `font/glyph_XX.png` by hand. For example, the help-box question mark rendered from a 16px-high Java font can be tested at half the Bedrock height:
+
+```yaml
+ui:
+  help_icon:
+    path: block/guide/help_icon.png
+    scale_ratio: 16
+    y_position: 15
+    bedrock_scale_ratio: 8
+```
+
+The height is still combined with Bedrock's shared pixel-density calibration and transparent cropping; `8` is an initial 50% correction, not a promise of identical world-space dimensions on every Bedrock device. Adjust the value from actual Java/Bedrock text-display comparisons, keeping other glyph definitions at their existing defaults.
+
 On Bedrock (Geyser), every `gui: true` definition is also exported as a chest-screen background: the Bedrock pack's `ui/chest_screen.json` shows the image whenever an inventory title contains that glyph, sized by `scale_ratio`, aligned for the conventional `:offset_-8:` prefix and placed vertically by `y_position`, and hides the default Bedrock title text for that menu. On those menus Bedrock's grey chest frame and close button are replaced by the Java container texture (`assets/minecraft/textures/gui/container/generic_54.png` from your packs, else vanilla), so a partly transparent retexture looks the same as on Java. This applies to Bedrock's Classic UI chest screen; the Pocket UI layout is unchanged. No server-side change is needed; a content pack that supplies its own `ui/chest_screen.json` keeps it and the generated backgrounds are skipped (listed in `unsupported-items.txt`).
 
 Menu rows are deliberately not configuration data. The same cropped overlay can cover any subset of slots in a 1–6 row inventory; its vertical placement is controlled only by `scale_ratio` and `y_position`.
