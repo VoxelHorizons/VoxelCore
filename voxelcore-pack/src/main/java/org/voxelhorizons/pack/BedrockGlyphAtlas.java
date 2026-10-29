@@ -81,7 +81,7 @@ final class BedrockGlyphAtlas {
             String unfit = unfit(icon);
             if (unfit != null) { skipped.add(label + ": " + unfit); continue; }
             // Java scales the whole bitmap to its font height; the trimmed part keeps its share.
-            Glyph sized = new Glyph(reduceBlocks(icon), visibleHeight(glyph.scaleRatio(), icon.getHeight(), original.getHeight()));
+            Glyph sized = new Glyph(reduceBlocks(icon), visibleHeight(glyph.scaleRatio(), icon.getHeight(), original.getHeight()), glyph.bedrockScale());
             if (pending.containsKey(Integer.valueOf(codePoint)) || occupiedByAuthoredPage(bedrockAssets, codePoint))
                 throw new IOException("Bedrock font cell U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT)
                         + " is already occupied (managed glyph " + glyph.id() + ")");
@@ -92,7 +92,7 @@ final class BedrockGlyphAtlas {
         double ratio = pixelRatio(pending.values());
         Map<Integer, BufferedImage> drawn = new TreeMap<Integer, BufferedImage>();
         for (Map.Entry<Integer, Glyph> entry : pending.entrySet())
-            drawn.put(entry.getKey(), sized(entry.getValue().art, entry.getValue().javaHeight, ratio, shrink));
+            drawn.put(entry.getKey(), sized(entry.getValue(), ratio, shrink));
         writePages(drawn, bedrockAssets);
         return count;
     }
@@ -204,9 +204,14 @@ final class BedrockGlyphAtlas {
     static final class Glyph {
         final BufferedImage art;
         final int javaHeight;
+        final double bedrockScale;
         Glyph(BufferedImage art, int javaHeight) {
+            this(art, javaHeight, 1.0D);
+        }
+        Glyph(BufferedImage art, int javaHeight, double bedrockScale) {
             this.art = art;
             this.javaHeight = Math.max(1, javaHeight <= 0 ? 8 : javaHeight);
+            this.bedrockScale = bedrockScale;
         }
     }
 
@@ -238,6 +243,13 @@ final class BedrockGlyphAtlas {
      * multiples (else nearest) when growing, nearest (pixel art stays crisp) when shrinking by
      * less than half, and smooth only for genuinely large images.
      */
+    /** Apply an opt-in Bedrock-only per-glyph scale without changing the shared ratio. */
+    static BufferedImage sized(Glyph glyph, double ratio, Shrink shrink) {
+        // Even in NATIVE mode an explicit Bedrock shrink must be honoured.
+        Shrink mode = glyph.bedrockScale < 1.0D ? Shrink.AREA : shrink;
+        return sized(glyph.art, glyph.javaHeight, ratio * glyph.bedrockScale, mode);
+    }
+
     static BufferedImage sized(BufferedImage art, int javaHeight, double ratio) {
         return sized(art, javaHeight, ratio, Shrink.AREA);
     }
