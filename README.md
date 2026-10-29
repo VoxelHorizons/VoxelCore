@@ -92,15 +92,21 @@ plugins/VoxelCore/assets/tooltip/
 
 These files are the default tooltip border templates bundled with the plugin. Edit the pixels in place and the next `pack validate` / `pack build` uses those files instead of the embedded fallback artwork. The three templates must remain exactly `2x38` pixels so their font advances remain stable. Existing files are never overwritten during startup, so plugin updates preserve local artwork changes. An optional `right_offset.png` may also be supplied at `4x38`; otherwise VoxelCore keeps its built-in offset variant.
 
-Physical chest titles can optionally be prefixed with any normal VoxelCore UI/offset placeholders. This does not add or bundle chest artwork: define the image through the ordinary `ui:` content system, then reference its placeholder from `config.yml`. Virtual/plugin-created chest GUIs are not modified.
+Physical container titles can use normal VoxelCore UI glyph and offset placeholders. Define any background artwork through the ordinary `ui:` content system and reference its glyph in `config.yml`. Only physical block-backed inventories are modified; virtual/plugin-created GUIs, entity inventories and vehicle inventories keep their own titles.
 
 ```yaml
 ui:
-  chest_prefixes:
+  container_titles:
     enabled: true
-    single: ':offset_-8::generic_27_top::offset_8:'
-    double: ':offset_-8::generic_54_top::offset_8:'
+    chest:
+      single: '&f:offset_-8::generic_27_top::offset_8:Chest'
+      double: '&f:offset_-8::generic_54_top::offset_8:Large Chest'
+    barrel: '&f:offset_-8::barrel_background::offset_8:Barrel'
 ```
+
+The `barrel_background` glyph is an example, not a bundled image: supply it in your content. Other physical block containers can use their lower-case material name (for example `hopper`, `dispenser`, `furnace`, `blast_furnace`, `smoker` and `brewing_stand`). The `shulker_box` key applies to all colours; an individual colour, such as `red_shulker_box`, can override it.
+
+The original `ui.chest_titles` configuration remains supported. When `ui.container_titles.enabled` is true, non-empty `container_titles.chest.single` and `container_titles.chest.double` values override the corresponding legacy chest values. Unconfigured containers retain their normal names. Title resolution uses the existing modern Paper initial-open override with the older Bukkit fallback. The Bedrock generated chest-screen background artwork remains a separate, Classic UI-only feature.
 
 When PlaceholderAPI is installed, VoxelCore registers an optional persistent `voxelcore` expansion. `%voxelcore_font_staff%` resolves exactly like `:staff:`, including GUI spacing behavior, while `%voxelcore_font_voxel/staff%` selects the explicit `voxel:staff` ContentID when aliases are ambiguous. Font names may contain underscores. Unknown or ambiguous names remain unresolved, and VoxelCore continues to work without PlaceholderAPI installed.
 

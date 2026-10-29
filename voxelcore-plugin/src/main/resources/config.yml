@@ -61,9 +61,21 @@ ui:
     #   x_offset: 30
   chest_titles:
     enabled: false
-    # Full titles used for real physical chests. Normal VoxelCore UI/offset placeholders are supported.
+    # Legacy chest settings. Still supported, including on existing installations.
     single: ''
     double: ''
+  container_titles:
+    enabled: false
+    # Physical block containers only; virtual/plugin inventory menus are unaffected.
+    # Full titles support & colors, :ui_glyph: and :offset_<pixels>: placeholders.
+    # Non-empty chest titles here take precedence over the legacy chest_titles above.
+    chest:
+      single: ''
+      double: ''
+    barrel: ''
+    # Other block materials can be configured by their lowercase Bukkit material name.
+    # For example: hopper, dropper, dispenser, furnace, blast_furnace,
+    # smoker, brewing_stand, shulker_box (all colours).
 
   browser:
     # Inventory titles for /vc admin item ui and /vc admin block ui.

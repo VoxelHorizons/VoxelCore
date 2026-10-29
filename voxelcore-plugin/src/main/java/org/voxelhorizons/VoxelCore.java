@@ -232,6 +232,7 @@ public final class VoxelCore extends JavaPlugin {
                     config.getBoolean("ui.chest_titles.enabled", false),
                     config.getString("ui.chest_titles.single", ""),
                     config.getString("ui.chest_titles.double", ""));
+            configureContainerTitles();
             getServer().getPluginManager().registerEvents(inventoryTitlePlaceholderListener, this);
             new PlayerListPlaceholderSynchronizer(this, textPlaceholderService).start();
             PlaceholderApiIntegration.registerIfAvailable(this, textPlaceholderService);
@@ -341,7 +342,25 @@ public final class VoxelCore extends JavaPlugin {
                     config.getBoolean("ui.chest_titles.enabled", false),
                     config.getString("ui.chest_titles.single", ""),
                     config.getString("ui.chest_titles.double", ""));
+            configureContainerTitles();
         }
+    }
+
+    /**
+     * Config values are material-based so new physical inventory blocks can be configured
+     * without introducing newer Bukkit interfaces into the shared 1.12 plugin module.
+     */
+    private void configureContainerTitles() {
+        org.bukkit.configuration.ConfigurationSection section =
+                config.getConfigurationSection("ui.container_titles");
+        java.util.Map<String, String> titles = new java.util.HashMap<String, String>();
+        if (section != null) {
+            for (String key : section.getKeys(true)) {
+                if (section.isString(key)) titles.put(key, section.getString(key));
+            }
+        }
+        inventoryTitlePlaceholderListener.updateContainerTitles(
+                config.getBoolean("ui.container_titles.enabled", false), titles);
     }
 
     public VersionAdapter getVersionAdapter() { return versionAdapter; }
