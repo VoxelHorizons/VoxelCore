@@ -370,6 +370,20 @@ public class BedrockPackCompilerTest {
         for (int y = 0; y < cell; y++) for (int x = 0; x < cell; x++)
             assertEquals("Rank glyph pixels must be identical", before.getRGB(left + x, top + y),
                     after.getRGB(left + x, top + y));
+
+        // Inverse case: changing a wide tag must not shift the shared calibration,
+        // because that would unexpectedly resize every unrelated glyph on the page.
+        write(definition, base + "  rank_tag:\n    path: ui/rank.png\n    scale_ratio: 8\n"
+                + "    bedrock_scale_ratio: 4\n");
+        BedrockPackCompiler.Result rankResized = new BedrockPackCompiler().compile(
+                root, temp.newFolder().toPath(), allocations);
+        try (ZipFile zip = new ZipFile(rankResized.directory.resolve("voxelcore.mcpack").toFile())) {
+            java.awt.image.BufferedImage third = javax.imageio.ImageIO.read(
+                    zip.getInputStream(zip.getEntry("font/glyph_E2.png")));
+            assertEquals("Help glyph must not depend on the tag's Bedrock override",
+                    17, visibleGlyphHeight(third, helpCodePoint));
+            assertEquals(6, visibleGlyphHeight(third, rankCodePoint));
+        }
     }
 
     private static int visibleGlyphHeight(java.awt.image.BufferedImage page, int codePoint) {
