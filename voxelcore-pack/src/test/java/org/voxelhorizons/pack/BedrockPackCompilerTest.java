@@ -311,6 +311,78 @@ public class BedrockPackCompilerTest {
             }
         }
     }
+
+    @Test public void individualBedrockGlyphHeightDoesNotResizeRanksOrJavaFont() throws Exception {
+        Path root = fixture(), out = temp.newFolder().toPath();
+        Path definition = root.resolve("demo/content/ui.yml");
+        Path images = root.resolve("demo/assets/demo/textures/ui");
+        Files.createDirectories(images);
+
+        // Matches the actual help-box glyph: transparent 16x16 image with 9x12 visible pixels.
+        java.awt.image.BufferedImage help = new java.awt.image.BufferedImage(16, 16, 2);
+        for (int y = 2; y < 14; y++) for (int x = 3; x < 12; x++)
+            help.setRGB(x, y, 0xffffffff);
+        javax.imageio.ImageIO.write(help, "png", images.resolve("help.png").toFile());
+
+        // A wide rank glyph anchors the shared atlas pixel-density ratio at 11/8.
+        java.awt.image.BufferedImage rank = new java.awt.image.BufferedImage(22, 11, 2);
+        for (int y = 0; y < 11; y++) for (int x = 0; x < 22; x++)
+            rank.setRGB(x, y, (x + y) % 2 == 0 ? 0xff123456 : 0xffabcdef);
+        javax.imageio.ImageIO.write(rank, "png", images.resolve("rank.png").toFile());
+
+        String base = "ui:\n  help_icon:\n    path: ui/help.png\n    scale_ratio: 16\n    y_position: 15\n";
+        String rankDefinition = "  rank_tag:\n    path: ui/rank.png\n    scale_ratio: 8\n";
+        write(definition, base + rankDefinition);
+        Path allocations = temp.newFolder("bedrock-glyph-heights").toPath().resolve("glyph-allocations.yml");
+        UiGlyphRegistry baseline = new UiGlyphLoader().load(root, allocations, true);
+        int helpCodePoint = baseline.get(org.voxelhorizons.content.ContentID.of("demo", "help_icon")).get().codePoint();
+        int rankCodePoint = baseline.get(org.voxelhorizons.content.ContentID.of("demo", "rank_tag")).get().codePoint();
+
+        BedrockPackCompiler.Result unchanged = new BedrockPackCompiler().compile(root, out, allocations);
+        java.awt.image.BufferedImage before;
+        try (ZipFile zip = new ZipFile(unchanged.directory.resolve("voxelcore.mcpack").toFile())) {
+            before = javax.imageio.ImageIO.read(zip.getInputStream(zip.getEntry("font/glyph_E2.png")));
+        }
+        assertEquals(17, visibleGlyphHeight(before, helpCodePoint));
+        assertEquals(11, visibleGlyphHeight(before, rankCodePoint));
+
+        // Opting in halves the *calculated* height of only the help icon; Java is unchanged.
+        write(definition, base + "    bedrock_scale_ratio: 8\n" + rankDefinition);
+        UiGlyphRegistry overridden = new UiGlyphLoader().load(root, allocations, false);
+        UiGlyphDefinition helpDefinition = overridden.get(
+                org.voxelhorizons.content.ContentID.of("demo", "help_icon")).get();
+        assertEquals(16, helpDefinition.scaleRatio());
+        assertEquals(8, helpDefinition.bedrockScaleRatio());
+        assertEquals(helpCodePoint, helpDefinition.codePoint());
+
+        BedrockPackCompiler.Result resized = new BedrockPackCompiler().compile(
+                root, temp.newFolder().toPath(), allocations);
+        java.awt.image.BufferedImage after;
+        try (ZipFile zip = new ZipFile(resized.directory.resolve("voxelcore.mcpack").toFile())) {
+            after = javax.imageio.ImageIO.read(zip.getInputStream(zip.getEntry("font/glyph_E2.png")));
+        }
+        assertEquals(8, visibleGlyphHeight(after, helpCodePoint));
+        assertEquals(11, visibleGlyphHeight(after, rankCodePoint));
+        int cell = before.getWidth() / 16;
+        assertEquals("Changing one glyph must not change atlas cell dimensions", before.getWidth(), after.getWidth());
+        int slot = rankCodePoint & 255;
+        int left = (slot % 16) * cell, top = (slot / 16) * cell;
+        for (int y = 0; y < cell; y++) for (int x = 0; x < cell; x++)
+            assertEquals("Rank glyph pixels must be identical", before.getRGB(left + x, top + y),
+                    after.getRGB(left + x, top + y));
+    }
+
+    private static int visibleGlyphHeight(java.awt.image.BufferedImage page, int codePoint) {
+        int cell = page.getWidth() / 16, slot = codePoint & 255;
+        int left = (slot % 16) * cell, top = (slot / 16) * cell;
+        int first = cell, last = -1;
+        for (int y = 0; y < cell; y++) for (int x = 0; x < cell; x++) {
+            if ((page.getRGB(left + x, top + y) >>> 24) == 0) continue;
+            first = Math.min(first, y); last = Math.max(last, y);
+        }
+        return last < 0 ? 0 : last - first + 1;
+    }
+
     @Test public void menuBackgroundGlyphsBecomeBedrockChestScreenImages() throws Exception {
         Path root = fixture(), out = temp.newFolder().toPath();
         write(root.resolve("demo/content/ui.yml"),
