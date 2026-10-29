@@ -2,6 +2,7 @@ package org.voxelhorizons.text;
 
 import org.bukkit.ChatColor;
 import org.bukkit.block.Chest;
+import org.bukkit.block.BlockState;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -15,7 +16,11 @@ import org.bukkit.plugin.Plugin;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.function.Function;
 
 /**
@@ -33,6 +38,8 @@ public final class InventoryTitlePlaceholderListener implements Listener {
     private volatile boolean chestTitlesEnabled;
     private volatile String singleChestTitle;
     private volatile String doubleChestTitle;
+    private volatile boolean containerTitlesEnabled;
+    private volatile Map<String, String> containerTitles = Collections.emptyMap();
 
     /** Modern Paper bridge is discovered at runtime to retain 1.12 binary compatibility. */
     private final PaperTitleOverrideSupport paperTitleSupport;
@@ -63,6 +70,23 @@ public final class InventoryTitlePlaceholderListener implements Listener {
         this.doubleChestTitle = doubleTitle == null ? "" : doubleTitle;
     }
 
+    /**
+     * Configures titles for physical block-backed inventories. Keys match Bukkit material names
+     * in lower case (for example barrel, hopper, furnace), plus chest.single/chest.double.
+     * No newer block API types are referenced, so this remains binary-compatible with 1.12.
+     */
+    public void updateContainerTitles(boolean enabled, Map<String, String> templates) {
+        Map<String, String> normalized = new HashMap<String, String>();
+        if (templates != null) {
+            for (Map.Entry<String, String> entry : templates.entrySet()) {
+                if (entry.getKey() == null || entry.getValue() == null || entry.getValue().isEmpty()) continue;
+                normalized.put(entry.getKey().toLowerCase(Locale.ROOT), entry.getValue());
+            }
+        }
+        containerTitles = Collections.unmodifiableMap(normalized);
+        containerTitlesEnabled = enabled;
+    }
+
     public boolean supported() {
         return setTitleMethod != null;
     }
@@ -72,15 +96,15 @@ public final class InventoryTitlePlaceholderListener implements Listener {
         final HumanEntity player = event.getPlayer();
         final Inventory openedTop = event.getInventory();
         final String originalTitle = event.getView().getTitle();
-        final String configuredChestTitle = chestTitle(openedTop);
-        final String titleInput = configuredChestTitle == null ? originalTitle : configuredChestTitle;
+        final String configuredContainerTitle = containerTitle(openedTop);
+        final String titleInput = configuredContainerTitle == null ? originalTitle : configuredContainerTitle;
         final String resolvedTitle = resolveTitle(titleInput);
 
         if (resolvedTitle == null || resolvedTitle.equals(originalTitle)) return;
 
         // Paper 1.20.2+ exposes InventoryOpenEvent#titleOverride(Component). This value is used
         // in the initial open-screen packet, so the client never renders the original title first.
-        if (applyInitialTitleOverride(event, configuredChestTitle, resolvedTitle)) return;
+        if (applyInitialTitleOverride(event, configuredContainerTitle, resolvedTitle)) return;
 
         // Older Bukkit/Paper versions have no pre-open title override. Retain the legacy
         // one-tick setTitle fallback for compatibility, accepting that those versions may flash.
@@ -98,7 +122,7 @@ public final class InventoryTitlePlaceholderListener implements Listener {
                 // Another plugin may have changed the title after the open event. Resolve that newer
                 // title too rather than blindly restoring the event-time value.
                 String currentTitle = currentView.getTitle();
-                String configured = chestTitle(openedTop);
+                String configured = containerTitle(openedTop);
                 String titleToApply = resolveTitle(configured == null ? currentTitle : configured);
                 if (titleToApply == null || titleToApply.equals(currentTitle)) return;
 
@@ -118,14 +142,44 @@ public final class InventoryTitlePlaceholderListener implements Listener {
         return resolved == null ? null : ChatColor.translateAlternateColorCodes('&', resolved);
     }
 
-    private String chestTitle(Inventory inventory) {
-        if (!chestTitlesEnabled || inventory == null) return null;
-        Object holder = inventory.getHolder();
-        if (!(holder instanceof Chest) && !(holder instanceof DoubleChest)) return null;
-        String configured;
-        if (inventory.getSize() == 27) configured = singleChestTitle;
-        else if (inventory.getSize() == 54) configured = doubleChestTitle;
-        else return null;
+    private String containerTitle(Inventory inventory) {
+        if (inventory == null) return null;
+        return titleForPhysicalHolder(inventory.getHolder(), inventory.getSize(),
+                chestTitlesEnabled, singleChestTitle, doubleChestTitle,
+                containerTitlesEnabled, containerTitles);
+    }
+
+    /**
+     * Only block-backed inventories are eligible. Virtual/plugin GUIs and vehicle/entity
+     * inventories must retain their own titles, even when they have the same slot count.
+     * Kept package-private for cross-version regression tests.
+     */
+    static String titleForPhysicalHolder(Object holder, int size, boolean legacyChestEnabled,
+                                         String singleChest, String doubleChest,
+                                         boolean typesEnabled, Map<String, String> templates) {
+        if (holder instanceof Chest || holder instanceof DoubleChest) {
+            String key;
+            String legacy;
+            if (size == 27) {
+                key = "chest.single";
+                legacy = singleChest;
+            } else if (size == 54) {
+                key = "chest.double";
+                legacy = doubleChest;
+            } else {
+                return null;
+            }
+            String configured = typesEnabled ? templates.get(key) : null;
+            if (configured != null && !configured.isEmpty()) return configured;
+            return legacyChestEnabled && legacy != null && !legacy.isEmpty() ? legacy : null;
+        }
+        if (!typesEnabled || !(holder instanceof BlockState)) return null;
+        String material = ((BlockState) holder).getType().name().toLowerCase(Locale.ROOT);
+        String configured = templates.get(material);
+        // One shulker_box template applies to all colours unless a specific colour is set.
+        if (configured == null && material.endsWith("_shulker_box")) {
+            configured = templates.get("shulker_box");
+        }
         return configured == null || configured.isEmpty() ? null : configured;
     }
 
@@ -134,15 +188,15 @@ public final class InventoryTitlePlaceholderListener implements Listener {
      * InventoryView#getTitle() loses Adventure fonts (and click/hover/decorations), even if the
      * text itself is unchanged. Resolve placeholders inside text leaves instead.
      *
-     * Physical chest title templates deliberately originate as legacy strings and can be
+     * Physical container title templates deliberately originate as legacy strings and can be
      * deserialized safely because there is no existing rich title to preserve.
      */
-    private boolean applyInitialTitleOverride(InventoryOpenEvent event, String configuredChestTitle,
+    private boolean applyInitialTitleOverride(InventoryOpenEvent event, String configuredContainerTitle,
                                               String resolvedLegacyTitle) {
         PaperTitleOverrideSupport paper = paperTitleSupport;
         if (paper == null) return false;
         try {
-            if (configuredChestTitle != null) {
+            if (configuredContainerTitle != null) {
                 Object component = paper.legacyDeserializeMethod.invoke(paper.serializer, resolvedLegacyTitle);
                 paper.titleOverrideMethod.invoke(event, component);
                 return true;
