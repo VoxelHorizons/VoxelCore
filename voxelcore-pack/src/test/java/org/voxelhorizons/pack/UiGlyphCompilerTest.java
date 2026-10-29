@@ -203,9 +203,27 @@ public class UiGlyphCompilerTest {
                 temporaryFolder.newFolder("explicit-build").toPath().resolve("glyphs.yml"), false)
                 .get(ContentID.of("voxel", "overlay")).get();
         assertEquals(18, glyph.scaleRatio());
+        assertEquals("Bedrock defaults to the Java height", 18, glyph.bedrockScaleRatio());
         assertEquals(8, glyph.yPosition());
         assertEquals(41, glyph.advance());
         assertTrue(!glyph.gui());
+
+        write(definition, "ui:\n  overlay:\n    path: ui/overlay.png\n    bedrock_scale_ratio: 9\n");
+        UiGlyphDefinition bedrock = new UiGlyphLoader().load(contentRoot.toPath(),
+                temporaryFolder.newFolder("bedrock-height-build").toPath().resolve("glyphs.yml"), false)
+                .get(ContentID.of("voxel", "overlay")).get();
+        assertEquals("Bedrock overrides must never change Java font metrics", 18, bedrock.scaleRatio());
+        assertEquals(9, bedrock.bedrockScaleRatio());
+        assertEquals(41, bedrock.advance());
+
+        write(definition, "ui:\n  overlay:\n    path: ui/overlay.png\n    bedrock_scale_ratio: 0\n");
+        try {
+            new UiGlyphLoader().load(contentRoot.toPath(),
+                    temporaryFolder.newFolder("invalid-bedrock-height").toPath().resolve("bad-glyphs.yml"), false);
+            fail("Expected invalid Bedrock font height to fail");
+        } catch (RuntimeException exception) {
+            assertTrue(exception.getMessage().contains("bedrock_scale_ratio must be between 1 and 256"));
+        }
 
         write(definition, "ui:\n  overlay:\n    path: ui/overlay.png\n    scale_ratio: 18\n    y_position: 19\n");
         try {
