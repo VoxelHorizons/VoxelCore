@@ -69,6 +69,7 @@ final class BedrockGlyphAtlas {
             // GUI overlays (menu backgrounds) and tall pictures are Java screen art, not inline text.
             if (glyph.gui()) continue;
             if (glyph.scaleRatio() > 32) { skipped.add(label + ": Java height " + glyph.scaleRatio() + " is too tall for a Bedrock text glyph"); continue; }
+            if (glyph.bedrockScaleRatio() > 32) { skipped.add(label + ": Bedrock height " + glyph.bedrockScaleRatio() + " is too tall for a Bedrock text glyph"); continue; }
             int codePoint = glyph.codePoint();
             if (codePoint < 0xE200 || codePoint > 0xF3FF) { skipped.add(label + ": codepoint outside U+E200..U+F3FF"); continue; }
             String[] ref = glyph.texture().split(":", 2);
@@ -80,8 +81,11 @@ final class BedrockGlyphAtlas {
             if (icon == null) { skipped.add(label + ": empty or unreadable bitmap"); continue; }
             String unfit = unfit(icon);
             if (unfit != null) { skipped.add(label + ": " + unfit); continue; }
-            // Java scales the whole bitmap to its font height; the trimmed part keeps its share.
-            Glyph sized = new Glyph(reduceBlocks(icon), visibleHeight(glyph.scaleRatio(), icon.getHeight(), original.getHeight()));
+            // Scale to the effective Bedrock bitmap height, preserving the visible fraction
+            // when the source has transparent padding. By default this equals Java height;
+            // an explicit bedrock_scale_ratio changes only this one generated glyph.
+            Glyph sized = new Glyph(reduceBlocks(icon),
+                    visibleHeight(glyph.bedrockScaleRatio(), icon.getHeight(), original.getHeight()));
             if (pending.containsKey(Integer.valueOf(codePoint)) || occupiedByAuthoredPage(bedrockAssets, codePoint))
                 throw new IOException("Bedrock font cell U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT)
                         + " is already occupied (managed glyph " + glyph.id() + ")");
