@@ -1,4 +1,4 @@
-version: 9 # DO NOT CHANGE
+version: 10 # DO NOT CHANGE
 game:
   bedrock_support: false # Build Bedrock resources alongside the current-server Java pack
 
