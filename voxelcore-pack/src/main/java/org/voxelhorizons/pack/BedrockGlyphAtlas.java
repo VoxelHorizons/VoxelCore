@@ -451,7 +451,8 @@ final class BedrockGlyphAtlas {
                 int width = Math.max(1, (int) Math.round(image.getWidth() * fit));
                 int height = Math.max(1, (int) Math.round(image.getHeight() * fit));
                 int centeredY = (cell - height) / 2;
-                int offsetY = verticalOffsets.get(glyph.getKey()).intValue();
+                int codePoint = (page.getKey().intValue() << 8) | glyph.getKey().intValue();
+                int offsetY = verticalOffsets.getOrDefault(Integer.valueOf(codePoint), Integer.valueOf(0)).intValue();
                 int glyphY = Math.max(0, Math.min(cell - height, centeredY + offsetY));
                 draw(sheet, image, x + (cell - width) / 2, y + glyphY, width, height);
             }
