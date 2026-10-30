@@ -223,8 +223,8 @@ final class BedrockGlyphAtlas {
     }
 
     /**
-     * Vertical displacement of the visible bitmap's centre from a normal Java font glyph
-     * (8px high, ascent 7). Unlike the cropped texture, this retains the provider's ascent
+     * Vertical displacement of the visible bitmap's centre from VoxelCore's normal
+     * 8px UI bitmap glyph (default ascent 8). Unlike the cropped texture, this retains the provider's ascent
      * and the transparent top margin in the original cell. Positive moves art down.
      * Convert this Java-pixel displacement to Bedrock atlas pixels using the same ratio
      * used to size that individual glyph.
@@ -232,7 +232,7 @@ final class BedrockGlyphAtlas {
     static double javaVerticalOffset(int height, int ascent, int sourceHeight, int transparentTop, int visibleSourceHeight) {
         if (height <= 0 || sourceHeight <= 0) return 0.0;
         double visibleCentre = (transparentTop + visibleSourceHeight / 2.0) * height / sourceHeight;
-        return (7.0 - ascent) + visibleCentre - 4.0;
+        return (7.0 - ascent) + visibleCentre - 3.0;
     }
 
     /** Java on-screen height of the trimmed part of a bitmap drawn at {@code javaHeight}. */
