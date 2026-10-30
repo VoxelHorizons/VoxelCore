@@ -307,7 +307,10 @@ public class BedrockPackCompilerTest {
             assertNull("Controller pages must never be modified", zip.getEntry("font/glyph_E1.png"));
             try (java.io.InputStream image = zip.getInputStream(zip.getEntry("font/glyph_E2.png"))) {
                 java.awt.image.BufferedImage atlas = javax.imageio.ImageIO.read(image);
-                assertTrue("1px glyph at Java height 16 stays 1px, centred", (atlas.getRGB(7,7) >>> 24) != 0);
+                assertEquals("1px glyph must retain its original visible height", 1,
+                        visibleGlyphHeight(atlas, 0xE200));
+                assertTrue("The glyph now follows Java ascent rather than being force-centred",
+                        (atlas.getRGB(7, 11) >>> 24) != 0);
             }
         }
     }
