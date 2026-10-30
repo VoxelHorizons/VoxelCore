@@ -310,7 +310,7 @@ public class BedrockPackCompilerTest {
                 assertEquals("1px glyph must retain its original visible height", 1,
                         visibleGlyphHeight(atlas, 0xE200));
                 assertTrue("The glyph now follows Java ascent rather than being force-centred",
-                        (atlas.getRGB(7, 11) >>> 24) != 0);
+                        (atlas.getRGB(7, 12) >>> 24) != 0);
             }
         }
     }
@@ -386,7 +386,7 @@ public class BedrockPackCompilerTest {
         javax.imageio.ImageIO.write(help, "png", images.resolve("help.png").toFile());
         java.awt.image.BufferedImage rank = new java.awt.image.BufferedImage(22, 11, 2);
         for (int y = 0; y < 11; y++) for (int x = 0; x < 22; x++)
-            rank.setRGB(x, y, 0xff123456);
+            rank.setRGB(x, y, (x + y) % 2 == 0 ? 0xff123456 : 0xffabcdef);
         javax.imageio.ImageIO.write(rank, "png", images.resolve("rank.png").toFile());
 
         String other = "  help_lower:\n    path: ui/help.png\n    scale_ratio: 16\n    y_position: 11\n"
