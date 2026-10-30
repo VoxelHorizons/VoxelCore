@@ -262,7 +262,7 @@ public class BedrockPackCompilerTest {
             assertNull("Backgrounds are not squeezed into text cells", zip.getEntry("font/glyph_F0.png"));
             try (java.io.InputStream image = zip.getInputStream(zip.getEntry("font/glyph_E3.png"))) {
                 java.awt.image.BufferedImage atlas = javax.imageio.ImageIO.read(image);
-                assertEquals("U+E300 cell holds the red icon", 0xffff0000, atlas.getRGB(7,7));
+                assertEquals("U+E300 cell retains the red icon at its ascent-aware position", 0xffff0000, atlas.getRGB(7,8));
                 assertEquals("U+E301 blank cell stays empty", 0, atlas.getRGB(32+8,8) >>> 24);
             }
         }
