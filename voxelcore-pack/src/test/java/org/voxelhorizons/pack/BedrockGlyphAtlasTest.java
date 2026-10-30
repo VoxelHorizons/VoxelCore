@@ -102,4 +102,16 @@ public class BedrockGlyphAtlasTest {
         assertEquals(10, out.getWidth());
         assertEquals(8, out.getHeight());
     }
+    @Test public void ascentAndTransparentMarginsDetermineJavaGlyphCentre() {
+        // Vanilla 8px font glyph: no movement relative to the calibrated atlas centre.
+        assertEquals(0.0, BedrockGlyphAtlas.javaVerticalOffset(8, 7, 8, 0, 8), 1e-9);
+        // Real 16px help glyph: two transparent rows above, twelve visible pixels.
+        assertEquals(-4.0, BedrockGlyphAtlas.javaVerticalOffset(16, 15, 16, 2, 12), 1e-9);
+        assertEquals(0.0, BedrockGlyphAtlas.javaVerticalOffset(16, 11, 16, 2, 12), 1e-9);
+        // The original source resolution must determine the shift, not cropped pixels.
+        assertEquals(-4.0, BedrockGlyphAtlas.javaVerticalOffset(16, 15, 32, 4, 24), 1e-9);
+        // A descender and a different declared ascent can move the same art down.
+        assertEquals(3.0, BedrockGlyphAtlas.javaVerticalOffset(8, 4, 8, 0, 8), 1e-9);
+    }
+
 }

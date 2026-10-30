@@ -370,6 +370,68 @@ public class BedrockPackCompilerTest {
                     before.getRGB(left + x, top + y), after.getRGB(left + x, top + y));
     }
 
+
+    @Test public void ascentMovesGlyphInkWithoutResizingOrMovingOtherGlyphs() throws Exception {
+        Path root = fixture(), out = temp.newFolder().toPath();
+        Path definition = root.resolve("demo/content/ui.yml");
+        Path images = root.resolve("demo/assets/demo/textures/ui");
+        Files.createDirectories(images);
+
+        java.awt.image.BufferedImage help = new java.awt.image.BufferedImage(16, 16, 2);
+        for (int y = 2; y < 14; y++) for (int x = 3; x < 12; x++)
+            help.setRGB(x, y, 0xffffffff);
+        javax.imageio.ImageIO.write(help, "png", images.resolve("help.png").toFile());
+        java.awt.image.BufferedImage rank = new java.awt.image.BufferedImage(22, 11, 2);
+        for (int y = 0; y < 11; y++) for (int x = 0; x < 22; x++)
+            rank.setRGB(x, y, 0xff123456);
+        javax.imageio.ImageIO.write(rank, "png", images.resolve("rank.png").toFile());
+
+        String other = "  help_lower:\n    path: ui/help.png\n    scale_ratio: 16\n    y_position: 11\n"
+                + "  rank_tag:\n    path: ui/rank.png\n    scale_ratio: 8\n    y_position: 7\n";
+        write(definition, "ui:\n  help_raised:\n    path: ui/help.png\n    scale_ratio: 16\n    y_position: 15\n" + other);
+        Path allocations = temp.newFolder("ascent-glyphs").toPath().resolve("glyph-allocations.yml");
+        UiGlyphRegistry glyphs = new UiGlyphLoader().load(root, allocations, true);
+        int raised = glyphs.get(org.voxelhorizons.content.ContentID.of("demo", "help_raised")).get().codePoint();
+        int lower = glyphs.get(org.voxelhorizons.content.ContentID.of("demo", "help_lower")).get().codePoint();
+        int rankCodePoint = glyphs.get(org.voxelhorizons.content.ContentID.of("demo", "rank_tag")).get().codePoint();
+
+        BedrockPackCompiler.Result initial = new BedrockPackCompiler().compile(root, out, allocations);
+        java.awt.image.BufferedImage before;
+        try (ZipFile zip = new ZipFile(initial.directory.resolve("voxelcore.mcpack").toFile())) {
+            before = javax.imageio.ImageIO.read(zip.getInputStream(zip.getEntry("font/glyph_E2.png")));
+        }
+        assertEquals(12, visibleGlyphHeight(before, raised));
+        assertEquals(12, visibleGlyphHeight(before, lower));
+        assertEquals(11, visibleGlyphHeight(before, rankCodePoint));
+        assertEquals("Four pixels of Java ascent must shift identical art by four Bedrock pixels",
+                4, firstVisibleGlyphRow(before, lower) - firstVisibleGlyphRow(before, raised));
+
+        // Changing only help_raised's ascent must not alter another symbol or the rank page.
+        write(definition, "ui:\n  help_raised:\n    path: ui/help.png\n    scale_ratio: 16\n    y_position: 14\n" + other);
+        BedrockPackCompiler.Result updated = new BedrockPackCompiler().compile(
+                root, temp.newFolder().toPath(), allocations);
+        java.awt.image.BufferedImage after;
+        try (ZipFile zip = new ZipFile(updated.directory.resolve("voxelcore.mcpack").toFile())) {
+            after = javax.imageio.ImageIO.read(zip.getInputStream(zip.getEntry("font/glyph_E2.png")));
+        }
+        assertEquals(1, firstVisibleGlyphRow(after, raised) - firstVisibleGlyphRow(before, raised));
+        assertEquals(firstVisibleGlyphRow(before, lower), firstVisibleGlyphRow(after, lower));
+        assertEquals(firstVisibleGlyphRow(before, rankCodePoint), firstVisibleGlyphRow(after, rankCodePoint));
+        int cell = before.getWidth() / 16;
+        int slot = rankCodePoint & 255, left = (slot % 16) * cell, top = (slot / 16) * cell;
+        for (int y = 0; y < cell; y++) for (int x = 0; x < cell; x++)
+            assertEquals("Ascent must not affect the neighbouring rank glyph",
+                    before.getRGB(left + x, top + y), after.getRGB(left + x, top + y));
+    }
+
+    private static int firstVisibleGlyphRow(java.awt.image.BufferedImage page, int codePoint) {
+        int cell = page.getWidth() / 16, slot = codePoint & 255;
+        int left = (slot % 16) * cell, top = (slot / 16) * cell;
+        for (int y = 0; y < cell; y++) for (int x = 0; x < cell; x++)
+            if ((page.getRGB(left + x, top + y) >>> 24) != 0) return y;
+        return -1;
+    }
+
     private static int visibleGlyphHeight(java.awt.image.BufferedImage page, int codePoint) {
         int cell = page.getWidth() / 16, slot = codePoint & 255;
         int left = (slot % 16) * cell, top = (slot / 16) * cell;
