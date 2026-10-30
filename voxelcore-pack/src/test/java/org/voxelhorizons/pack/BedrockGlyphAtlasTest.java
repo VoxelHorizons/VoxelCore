@@ -60,6 +60,33 @@ public class BedrockGlyphAtlasTest {
                 BedrockGlyphAtlas.areaAverage(edge, 1, 1).getRGB(0, 0) & 0xffffff);
     }
 
+    @Test public void nativeResolutionLargeGlyphUsesNaturalPixelsWithoutResizingSmallIcons() {
+        double shared = 11.0 / 8;
+        BufferedImage help = new BufferedImage(9, 12, BufferedImage.TYPE_INT_ARGB);
+        BedrockGlyphAtlas.Glyph questionMark = new BedrockGlyphAtlas.Glyph(help, 12, 1.0, 16);
+        assertEquals("16px native help glyph must not inherit rank-tag enlargement",
+                1.0, BedrockGlyphAtlas.effectiveRatio(questionMark, shared), 0.000001);
+        assertEquals(12, BedrockGlyphAtlas.sized(help, 12,
+                BedrockGlyphAtlas.effectiveRatio(questionMark, shared)).getHeight());
+
+        BedrockGlyphAtlas.Glyph rank = new BedrockGlyphAtlas.Glyph(tag(1), 8, 11.0 / 8, 8);
+        assertEquals("8px rank must retain its existing calibration",
+                shared, BedrockGlyphAtlas.effectiveRatio(rank, shared), 0.000001);
+        BedrockGlyphAtlas.Glyph mouse = new BedrockGlyphAtlas.Glyph(flag(), 12, 16.0 / 12, 12);
+        assertEquals("12px UI icons must retain their existing calibration",
+                shared, BedrockGlyphAtlas.effectiveRatio(mouse, shared), 0.000001);
+
+        BedrockGlyphAtlas.Glyph highResArt = new BedrockGlyphAtlas.Glyph(
+                new BufferedImage(32, 32, BufferedImage.TYPE_INT_ARGB), 16, 2.0, 16);
+        assertEquals("High-resolution source art can still be downscaled as before",
+                shared, BedrockGlyphAtlas.effectiveRatio(highResArt, shared), 0.000001);
+
+        BedrockGlyphAtlas.Glyph authoredLarger = new BedrockGlyphAtlas.Glyph(
+                new BufferedImage(8, 8, BufferedImage.TYPE_INT_ARGB), 16, 0.5, 16);
+        assertEquals("Never shrink a glyph below Java's deliberately larger rendered height",
+                1.0, BedrockGlyphAtlas.effectiveRatio(authoredLarger, shared), 0.000001);
+    }
+
     @Test public void integerUpscaledArtIsReducedExactly() {
         BufferedImage out = BedrockGlyphAtlas.reduceBlocks(tag(4));
         assertEquals(43, out.getWidth());
