@@ -132,6 +132,11 @@ bedrock:
   # Proxy/standalone Geyser needs a mounted path to its REAL data directory.
   # Example local override: 'plugins/Geyser-Spigot'
   geyser_data_directory: ''
+  # Number of generated Bedrock revision folders to retain under
+  # build/resource-packs/bedrock after a successful build/publish.
+  # Always protects the current revision and previous verified Geyser publication.
+  # Does not delete icon-cache, other files or Geyser's installed pack. 0 disables cleanup.
+  generated_pack_retention: 2
   # Vanilla textures/models for Bedrock icons and 3D: furniture models often use
   # minecraft:block/... textures that content packs do not ship. 'auto' downloads the official
   # client jar for this server version once from Mojang (SHA-1 verified, cached in
