@@ -111,7 +111,9 @@ final class BedrockGlyphAtlas {
             } else {
                 sized = new Glyph(reduceBlocks(icon),
                         visibleHeight(glyph.scaleRatio(), icon.getHeight(), original.getHeight()),
-                        (double) original.getHeight() / glyph.scaleRatio(), glyph.scaleRatio());
+                        (double) original.getHeight() / glyph.scaleRatio(), glyph.scaleRatio(),
+                        javaVerticalOffset(glyph.scaleRatio(), glyph.ascent(), original.getHeight(),
+                                transparentTopRows(original), icon.getHeight()));
             }
             if (pending.containsKey(Integer.valueOf(codePoint)) || occupiedByAuthoredPage(bedrockAssets, codePoint))
                 throw new IOException("Bedrock font cell U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT)
@@ -122,13 +124,18 @@ final class BedrockGlyphAtlas {
         count += appendAuthored(contentRoot, javaAssets, pending, bedrockAssets, skipped, overrideControllerPages, oversizedLimit);
         double ratio = pixelRatio(pending.values());
         Map<Integer, BufferedImage> drawn = new TreeMap<Integer, BufferedImage>();
+        Map<Integer, Integer> verticalOffsets = new TreeMap<Integer, Integer>();
         for (Map.Entry<Integer, Glyph> entry : pending.entrySet()) {
             Glyph glyph = entry.getValue();
+            // The oversized path is deliberately independent of the normal-font ascent calibration.
+            double glyphRatio = effectiveRatio(glyph, ratio);
             drawn.put(entry.getKey(), glyph.maxSide > 0
                     ? sizedOversized(glyph.art, glyph.javaHeight, glyph.maxSide, shrink)
-                    : sized(glyph.art, glyph.javaHeight, effectiveRatio(glyph, ratio), shrink));
+                    : sized(glyph.art, glyph.javaHeight, glyphRatio, shrink));
+            verticalOffsets.put(entry.getKey(), Integer.valueOf(glyph.maxSide > 0 ? 0
+                    : (int) Math.round(glyph.javaVerticalOffset * glyphRatio)));
         }
-        writePages(drawn, bedrockAssets);
+        writePages(drawn, verticalOffsets, bedrockAssets);
         return count;
     }
 
@@ -207,6 +214,7 @@ final class BedrockGlyphAtlas {
                     if (rows.isEmpty() || columns == 0) continue;
                     int cellWidth = bitmap.getWidth() / columns, cellHeight = bitmap.getHeight() / rows.size();
                     if (cellWidth < 1 || cellHeight < 1) continue;
+                    int javaAscent = provider.has("ascent") ? provider.get("ascent").getAsInt() : Math.min(7, javaHeight);
                     for (int r = 0; r < rows.size(); r++) {
                         int[] codePoints = rows.get(r);
                         for (int c = 0; c < codePoints.length; c++) {
@@ -220,7 +228,8 @@ final class BedrockGlyphAtlas {
                             }
                             if (codePoint < 0xE000) continue; // Ordinary text keeps Bedrock's own font.
                             if (pending.containsKey(Integer.valueOf(codePoint)) || occupiedByAuthoredPage(bedrockAssets, codePoint)) continue;
-                            BufferedImage icon = trim(bitmap.getSubimage(c * cellWidth, r * cellHeight, cellWidth, cellHeight));
+                            BufferedImage sourceCell = bitmap.getSubimage(c * cellWidth, r * cellHeight, cellWidth, cellHeight);
+                            BufferedImage icon = trim(sourceCell);
                             if (icon == null) continue;
                             String unfit = unfit(icon);
                             if (unfit != null) {
@@ -232,7 +241,9 @@ final class BedrockGlyphAtlas {
                                     ? Glyph.oversized(reduceBlocks(icon),
                                             visibleHeight(javaHeight, icon.getHeight(), cellHeight), oversizedLimit)
                                     : new Glyph(reduceBlocks(icon), visibleHeight(javaHeight, icon.getHeight(), cellHeight),
-                                            (double) cellHeight / javaHeight, javaHeight));
+                                            (double) cellHeight / javaHeight, javaHeight,
+                                            javaVerticalOffset(javaHeight, javaAscent, cellHeight,
+                                                    transparentTopRows(sourceCell), icon.getHeight())));
                             count++;
                         }
                     }
@@ -261,6 +272,29 @@ final class BedrockGlyphAtlas {
         return cell.getSubimage(minX, minY, maxX - minX + 1, maxY - minY + 1);
     }
 
+    /** Number of transparent rows before the first visible pixel in the original bitmap cell. */
+    private static int transparentTopRows(BufferedImage image) {
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                if ((image.getRGB(x, y) >>> 24) != 0) return y;
+            }
+        }
+        return image.getHeight();
+    }
+
+    /**
+     * Vertical displacement of the visible bitmap's centre from VoxelCore's normal
+     * 8px UI bitmap glyph (default ascent 8). Unlike the cropped texture, this retains the provider's ascent
+     * and the transparent top margin in the original cell. Positive moves art down.
+     * Convert this Java-pixel displacement to Bedrock atlas pixels using the same ratio
+     * used to size that individual glyph.
+     */
+    static double javaVerticalOffset(int height, int ascent, int sourceHeight, int transparentTop, int visibleSourceHeight) {
+        if (height <= 0 || sourceHeight <= 0) return 0.0;
+        double visibleCentre = (transparentTop + visibleSourceHeight / 2.0) * height / sourceHeight;
+        return (7.0 - ascent) + visibleCentre - 3.0;
+    }
+
     /** Java on-screen height of the trimmed part of a bitmap drawn at {@code javaHeight}. */
     static int visibleHeight(int javaHeight, int trimmedHeight, int fullHeight) {
         if (javaHeight <= 0 || fullHeight <= 0) return javaHeight;
@@ -275,21 +309,28 @@ final class BedrockGlyphAtlas {
         final int providerHeight;
         /** Longest allowed side for an oversized glyph baked at exactly javaHeight; 0 for ordinary glyphs. */
         final int maxSide;
+        final double javaVerticalOffset;
         static Glyph oversized(BufferedImage art, int bakedHeight, int maxSide) {
-            return new Glyph(art, bakedHeight, Double.POSITIVE_INFINITY, bakedHeight, maxSide);
+            return new Glyph(art, bakedHeight, Double.POSITIVE_INFINITY, bakedHeight, maxSide, 0.0);
         }
         Glyph(BufferedImage art, int javaHeight) {
             this(art, javaHeight, Double.POSITIVE_INFINITY, javaHeight);
         }
         Glyph(BufferedImage art, int javaHeight, double sourcePixelsPerJavaPixel, int providerHeight) {
-            this(art, javaHeight, sourcePixelsPerJavaPixel, providerHeight, 0);
+            this(art, javaHeight, sourcePixelsPerJavaPixel, providerHeight, 0, 0.0);
         }
-        private Glyph(BufferedImage art, int javaHeight, double sourcePixelsPerJavaPixel, int providerHeight, int maxSide) {
+        Glyph(BufferedImage art, int javaHeight, double sourcePixelsPerJavaPixel,
+              int providerHeight, double javaVerticalOffset) {
+            this(art, javaHeight, sourcePixelsPerJavaPixel, providerHeight, 0, javaVerticalOffset);
+        }
+        private Glyph(BufferedImage art, int javaHeight, double sourcePixelsPerJavaPixel,
+                      int providerHeight, int maxSide, double javaVerticalOffset) {
             this.maxSide = maxSide;
             this.art = art;
             this.javaHeight = Math.max(1, javaHeight <= 0 ? 8 : javaHeight);
             this.sourcePixelsPerJavaPixel = sourcePixelsPerJavaPixel;
             this.providerHeight = providerHeight;
+            this.javaVerticalOffset = javaVerticalOffset;
         }
     }
 
@@ -482,8 +523,14 @@ final class BedrockGlyphAtlas {
         return String.format(java.util.Locale.ROOT, "font/glyph_%02X.png", page);
     }
 
-    /** Draw every pending glyph centred in its page cell; authored pages keep their own cell size. */
-    private static void writePages(Map<Integer, BufferedImage> pending, Map<String, byte[]> bedrockAssets) throws IOException {
+    /**
+     * Keep the existing centred page-cell layout as the reference used by rank and HUD
+     * glyphs, but shift each bitmap by its own Java ascent/transparent-padding metrics.
+     * Authored pages keep their existing cell size. Out-of-cell positions are clamped:
+     * a Bedrock glyph sheet cannot represent pixels outside a fixed-size cell.
+     */
+    private static void writePages(Map<Integer, BufferedImage> pending, Map<Integer, Integer> verticalOffsets,
+                                   Map<String, byte[]> bedrockAssets) throws IOException {
         Map<Integer, Map<Integer, BufferedImage>> pages = new TreeMap<Integer, Map<Integer, BufferedImage>>();
         for (Map.Entry<Integer, BufferedImage> entry : pending.entrySet()) {
             int codePoint = entry.getKey().intValue();
@@ -508,7 +555,11 @@ final class BedrockGlyphAtlas {
                 double fit = Math.min(1.0, (double) cell / Math.max(image.getWidth(), image.getHeight()));
                 int width = Math.max(1, (int) Math.round(image.getWidth() * fit));
                 int height = Math.max(1, (int) Math.round(image.getHeight() * fit));
-                draw(sheet, image, x + (cell - width) / 2, y + (cell - height) / 2, width, height);
+                int centeredY = (cell - height) / 2;
+                int codePoint = (page.getKey().intValue() << 8) | glyph.getKey().intValue();
+                int offsetY = verticalOffsets.getOrDefault(Integer.valueOf(codePoint), Integer.valueOf(0)).intValue();
+                int glyphY = Math.max(0, Math.min(cell - height, centeredY + offsetY));
+                draw(sheet, image, x + (cell - width) / 2, y + glyphY, width, height);
             }
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             if (!ImageIO.write(sheet, "png", output)) throw new IOException("PNG encoding unavailable");
