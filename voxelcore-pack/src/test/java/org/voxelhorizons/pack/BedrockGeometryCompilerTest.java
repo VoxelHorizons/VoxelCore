@@ -76,6 +76,110 @@ public final class BedrockGeometryCompilerTest {
         for(String path:first.assets.keySet())assertArrayEquals(first.assets.get(path),repeated.assets.get(path));
     }
 
+
+    @Test public void sourceResolutionBannerFacesPreserveEveryPixelAndHaveSafeGutters() throws Exception {
+        // Real voxel:furniture/brand/banner uses a 128x128 PNG and these UVs.
+        // The old converter crushed the 44x64 and 44x48 cloth faces to 16x16 each.
+        Map<String,byte[]> assets = modelAssets();
+        BufferedImage fabric = new BufferedImage(128,128,BufferedImage.TYPE_INT_ARGB);
+        for (int y=0;y<128;y++) for (int x=0;x<128;x++)
+            fabric.setRGB(x,y,0xff000000 | (x<<16) | (y<<8) | ((x*13+y*7)&255));
+        ByteArrayOutputStream png = new ByteArrayOutputStream();
+        ImageIO.write(fabric,"png",png);
+        assets.put("assets/demo/textures/banner.png",png.toByteArray());
+        assets.put("assets/demo/models/banner.json",(
+                "{\"textures\":{\"fabric\":\"demo:banner\"},\"elements\":["
+                + "{\"from\":[2.525,-9,10],\"to\":[13.525,7,10.001],\"faces\":{"
+                + "\"north\":{\"texture\":\"#fabric\",\"uv\":[0.25,6,5.75,14]},"
+                + "\"south\":{\"texture\":\"#fabric\",\"uv\":[0.25,0,5.75,6]}}}]}").getBytes(StandardCharsets.UTF_8));
+        String shortId = "i_11112222333344445555666677778888";
+        BedrockGeometryCompiler converter = new BedrockGeometryCompiler(assets);
+        BedrockGeometryCompiler.Output output = converter.compile("demo:banner","voxelcore:"+shortId,shortId);
+        JsonObject description = JsonParser.parseString(new String(output.assets.get(
+                "models/entity/voxelcore/"+shortId+".geo.json"),StandardCharsets.UTF_8))
+                .getAsJsonObject().getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject()
+                .getAsJsonObject("description");
+        JsonObject cube = JsonParser.parseString(new String(output.assets.get(
+                "models/entity/voxelcore/"+shortId+".geo.json"),StandardCharsets.UTF_8))
+                .getAsJsonObject().getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject()
+                .getAsJsonArray("bones").get(0).getAsJsonObject().getAsJsonArray("cubes").get(0).getAsJsonObject();
+        JsonObject north = cube.getAsJsonObject("uv").getAsJsonObject("north");
+        JsonObject south = cube.getAsJsonObject("uv").getAsJsonObject("south");
+        assertEquals("[44.0,64.0]",north.get("uv_size").toString());
+        assertEquals("[44.0,48.0]",south.get("uv_size").toString());
+        assertTrue("High-resolution face requires a native atlas larger than the old 16px tiles",
+                description.get("texture_width").getAsInt()>=64);
+        BufferedImage atlas = ImageIO.read(new ByteArrayInputStream(output.assets.get(
+                "textures/voxelcore/g_"+shortId+".png")));
+        int x = north.getAsJsonArray("uv").get(0).getAsInt(), y = north.getAsJsonArray("uv").get(1).getAsInt();
+        assertTrue("Keep a gutter around the source rectangle",x>=1 && y>=1);
+        for (int iy=0;iy<64;iy++) for (int ix=0;ix<44;ix++)
+            assertEquals("Original lower-fabric pixel " + ix + "," + iy,
+                    fabric.getRGB(2+ix,48+iy),atlas.getRGB(x+ix,y+iy));
+        assertEquals("Gutter repeats first texel instead of sampling adjacent face",
+                atlas.getRGB(x,y),atlas.getRGB(x-1,y));
+        assertEquals("Right gutter repeats final texel",
+                atlas.getRGB(x+43,y+20),atlas.getRGB(x+44,y+20));
+        int sx = south.getAsJsonArray("uv").get(0).getAsInt(), sy = south.getAsJsonArray("uv").get(1).getAsInt();
+        assertTrue("Atlas rectangles may not overlap",sx>=x+45 || sy>=y+65);
+        for (int iy=0;iy<48;iy++) for (int ix=0;ix<44;ix++)
+            assertEquals("Original upper-fabric pixel " + ix + "," + iy,
+                    fabric.getRGB(2+ix,iy),atlas.getRGB(sx+ix,sy+iy));
+
+        BedrockGeometryCompiler.Output repeat = converter.compile("demo:banner","voxelcore:"+shortId,shortId);
+        for (String file : output.assets.keySet())
+            assertArrayEquals("Identical model must produce identical Bedrock resource " + file,
+                    output.assets.get(file),repeat.assets.get(file));
+        assertArrayEquals(new int[]{64,44},
+                BedrockGeometryCompiler.nativeFaceSize(fabric,new double[]{0.25,6,5.75,14},90));
+    }
+
+    @Test public void highResolutionAnimatedFacesReuseAtlasCoordinatesAcrossFrames() throws Exception {
+        Map<String,byte[]> assets = modelAssets();
+        BufferedImage strip = new BufferedImage(128,256,BufferedImage.TYPE_INT_ARGB);
+        for (int y=0;y<256;y++) for (int x=0;x<128;x++)
+            strip.setRGB(x,y,y<128 ? 0xffff0000 : 0xff0000ff);
+        ByteArrayOutputStream png = new ByteArrayOutputStream();
+        ImageIO.write(strip,"png",png);
+        assets.put("assets/demo/textures/animated_banner.png",png.toByteArray());
+        assets.put("assets/demo/textures/animated_banner.png.mcmeta",
+                "{\"animation\":{\"frametime\":2}}".getBytes(StandardCharsets.UTF_8));
+        assets.put("assets/demo/models/animated_banner.json",(
+                "{\"textures\":{\"fabric\":\"demo:animated_banner\"},\"elements\":["
+                + "{\"from\":[0,0,8],\"to\":[16,16,8],\"faces\":{"
+                + "\"north\":{\"texture\":\"#fabric\",\"uv\":[0.25,6,5.75,14]}}}]}").getBytes(StandardCharsets.UTF_8));
+        String shortId = "i_11112222333344445555666677778888";
+        BedrockGeometryCompiler.Output output = new BedrockGeometryCompiler(assets)
+                .compile("demo:animated_banner","voxelcore:"+shortId,shortId);
+        JsonObject geometry = JsonParser.parseString(new String(output.assets.get(
+                "models/entity/voxelcore/"+shortId+".geo.json"),StandardCharsets.UTF_8))
+                .getAsJsonObject().getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject();
+        JsonObject face = geometry.getAsJsonArray("bones").get(0).getAsJsonObject()
+                .getAsJsonArray("cubes").get(0).getAsJsonObject()
+                .getAsJsonObject("uv").getAsJsonObject("north");
+        assertEquals("[44.0,64.0]",face.get("uv_size").toString());
+        int x=face.getAsJsonArray("uv").get(0).getAsInt();
+        int y=face.getAsJsonArray("uv").get(1).getAsInt();
+        BufferedImage first=ImageIO.read(new ByteArrayInputStream(output.assets.get(
+                "textures/voxelcore/g_"+shortId+".png")));
+        BufferedImage second=ImageIO.read(new ByteArrayInputStream(output.assets.get(
+                "textures/voxelcore/g_"+shortId+"_f1.png")));
+        assertEquals(0xffff0000,first.getRGB(x+20,y+35));
+        assertEquals(0xff0000ff,second.getRGB(x+20,y+35));
+        assertEquals(first.getWidth(),second.getWidth());
+        assertEquals(first.getHeight(),second.getHeight());
+    }
+
+    @Test public void extremeFaceResolutionIsReportedInsteadOfSilentlyDiscardingPixels() throws Exception {
+        BufferedImage texture = new BufferedImage(2048,2048,BufferedImage.TYPE_INT_ARGB);
+        try {
+            BedrockGeometryCompiler.nativeFaceSize(texture,new double[]{0,0,16,16},0);
+            fail("Oversize UV face must not be silently reduced");
+        } catch (IOException expected) {
+            assertTrue(expected.getMessage().contains("source pixels"));
+        }
+    }
+
     @Test public void flatGeneratedSpriteHasNoGeometry() throws Exception {
         Map<String,byte[]> assets = new TreeMap<String,byte[]>();
         assets.put("assets/demo/models/token.json",
