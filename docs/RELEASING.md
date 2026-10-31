@@ -23,3 +23,17 @@ This project uses read-only CI for pull requests and branch pushes. A normal com
 **Required GitHub governance:** A developer with Write access must not be able to trigger a public release by pushing to `main`. The release workflow deliberately does not run on `push` and the write token is granted only to its final draft-creation job. An environment name by itself is *not* an approval rule; configure required reviewers separately on GitHub.
 
 **Important:** The draft workflow is intentionally blocked while the Maven version is `-SNAPSHOT`. Addon release jobs also reject `-SNAPSHOT` VoxelCore/Furniture dependencies. Review any pinned dependency commit references before the first release.
+
+## Discord announcements — published releases only
+
+The workflow `.github/workflows/discord-release.yml` announces **only** the `release.published` GitHub event to the VoxelCore Updates channel. Saving a draft, editing release notes, pushing commits, opening PRs, and creating tags do **not** send announcements. Both stable releases and published pre-releases are announced.
+
+Before the first published release, set the repository-level Actions secret `DISCORD_RELEASE_WEBHOOK_URL`:
+
+```powershell
+gh secret set DISCORD_RELEASE_WEBHOOK_URL -R VoxelHorizons/VoxelCore
+```
+
+When prompted, paste the Discord webhook URL privately. The workflow accepts the ordinary Discord URL or the GitHub-compatible variant ending in `/github`; it removes that suffix because it sends a formatted Discord message rather than the raw GitHub payload. Verify the name exists with `gh secret list -R VoxelHorizons/VoxelCore`. Never commit the URL, add it to release notes, or include it in a support log.
+
+Do not also create a native GitHub repository webhook to the same Discord channel: it would produce duplicate notifications and GitHub's native `release` event subscription includes release activities other than publication. Discord notifications do not publish releases; they run only *after* publication, so a notification failure cannot unpublish or block the GitHub Release.
