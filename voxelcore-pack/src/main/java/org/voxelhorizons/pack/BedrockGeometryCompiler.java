@@ -265,22 +265,31 @@ final class BedrockGeometryCompiler {
                 // with the texture mirrored along each reversed in-plane axis.
                 String bedrockFace = insideOut ? insideOutFace(direction, inverted) : direction;
                 boolean[] flip = insideOut ? insideOutFlip(direction, bedrockFace, inverted) : new boolean[2];
-                BufferedImage tile = flipped(sampleTile(image, uv, turn), flip);
+                int[] tileSize = nativeFaceSize(image, uv, turn);
+                BufferedImage tile = flipped(sampleTile(image, uv, turn, tileSize[0], tileSize[1]), flip);
                 int index=painted.size();
+                if (painted.size() >= 4096) throw new IOException("Bedrock face atlas requires more than 4096 tiles");
+                long tilePixels = (long) tile.getWidth() * tile.getHeight();
+                long existingPixels = 0;
+                for (BufferedImage prior : painted)
+                    existingPixels += (long) prior.getWidth() * prior.getHeight();
+                if (existingPixels + tilePixels > MAX_ATLAS_PIXELS)
+                    throw new IOException("Bedrock face atlas requires more than " + MAX_ATLAS_PIXELS
+                            + " source tile pixels; reduce face resolution or split the model");
                 painted.add(tile);
                 if (animation != null) {
                     BufferedImage[] perFrame = new BufferedImage[animation.frames.size()];
                     for (int f = 0; f < perFrame.length; f++) {
                         BufferedImage frame = animation.frames.get(f);
                         if (tintIndex != null) frame = BedrockTints.face(frame, tintIndex.intValue(), tints, javaModel);
-                        perFrame[f] = flipped(sampleTile(frame, uv, turn), flip);
+                        perFrame[f] = flipped(sampleTile(frame, uv, turn, tileSize[0], tileSize[1]), flip);
                     }
                     animatedTiles.put(Integer.valueOf(index), animation);
                     frameTiles.put(Integer.valueOf(index), perFrame);
                 }
                 JsonObject mapped = new JsonObject();
                 mapped.add("uv",xyz2(index,0)); // Absolute atlas placement fixed below.
-                mapped.add("uv_size",xyz2(16,16));
+                mapped.add("uv_size",xyz2(tile.getWidth(),tile.getHeight()));
                 if (!insideOut) { mappedFaces.add(direction,mapped); continue; }
                 // Bedrock cubes only face outward: draw the face as a zero-thickness plane at the
                 // position Java puts it (the authored from/to coordinate), facing as Java's winding.
@@ -301,43 +310,38 @@ final class BedrockGeometryCompiler {
                 cubes.add(cube);
             }
         }
-        if (painted.size() > 4096)
-            throw new IOException("Bedrock face atlas requires too many tiles: "+painted.size());
-        int columns = 1;
-        while (columns*columns < painted.size()) columns*=2;
-        int rows = (painted.size()+columns-1)/columns;
-        int textureWidth = columns*16, textureHeight=1;
-        while(textureHeight < rows*16) textureHeight*=2;
+        AtlasLayout layout = layout(painted);
+        int textureWidth = layout.width, textureHeight = layout.height;
         // Animated textures: one complete atlas per animation step (frame 0 is the default
-        // texture) and a per-model render controller picking one by time with a texture array,
-        // the mechanism the dye controller proved live. Custom materials / uv_anim made the
-        // models invisible on Bedrock (RenderDragon does not load pack materials).
+        // texture) and a per-model render controller picking one by time with a texture array.
+        // All frames reuse identical pixel-exact tile positions so changing frames cannot alter UVs.
         int[] steps = animationSteps(animatedTiles.values(), textureWidth, textureHeight);
         int animationFrames = steps[0], ticksPerFrame = steps[1];
         BufferedImage[] atlases = new BufferedImage[animationFrames];
         for (int frame=0;frame<animationFrames;frame++) {
             BufferedImage atlas = new BufferedImage(textureWidth,textureHeight,BufferedImage.TYPE_INT_ARGB);
-            Graphics2D graphics = atlas.createGraphics();
-            try {
-                for (int i=0;i<painted.size();i++) {
-                    BufferedImage tile = painted.get(i);
-                    JavaTextureAnimation animation = animatedTiles.get(Integer.valueOf(i));
-                    if (animation != null) tile = frameTiles.get(Integer.valueOf(i))[animation.frameIndexAt(frame*ticksPerFrame)];
-                    graphics.drawImage(tile,(i%columns)*16,(i/columns)*16,null);
-                }
-            } finally { graphics.dispose(); }
+            for (int i=0;i<painted.size();i++) {
+                BufferedImage tile = painted.get(i);
+                JavaTextureAnimation animation = animatedTiles.get(Integer.valueOf(i));
+                if (animation != null)
+                    tile = frameTiles.get(Integer.valueOf(i))[animation.frameIndexAt(frame*ticksPerFrame)];
+                paintTile(atlas, tile, layout.positions[i][0], layout.positions[i][1], layout.padding);
+            }
             atlases[frame] = atlas;
         }
 
-        // Copy each face UV to its actual native atlas tile, preserving missing faces.
+        // Copy every face's exact rectangle into the geometry. Preserve Java face ordering
+        // (including inward-facing planes) so indices correspond to the sampled images.
         int next=0;
         for (JsonElement cubeValue : cubes)
             for (Map.Entry<String,JsonElement> face : cubeValue.getAsJsonObject().getAsJsonObject("uv").entrySet()) {
                 JsonArray coordinate = face.getValue().getAsJsonObject().getAsJsonArray("uv");
-                coordinate.set(0,new JsonPrimitive((next%columns)*16));
-                coordinate.set(1,new JsonPrimitive((next/columns)*16));
+                coordinate.set(0,new JsonPrimitive(layout.positions[next][0]));
+                coordinate.set(1,new JsonPrimitive(layout.positions[next][1]));
                 next++;
             }
+        if (next != painted.size())
+            throw new IOException("Generated Bedrock faces do not match sampled texture rectangles");
 
         String geometryId = "geometry.voxelcore." + shortId;
         JsonObject description = new JsonObject();
@@ -489,13 +493,100 @@ final class BedrockGeometryCompiler {
         return new Output(assets,cubes.size(),tinted);
     }
 
-    /** Resample a Java face UV region (with UV rotation) into one 16x16 atlas tile. */
-    private static BufferedImage sampleTile(BufferedImage image, double[] uv, int turn) {
-        // Java models may extend outside the 0..16 cube: clamp source UV to image bounds as in
-        // the preview renderer; cropping with drawImage would leave oversized cuboids transparent.
-        BufferedImage tile = new BufferedImage(16,16,BufferedImage.TYPE_INT_ARGB);
-        for (int ty=0;ty<16;ty++) for (int tx=0;tx<16;tx++) {
-            double u=(tx+0.5)/16.0, v=(ty+0.5)/16.0;
+    /** Native Bedrock texture limits: avoid an accidental huge texture or costly 17-colour dye atlas. */
+    static final int MAX_ATLAS_SIDE = 4096;
+    static final long MAX_ATLAS_PIXELS = 16L * 1024 * 1024;
+    static final int MAX_FACE_SIDE = 1024;
+
+    /**
+     * Java UVs are in 0..16 model units, not source pixels. A 128px texture with a
+     * 5.5x8 UV rectangle needs 44x64 pixels, NOT 16x16. Retain the existing 16px
+     * minimum for low-resolution faces, so their old atlas coordinates remain stable.
+     */
+    static int[] nativeFaceSize(BufferedImage source, double[] uv, int turn) throws IOException {
+        for (double coordinate : uv)
+            if (!Double.isFinite(coordinate))
+                throw new IOException("Non-finite Java face UV coordinate");
+        double rawWidth = Math.abs(uv[2]-uv[0]) * source.getWidth() / 16.0;
+        double rawHeight = Math.abs(uv[3]-uv[1]) * source.getHeight() / 16.0;
+        if (rawWidth > MAX_FACE_SIDE || rawHeight > MAX_FACE_SIDE)
+            throw new IOException("Java face UV needs " + rawWidth + "x" + rawHeight
+                    + " source pixels (max " + MAX_FACE_SIDE + " per axis)");
+        // Rotated Java UVs swap the sampled source axes. No filtering or fractional
+        // downscaling when the UV spans an integral number of source pixels.
+        int quarter = (turn % 180 == 0) ? 0 : 1;
+        int w = (int) Math.ceil((quarter == 0 ? rawWidth : rawHeight) - 1e-9);
+        int h = (int) Math.ceil((quarter == 0 ? rawHeight : rawWidth) - 1e-9);
+        return new int[]{Math.max(16, w), Math.max(16, h)};
+    }
+
+    /** A deterministic shelf-packed atlas; padded when any face is above 16px. */
+    private static final class AtlasLayout {
+        final int width, height, padding;
+        final int[][] positions;
+        AtlasLayout(int width, int height, int padding, int[][] positions) {
+            this.width=width; this.height=height; this.padding=padding; this.positions=positions;
+        }
+    }
+
+    private static AtlasLayout layout(List<BufferedImage> tiles) throws IOException {
+        int padding=0, maxWidth=16;
+        long occupied=0;
+        for (BufferedImage tile : tiles) {
+            if (tile.getWidth()>16 || tile.getHeight()>16) padding=1;
+            maxWidth=Math.max(maxWidth,tile.getWidth());
+        }
+        for (BufferedImage tile : tiles)
+            occupied+=(long)(tile.getWidth()+2*padding)*(tile.getHeight()+2*padding);
+        int width=16;
+        long ideal=Math.max((long)maxWidth+2*padding,(long)Math.ceil(Math.sqrt(occupied)));
+        while (width<ideal && width<MAX_ATLAS_SIDE) width*=2;
+        for (;width<=MAX_ATLAS_SIDE;width*=2) {
+            int[][] positions=new int[tiles.size()][2];
+            int x=0,y=0,rowHeight=0;
+            boolean overflow=false;
+            for (int i=0;i<tiles.size();i++) {
+                BufferedImage tile=tiles.get(i);
+                int cellWidth=tile.getWidth()+2*padding, cellHeight=tile.getHeight()+2*padding;
+                if (cellWidth>width) { overflow=true; break; }
+                if (x+cellWidth>width) {
+                    y+=rowHeight; x=0; rowHeight=0;
+                }
+                positions[i][0]=x+padding; positions[i][1]=y+padding;
+                x+=cellWidth; rowHeight=Math.max(rowHeight,cellHeight);
+                if ((long)y+rowHeight>MAX_ATLAS_SIDE) { overflow=true; break; }
+            }
+            if (overflow) continue;
+            int height=16;
+            while (height<y+rowHeight && height<MAX_ATLAS_SIDE) height*=2;
+            if (height<=MAX_ATLAS_SIDE && (long)width*height<=MAX_ATLAS_PIXELS)
+                return new AtlasLayout(width,height,padding,positions);
+        }
+        throw new IOException("Native face atlas exceeds " + MAX_ATLAS_SIDE + "px / "
+                + MAX_ATLAS_PIXELS + " pixel limit; reduce textures or split the model");
+    }
+
+    /** Copy edge colours into a one-pixel gutter so filtering cannot sample neighbouring faces. */
+    private static void paintTile(BufferedImage atlas, BufferedImage tile, int x, int y, int padding) {
+        Graphics2D graphics=atlas.createGraphics();
+        try { graphics.drawImage(tile,x,y,null); }
+        finally { graphics.dispose(); }
+        if (padding==0) return;
+        for (int row=-1;row<=tile.getHeight();row++)
+            for (int col=-1;col<=tile.getWidth();col++) {
+                if (col>=0 && col<tile.getWidth() && row>=0 && row<tile.getHeight()) continue;
+                int sx=Math.max(0,Math.min(tile.getWidth()-1,col));
+                int sy=Math.max(0,Math.min(tile.getHeight()-1,row));
+                atlas.setRGB(x+col,y+row,tile.getRGB(sx,sy));
+            }
+    }
+
+    /** Sample Java's UV rectangle at native texel density (with UV rotation). */
+    private static BufferedImage sampleTile(BufferedImage image, double[] uv, int turn, int width, int height) {
+        // Keep the existing Minecraft UV/clamp semantics for oversized or inverted cuboids.
+        BufferedImage tile = new BufferedImage(width,height,BufferedImage.TYPE_INT_ARGB);
+        for (int ty=0;ty<height;ty++) for (int tx=0;tx<width;tx++) {
+            double u=(tx+0.5)/width, v=(ty+0.5)/height;
             switch ((turn % 360 + 360) % 360) {
                 case 90: { double t=u; u=v; v=1-t; break; }
                 case 180: u=1-u; v=1-v; break;
