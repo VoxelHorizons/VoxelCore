@@ -8,6 +8,8 @@ import org.voxelhorizons.content.render.RenderAllocation;
 import org.voxelhorizons.content.render.RenderAllocationRegistry;
 import org.voxelhorizons.content.render.RenderAllocationStore;
 import org.voxelhorizons.content.load.ContentLoader;
+import org.voxelhorizons.content.load.ContentDefinitions;
+import org.voxelhorizons.content.block.BlockDefinition;
 import org.voxelhorizons.content.pack.ContentPack;
 import org.voxelhorizons.content.pack.ContentPackDiscovery;
 import java.io.*;
@@ -146,7 +148,25 @@ public final class BedrockPackCompiler {
             }
         }
         for (String ambiguous : ambiguousAssets) javaAssets.remove(ambiguous);
-        progress.report("Bedrock: read " + javaAssets.size() + " Java models/textures from " + packs.size() + " content pack(s)");
+        ContentDefinitions contentDefinitions = new ContentLoader().loadDefinitions(contentRoot);
+        // Java's block models are generated, not authored assets, so reading content-pack
+        // assets alone leaves the implicit block items without a renderable model.
+        // Share the exact Java model template here before hashing the icon cache and
+        // creating Geyser's inventory item mappings. The world's block state mapping
+        // continues to be generated separately by BedrockBlockCompiler.
+        int generatedBlockModels = 0;
+        for (BlockDefinition block : contentDefinitions.blocks().entries().values()) {
+            if (block.abstractDefinition()) continue;
+            String modelPath = "assets/" + block.id().namespace() + "/models/block/"
+                    + block.id().value() + ".json";
+            byte[] generated = BlockPackCompiler.modelJson(block).getBytes(StandardCharsets.UTF_8);
+            if (javaAssets.containsKey(modelPath) || ambiguousAssets.contains(modelPath))
+                throw new IOException("Conflicting authored/generated block model " + modelPath);
+            javaAssets.put(modelPath, generated);
+            generatedBlockModels++;
+        }
+        progress.report("Bedrock: read " + javaAssets.size() + " Java models/textures (including "
+                + generatedBlockModels + " generated block models) from " + packs.size() + " content pack(s)");
         if (vanillaAssets != null)
             for (Map.Entry<String, byte[]> vanilla : VanillaAssets.load(vanillaAssets, progress).entrySet())
                 if (!javaAssets.containsKey(vanilla.getKey())) javaAssets.put(vanilla.getKey(), vanilla.getValue());
@@ -173,7 +193,7 @@ public final class BedrockPackCompiler {
         BedrockGeometryCompiler geometry = new BedrockGeometryCompiler(javaAssets);
         Map<String, byte[]> rendered = new HashMap<String, byte[]>();
         int count = 0;
-        ItemDefinitionRegistry itemRegistry = new ContentLoader().load(contentRoot);
+        ItemDefinitionRegistry itemRegistry = contentDefinitions.items();
         RenderAllocationRegistry renderAllocations = renderAllocations(itemRegistry, glyphAllocationManifest);
         BuildProgress.Step itemStep = progress.step("Bedrock: converting items (icons + 3D models)",
                 itemRegistry.entries().size());
