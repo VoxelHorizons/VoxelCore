@@ -32,7 +32,8 @@ import java.util.HexFormat;
  * at Geyser pre-initialisation, before registries read packs and custom mappings.
  */
 final class RemotePublicationSync {
-    static final String PROTOCOL = "voxelcore-bedrock-remote|1|";
+    static final String PROTOCOL = "voxelcore-bedrock-remote|2|";
+    static final String LEGACY_PROTOCOL = "voxelcore-bedrock-remote|1|";
     static final String PULL_TOKEN_MESSAGE = "voxelcore-bedrock-pull|1";
     static final long MAX_DESCRIPTOR_BYTES = 64 * 1024;
     static final long MAX_PACK_BYTES = 512L * 1024 * 1024;
@@ -57,21 +58,27 @@ final class RemotePublicationSync {
         } catch (RuntimeException invalid) {
             throw new IOException("Remote descriptor is not valid JSON", invalid);
         }
-        final String revision, packHash, mappingsHash, signature;
+        final String revision, packHash, mappingsHash, blocksHash, signature;
+        final int schema;
         final long issuedAt;
         try {
-            if (descriptor.get("schema").getAsInt() != 1) throw new IOException("Unsupported remote descriptor schema");
+            schema = descriptor.get("schema").getAsInt();
+            if (schema != 1 && schema != 2) throw new IOException("Unsupported remote descriptor schema " + schema);
             revision = descriptor.get("revision").getAsString();
             packHash = descriptor.get("pack_sha256").getAsString();
             mappingsHash = descriptor.get("mappings_sha256").getAsString();
+            blocksHash = schema >= 2 ? descriptor.get("blocks_sha256").getAsString() : null;
             issuedAt = descriptor.get("issued_at").getAsLong();
             signature = descriptor.get("signature").getAsString();
         } catch (RuntimeException invalid) {
             throw new IOException("Remote descriptor is missing required fields", invalid);
         }
-        if (!sha256Hex(revision) || !sha256Hex(packHash) || !sha256Hex(mappingsHash) || !sha256Hex(signature))
+        if (!sha256Hex(revision) || !sha256Hex(packHash) || !sha256Hex(mappingsHash)
+                || (schema >= 2 && !sha256Hex(blocksHash)) || !sha256Hex(signature))
             throw new IOException("Remote descriptor has malformed digests");
-        byte[] expected = hmac(secret, PROTOCOL + revision + "|" + packHash + "|" + mappingsHash + "|" + issuedAt);
+        String signed = (schema == 2 ? PROTOCOL : LEGACY_PROTOCOL) + revision + "|" + packHash + "|"
+                + mappingsHash + (schema >= 2 ? "|" + blocksHash : "") + "|" + issuedAt;
+        byte[] expected = hmac(secret, signed);
         if (!MessageDigest.isEqual(expected, HexFormat.of().parseHex(signature)))
             throw new IOException("Remote descriptor signature is invalid");
         if (issuedAt > now + MAX_FUTURE_SKEW_MILLIS)
@@ -87,7 +94,9 @@ final class RemotePublicationSync {
 
         byte[] pack = fetcher.get("voxelcore.mcpack", MAX_PACK_BYTES);
         byte[] mappings = fetcher.get("voxelcore-items.json", MAX_MAPPINGS_BYTES);
-        if (!packHash.equals(sha256(pack)) || !mappingsHash.equals(sha256(mappings)))
+        byte[] blocks = schema >= 2 ? fetcher.get("voxelcore-blocks.json", MAX_MAPPINGS_BYTES) : null;
+        if (!packHash.equals(sha256(pack)) || !mappingsHash.equals(sha256(mappings))
+                || (schema >= 2 && !blocksHash.equals(sha256(blocks))))
             throw new IOException("Downloaded pack/mappings do not match the signed digests");
 
         JsonObject receipt = new JsonObject();
@@ -95,7 +104,8 @@ final class RemotePublicationSync {
         receipt.addProperty("revision", revision);
         receipt.addProperty("pack_sha256", packHash);
         receipt.addProperty("mappings_sha256", mappingsHash);
-        install(geyserRoot, pack, mappings, receipt.toString().getBytes(StandardCharsets.UTF_8));
+        if (schema >= 2) receipt.addProperty("blocks_sha256", blocksHash);
+        install(geyserRoot, pack, mappings, blocks, receipt.toString().getBytes(StandardCharsets.UTF_8));
         PublicationVerifier.State installed = PublicationVerifier.inspect(geyserRoot);
         if (installed.status() != PublicationVerifier.Status.VERIFIED_ON_DISK || !revision.equals(installed.revision()))
             throw new IOException("Installed remote publication failed verification: " + installed.status());
@@ -108,20 +118,23 @@ final class RemotePublicationSync {
         return HexFormat.of().formatHex(hmac(secret, PULL_TOKEN_MESSAGE));
     }
 
-    private static void install(Path root, byte[] pack, byte[] mappings, byte[] receipt) throws IOException {
+    private static void install(Path root, byte[] pack, byte[] mappings, byte[] blocks, byte[] receipt) throws IOException {
         Path[] targets = {root.resolve("packs/voxelcore.mcpack"), root.resolve("custom_mappings/voxelcore-items.json"),
-                root.resolve("voxelcore-publication.json")};
-        byte[][] next = {pack, mappings, receipt};
-        byte[][] previous = new byte[3][];
-        for (int i = 0; i < 3; i++) {
+                root.resolve("custom_mappings/voxelcore-blocks.json"), root.resolve("voxelcore-publication.json")};
+        byte[][] next = {pack, mappings, blocks, receipt};
+        byte[][] previous = new byte[targets.length][];
+        for (int i = 0; i < targets.length; i++) {
             if (Files.isSymbolicLink(targets[i])) throw new IOException("Publication target is a symlink: " + targets[i]);
             previous[i] = Files.isRegularFile(targets[i], LinkOption.NOFOLLOW_LINKS) ? Files.readAllBytes(targets[i]) : null;
         }
         int written = 0;
         try {
-            for (; written < 3; written++) replace(targets[written], next[written]);
+            for (; written < targets.length; written++) {
+                if (next[written] == null) Files.deleteIfExists(targets[written]);
+                else replace(targets[written], next[written]);
+            }
         } catch (IOException failure) {
-            for (int i = 0; i <= Math.min(written, 2); i++) {
+            for (int i = 0; i <= Math.min(written, targets.length - 1); i++) {
                 try {
                     if (previous[i] == null) Files.deleteIfExists(targets[i]);
                     else replace(targets[i], previous[i]);

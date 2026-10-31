@@ -30,7 +30,7 @@ Install a compatible built JAR from the `voxelcore-geyser-extension` module into
 
 ## Author, build, publish and roll back
 
-The compiler automatically renders supported Java models into Bedrock icons, including renderable `abstract: true` definitions. Give individual content a separate explicit flat icon if the original model is unsupported:
+The compiler automatically renders supported Java models into Bedrock icons, including renderable `abstract: true` definitions. For placed custom blocks, it reads **persisted** `block-allocations.yml` from the Java build and translates supported `cube_all`, `cube_column` and six-face `cube` definitions into Geyser `only_override_states` entries with unit-cube native terrain textures. Run the Java build first to create or update block allocations; Bedrock-only compilation fails closed if blocks exist but that manifest is missing. Give individual content a separate explicit flat icon if the original model is unsupported:
 
 ```yaml
 items:
@@ -60,7 +60,8 @@ With no scope (or `all`), build both editions. `pack build java` generates/reloa
 Inspect `plugins/VoxelCore/build/resource-packs/bedrock/<revision>/`:
 
 - `voxelcore.mcpack` — native Bedrock resource pack
-- `voxelcore-items.json` — paired Geyser v2 custom mapping
+- `voxelcore-items.json` — paired Geyser v2 custom item mappings
+- `voxelcore-blocks.json` — Geyser v1 custom block state overrides for supported Java carrier-backed blocks
 - `unsupported-items.txt` — items lacking a valid mapping/preview, with reasons
 - `unsupported-geometry.txt` — icon produced, but native geometry/attachable export unsupported
 
@@ -77,7 +78,7 @@ unrecognised or modified folders, and packs already installed in Geyser are
 not affected. Back up revisions you wish to keep indefinitely outside this build
 output directory.
 
-Configured publication writes `packs/voxelcore.mcpack` and `custom_mappings/voxelcore-items.json` under Geyser, followed by `voxelcore-publication.json` (revision + SHA-256 digests). `pack info` shows publication status. **VERIFIED_ON_DISK does not prove Geyser loaded the revision or that a Bedrock player accepted it.** Restart Geyser after changing mapping/entity registration, and reconnect Bedrock clients. For rollback, stop the owning Geyser, restore **both** files from the same previously exported revision, restart, reconnect and check the receipt. Never restore only one half.
+Configured publication writes `packs/voxelcore.mcpack`, `custom_mappings/voxelcore-items.json` and `custom_mappings/voxelcore-blocks.json` under Geyser, followed by `voxelcore-publication.json` (revision + three SHA-256 digests). `pack info` shows publication status. **VERIFIED_ON_DISK does not prove Geyser loaded the revision or that a Bedrock player accepted it.** Restart Geyser after changing mapping/entity registration, and reconnect Bedrock clients. For rollback, stop the owning Geyser, restore **both** files from the same previously exported revision, restart, reconnect and check the receipt. Restore all three artifacts together; never restore a mismatched subset.
 
 VoxelCore's Java resource-pack `required` setting does not enforce Geyser's Bedrock pack policy. Configure required-pack behavior on Geyser itself. If Floodgate is installed only on a proxy, correctly configure backend Floodgate and key transfer; otherwise the backend may not recognize a Bedrock session.
 
@@ -97,7 +98,7 @@ The 85-question owner audit confirms a useful live Bedrock feature subset on Pap
 | --- | --- | --- |
 | Native pack distribution after build/Geyser restart and client reconnect | Works in observed flow; pack refusal enforcement **not tested** | R2/B01-B03 |
 | Held custom 3D item geometry and inventory/browser icons | Generally works; selected generated textures visibly degrade and some glyphs render incorrectly | [Core #98](https://github.com/VoxelHorizons/VoxelCore/issues/98) |
-| Custom placed blocks using Java carrier/blockstate remaps | **Not visually supported in observed Bedrock behavior**: vanilla carrier note block displays rather than custom model | [Core #94](https://github.com/VoxelHorizons/VoxelCore/issues/94) |
+| Custom placed blocks using Java carrier/blockstate remaps | **Reported defect (31 Oct screenshot)**: Bedrock displays note-block carriers. New mapping generation is pending **live client verification** of both old note-block and new mushroom carriers; never mark it verified from compilation alone | [Core #94](https://github.com/VoxelHorizons/VoxelCore/issues/94) |
 | Furniture models, seats, storage and chunk/client reconnect | Generally works, but some furniture spins/rotates on spawning and model change | [Furniture #46](https://github.com/VoxelHorizons/VoxelFurniture/issues/46) |
 | Bedrock non-OP Survival opening bamboo cupboard-bench storage | **Confirmed defect**: drops/breaks furniture on right-click; can leave ghost that survives chunk reload and server restart. Cherry drawer bench and comparable Java interaction were unaffected. Stored items tested recoverable; duplication unconfirmed. | [Furniture #48](https://github.com/VoxelHorizons/VoxelFurniture/issues/48) |
 | Tractor movement, steering, dismount and chest inventory | Works; attached chest **physical model is invisible** while storage operates | [Vehicles #24](https://github.com/VoxelHorizons/VoxelVehicles/issues/24) |
@@ -112,7 +113,7 @@ The 85-question owner audit confirms a useful live Bedrock feature subset on Pap
 
 The VoxelCore repository contains signed remote publication and projection components. Their implementation and unit tests do **not** prove a real proxy deployment. Use TLS for remotely reachable endpoints, pin versions and keep credentials outside Git.
 
-On the Paper backend set `bedrock.remote_sync.secret` to a private secret **at least 32 characters** long and enable `resource_pack.host`. A Bedrock build exposes `remote.json`, `voxelcore.mcpack` and `voxelcore-items.json` under the hosted `/bedrock/` route using a derived bearer authorization token. In the extension data directory, create `<geyser>/extensions/voxelcore/remote-sync.properties`:
+On the Paper backend set `bedrock.remote_sync.secret` to a private secret **at least 32 characters** long and enable `resource_pack.host`. A Bedrock build exposes `remote.json`, `voxelcore.mcpack`, `voxelcore-items.json` and `voxelcore-blocks.json` under the hosted `/bedrock/` route using a derived bearer authorization token. In the extension data directory, create `<geyser>/extensions/voxelcore/remote-sync.properties`:
 
 ```properties
 url=https://pack.example.net/bedrock
@@ -120,7 +121,7 @@ secret=<same private secret>
 # allow_insecure_http=true  # only on an appropriately secured private network
 ```
 
-At pre-initialization, the extension verifies the HMAC signature, SHA-256 digests, revision and issue time; rejects replay, rollback and future-dated bundle metadata; then stages the pair and receipt with failure recovery. Running Geyser still requires a restart for registration. Treat publication receipt verification as a disk-state fact until the active Geyser/client revision is confirmed.
+At pre-initialization, the extension verifies the versioned HMAC signature, SHA-256 digests for pack/items/blocks, revision and issue time; rejects replay, rollback and future-dated bundle metadata; then stages the pack, both mappings and receipt with failure recovery. Running Geyser still requires a restart for registration. Treat publication receipt verification as a disk-state fact until the active Geyser/client revision is confirmed.
 
 For remote visual feeds, configure VoxelCore `bedrock.remote_sync.projection_directory` and point VoxelFurniture/VoxelVehicles `bedrock.projection.geyser-data-directory` at the matching export folder. The host serves authenticated `/bedrock/projection/<kind>.json`. Configure one entry per backend in the Geyser extension:
 
@@ -142,6 +143,12 @@ Record exact build SHAs and versions and attach outcomes to the relevant issue/r
 5. Test placed furniture/vehicles: ownership/protection, dye, animations, seats, cargo/chests, transform/model change, disconnect, chunk unload/load, teleport/world change and server restart. Verify stale entity cleanup.
 6. Test local and remote deployment, interrupted/mixed revision, stale signed feed, proxy offline, genuine rollback, old client cache and rejoin.
 7. Record expected/actual result, artifact SHA/revision, Paper/Geyser/Floodgate/Bedrock versions, screenshots/logs and approver. **Only then mark a capability Verified.**
+
+### Custom block-state safety and legacy worlds
+
+New modern `method: auto` or `method: mushroom` blocks use a limited reservation pool of opposed horizontal mushroom-face combinations (not the usual naturally generated mushroom faces or vanilla-placed all-faces state). VoxelCore does **not** allocate new note-block states automatically: every combination of vanilla note pitch and instrument is reachable. Persisted note-block allocations continue to map and are **never silently migrated**, because changing them would strand existing placed world blocks. The reserved mushroom pool is intentionally small (24 states). The reservation rule covers ordinary vanilla generation and placement; commands and debug sticks can deliberately create any legal block state, so no carrier-based system can provide an unconditional collision guarantee. Back up `block-allocations.yml` before changing world content.
+
+For #94 reproduction, build Java then Bedrock from the supplied `voxel:ruby_ore` and `voxel:deepslate_ruby_ore` YAML, inspect `voxelcore-blocks.json` and `textures/terrain_texture.json` in the matching revisions, restart the actual Geyser instance, reconnect on Bedrock, and compare the same two placed blocks and vanilla mushrooms/note blocks side by side. Verify break/drop/placement permissions, unload/reload, and a server restart. An on-disk receipt alone is not proof that Geyser accepted the mappings.
 
 ## Known test exception and external bridge decision
 
