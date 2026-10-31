@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing tag vX.Y.Z or vX.Y.Z-rc.N
+        description: Existing numbered tag vX.Y.Z (for example v1.0.0)
         required: true
         type: string
 
@@ -35,7 +35,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]] || { echo 'Invalid release tag'; exit 1; }
+          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo 'Invalid release tag'; exit 1; }
           git fetch --tags origin
           COMMIT=$(git rev-parse --verify "refs/tags/${RELEASE_TAG}^{commit}")
           git merge-base --is-ancestor "$COMMIT" origin/main || { echo 'Tag is not on main'; exit 1; }
@@ -76,10 +76,12 @@ jobs:
           for module in voxelcore-v1_12 voxelcore-v1_14 voxelcore-v1_19_4 voxelcore-v1_20_5 voxelcore-v1_21_4 voxelcore-v26_2 voxelcore-v26_3; do
             mapfile -t jars < <(find "$module/target" -maxdepth 1 -type f -name "VoxelCore-${RELEASE_VERSION}-mc*.jar")
             [[ "${#jars[@]}" -eq 1 ]] || { echo "Expected one JAR in $module"; exit 1; }
+            unzip -p "${jars[0]}" plugin.yml | grep -Fx "version: ${RELEASE_VERSION}"
             cp "${jars[0]}" dist/
           done
           EXTENSION="voxelcore-geyser-extension/target/VoxelCore-GeyserExtension-${RELEASE_VERSION}.jar"
           [[ -s "$EXTENSION" ]] || { echo 'Missing Geyser extension'; exit 1; }
+          unzip -p "$EXTENSION" extension.yml | grep -Fx "version: ${RELEASE_VERSION}"
           cp "$EXTENSION" dist/
           [[ "$(find dist -maxdepth 1 -name '*.jar' | wc -l)" -eq 8 ]] || exit 1
           (cd dist && sha256sum ./*.jar > SHA256SUMS)
@@ -125,5 +127,4 @@ jobs:
           fi
           [[ "$TAG_SHA" == "$EXPECTED_COMMIT" ]] || { echo 'Tag moved after build'; exit 1; }
           FLAGS=(--draft --verify-tag --generate-notes --latest=false)
-          [[ "$RELEASE_TAG" == *-rc.* ]] && FLAGS+=(--prerelease)
           gh release create "$RELEASE_TAG" ./*.jar ./SHA256SUMS -R "$GH_REPO" "${FLAGS[@]}"
