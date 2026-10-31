@@ -73,10 +73,12 @@ jobs:
           for module in voxelcore-v1_12 voxelcore-v1_14 voxelcore-v1_19_4 voxelcore-v1_20_5 voxelcore-v1_21_4 voxelcore-v26_2 voxelcore-v26_3; do
             mapfile -t jars < <(find "$module/target" -maxdepth 1 -type f -name "VoxelCore-${RELEASE_VERSION}-mc*.jar")
             [[ "${#jars[@]}" -eq 1 ]] || { echo "Expected one JAR in $module"; exit 1; }
+            unzip -p "${jars[0]}" plugin.yml | grep -Fx "version: ${RELEASE_VERSION}"
             cp "${jars[0]}" dist/
           done
           EXTENSION="voxelcore-geyser-extension/target/VoxelCore-GeyserExtension-${RELEASE_VERSION}.jar"
           [[ -s "$EXTENSION" ]] || { echo 'Missing Geyser extension'; exit 1; }
+          unzip -p "$EXTENSION" extension.yml | grep -Fx "version: ${RELEASE_VERSION}"
           cp "$EXTENSION" dist/
           [[ "$(find dist -maxdepth 1 -name '*.jar' | wc -l)" -eq 8 ]] || exit 1
           (cd dist && sha256sum ./*.jar > SHA256SUMS)
