@@ -1,7 +1,7 @@
 package org.voxelhorizons.content.block;
 
 import org.voxelhorizons.content.ContentID;
-import org.yaml.snakeyaml.Yaml;
+import org.voxelhorizons.content.pack.ContentPackDiscovery;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,7 +29,7 @@ public final class BlockAllocationStore {
     public BlockAllocationRegistry load() {
         if (!Files.exists(path)) return BlockAllocationRegistry.empty();
         Object loaded;
-        try (InputStream input = Files.newInputStream(path)) { loaded = new Yaml().load(input); }
+        try (InputStream input = Files.newInputStream(path)) { loaded = ContentPackDiscovery.yaml().load(input); }
         catch (IOException exception) { throw new IllegalStateException("Unable to read block allocations " + path, exception); }
         if (!(loaded instanceof Map)) throw new IllegalStateException("Block allocation manifest must be a mapping: " + path);
         Map<?, ?> root = (Map<?, ?>) loaded;
