@@ -10,6 +10,10 @@ updates:
       time: "06:00"
       timezone: "Australia/Melbourne"
     open-pull-requests-limit: 5
+    groups:
+      maven-build-plugins:
+        patterns:
+          - "org.apache.maven.plugins:*"
     # Paper API versions track specific Minecraft server lines, not latest semver.
     # Keep 26.2 and 26.3 API pins independent; audit security updates manually.
     ignore:
@@ -22,3 +26,7 @@ updates:
       time: "06:00"
       timezone: "Australia/Melbourne"
     open-pull-requests-limit: 3
+    groups:
+      github-owned-actions:
+        patterns:
+          - "actions/*"
