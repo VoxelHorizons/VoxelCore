@@ -330,7 +330,15 @@ public final class BedrockPackCompiler {
             }
         }
         itemStep.finish(count + " mapped, " + nativeGeometryCount + " 3D, " + unsupported.size() + " unsupported");
-        if (count == 0 && assets.isEmpty()) throw new IOException("No Bedrock assets or mapped items; add properties.bedrock.texture or bedrock/resource_pack assets");
+        // Java Paper remains the only gameplay state owner; Geyser receives only
+        // resource-pack textures and exact Java carrier-state visual overrides.
+        Path blockManifest = glyphAllocationManifest == null ? null
+                : glyphAllocationManifest.resolveSibling("block-allocations.yml");
+        BedrockBlockCompiler.Output customBlocks = BedrockBlockCompiler.append(
+                contentRoot, blockManifest, javaAssets, assets, unsupported);
+        progress.report("Bedrock: " + customBlocks.count + " placed custom block states mapped for Geyser");
+        if (count == 0 && assets.isEmpty() && customBlocks.count == 0)
+            throw new IOException("No Bedrock assets or mapped items; add properties.bedrock.texture or bedrock/resource_pack assets");
         JsonObject entityIndex = new JsonObject();
         entityIndex.addProperty("schema", 1);
         entityIndex.add("content_models", entityModels);
@@ -367,6 +375,7 @@ public final class BedrockPackCompiler {
         digest.update(unsupported.toString().getBytes(StandardCharsets.UTF_8));
         digest.update(unsupportedGeometry.toString().getBytes(StandardCharsets.UTF_8));
         digest.update(mappingBytes);
+        digest.update(customBlocks.mapping);
         // The zip encoding is part of the published bytes: a new encoding must yield a new revision,
         // or an existing revision directory (and the clients' cached pack) would be reused.
         digest.update(PACK_ENCODING.getBytes(StandardCharsets.UTF_8));
@@ -408,12 +417,13 @@ public final class BedrockPackCompiler {
             }
             zipStep.finish(assets.size() + " files, revision " + revision.substring(0, Math.min(12, revision.length())));
             Files.write(staging.resolve("voxelcore-items.json"), mappingBytes);
+            Files.write(staging.resolve("voxelcore-blocks.json"), customBlocks.mapping);
             Files.write(staging.resolve("unsupported-items.txt"), unsupported, StandardCharsets.UTF_8);
             Files.write(staging.resolve("unsupported-geometry.txt"), unsupportedGeometry, StandardCharsets.UTF_8);
             Path destination = outputRoot.resolve(revision);
             if (!Files.exists(destination)) Files.move(staging, destination);
             return new Result(destination, count, unsupported.size(), revision, reasonSummary, mappedGlyphs,
-                    nativeGeometryCount, unsupportedGeometry.size());
+                    nativeGeometryCount, unsupportedGeometry.size(), customBlocks.count);
         } finally {
             if (Files.exists(staging)) try (Stream<Path> paths = Files.walk(staging)) {
                 for (Path path : (Iterable<Path>) paths.sorted(Comparator.reverseOrder())::iterator) Files.delete(path);
@@ -583,13 +593,20 @@ public final class BedrockPackCompiler {
         public final int mappedGlyphs;
         public final int nativeGeometryCount;
         public final int unsupportedGeometryCount;
+        public final int mappedBlocks;
         Result(Path directory, int mappedItems, int unsupportedItems, String revision, String unsupportedReasonSummary, int mappedGlyphs,
                int nativeGeometryCount, int unsupportedGeometryCount) {
+            this(directory, mappedItems, unsupportedItems, revision, unsupportedReasonSummary, mappedGlyphs,
+                    nativeGeometryCount, unsupportedGeometryCount, 0);
+        }
+        Result(Path directory, int mappedItems, int unsupportedItems, String revision, String unsupportedReasonSummary, int mappedGlyphs,
+               int nativeGeometryCount, int unsupportedGeometryCount, int mappedBlocks) {
             this.directory = directory; this.mappedItems = mappedItems; this.unsupportedItems = unsupportedItems; this.revision = revision;
             this.unsupportedReasonSummary = unsupportedReasonSummary;
             this.mappedGlyphs = mappedGlyphs;
             this.nativeGeometryCount = nativeGeometryCount;
             this.unsupportedGeometryCount = unsupportedGeometryCount;
+            this.mappedBlocks = mappedBlocks;
         }
     }
 }

@@ -30,7 +30,7 @@ public class CustomBlockPackCompilerTest {
         assertEquals(1, result.renderedItems());
         assertTrue(zipText(zip, "assets/test/models/block/ruby_ore.json").contains("test:block/ruby_ore"));
         assertTrue(zipText(zip, "assets/test/items/block/ruby_ore.json").contains("test:block/ruby_ore"));
-        assertTrue(zipText(zip, "assets/minecraft/blockstates/note_block.json").contains("test:block/ruby_ore"));
+        assertTrue(zipText(zip, "assets/minecraft/blockstates/brown_mushroom_block.json").contains("test:block/ruby_ore"));
         assertTrue(Files.readAllBytes(build.resolve("block-allocations.yml")).length > 0);
 
         Path numericBuild = temporaryFolder.newFolder("numeric-build").toPath();

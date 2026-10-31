@@ -22,12 +22,14 @@ public final class PublicationVerifier {
             return new State(Status.NOT_PUBLISHED, "", "Geyser data directory is absent");
         Path pack = root.resolve("packs/voxelcore.mcpack");
         Path mapping = root.resolve("custom_mappings/voxelcore-items.json");
+        Path blocks = root.resolve("custom_mappings/voxelcore-blocks.json");
         Path receipt = root.resolve("voxelcore-publication.json");
         try {
-            if (Files.isSymbolicLink(pack) || Files.isSymbolicLink(mapping) || Files.isSymbolicLink(receipt))
+            if (Files.isSymbolicLink(pack) || Files.isSymbolicLink(mapping)
+                    || Files.isSymbolicLink(blocks) || Files.isSymbolicLink(receipt))
                 return new State(Status.UNSAFE_PATH, "", "Publication paths cannot be symlinks");
             if (!Files.isRegularFile(receipt)) {
-                if (Files.isRegularFile(pack) || Files.isRegularFile(mapping))
+                if (Files.isRegularFile(pack) || Files.isRegularFile(mapping) || Files.isRegularFile(blocks))
                     return new State(Status.UNTRACKED, "", "Pack/mappings found without revision receipt");
                 return new State(Status.NOT_PUBLISHED, "", "No VoxelCore publication files found");
             }
@@ -39,15 +41,21 @@ public final class PublicationVerifier {
                 String revision = json.get("revision").getAsString();
                 String packHash = json.get("pack_sha256").getAsString();
                 String mappingHash = json.get("mappings_sha256").getAsString();
-                if (!valid(revision) || !valid(packHash) || !valid(mappingHash))
+                boolean hasBlocks = json.has("blocks_sha256");
+                String blocksHash = hasBlocks ? json.get("blocks_sha256").getAsString() : "";
+                if (!valid(revision) || !valid(packHash) || !valid(mappingHash)
+                        || (hasBlocks && !valid(blocksHash)))
                     throw new IllegalArgumentException("Invalid SHA-256 fields");
-                if (!Files.isRegularFile(pack) || !Files.isRegularFile(mapping))
-                    return new State(Status.MISMATCH, revision, "Published pack and mappings must both exist");
+                if (!Files.isRegularFile(pack) || !Files.isRegularFile(mapping)
+                        || (hasBlocks && !Files.isRegularFile(blocks)))
+                    return new State(Status.MISMATCH, revision, "Published files required by receipt are missing");
                 if (!packHash.equals(sha256(Files.readAllBytes(pack)))
-                        || !mappingHash.equals(sha256(Files.readAllBytes(mapping))))
+                        || !mappingHash.equals(sha256(Files.readAllBytes(mapping)))
+                        || (hasBlocks && !blocksHash.equals(sha256(Files.readAllBytes(blocks)))))
                     return new State(Status.MISMATCH, revision, "Published file digests do not match the receipt");
-                return new State(Status.VERIFIED_ON_DISK, revision,
-                        "Pair matches receipt; active Geyser/client state is not verified");
+                return new State(Status.VERIFIED_ON_DISK, revision, hasBlocks
+                        ? "Pack, items and blocks match receipt; active Geyser/client state is not verified"
+                        : "Legacy pack/item pair matches receipt; block mappings are not covered");
             } catch (RuntimeException invalid) {
                 return new State(Status.CORRUPT_RECEIPT, "", invalid.getMessage());
             }

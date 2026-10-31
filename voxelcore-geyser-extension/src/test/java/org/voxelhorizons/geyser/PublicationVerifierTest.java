@@ -44,6 +44,29 @@ public final class PublicationVerifierTest {
         assertEquals(PublicationVerifier.Status.MISMATCH,PublicationVerifier.inspect(root).status());
     }
 
+    @Test public void validatesBlockMappingAndRejectsTampering() throws Exception {
+        Path root = temp.newFolder().toPath();
+        Path pack = root.resolve("packs/voxelcore.mcpack");
+        Path items = root.resolve("custom_mappings/voxelcore-items.json");
+        Path blocks = root.resolve("custom_mappings/voxelcore-blocks.json");
+        Files.createDirectories(pack.getParent());
+        Files.createDirectories(items.getParent());
+        byte[] p = {1, 2}, i = {3, 4}, b = "{\"format_version\":1,\"blocks\":{}}".getBytes(StandardCharsets.UTF_8);
+        Files.write(pack, p);
+        Files.write(items, i);
+        Files.write(blocks, b);
+        JsonObject receipt = new JsonObject();
+        receipt.addProperty("schema", 1);
+        receipt.addProperty("revision", "ab".repeat(32));
+        receipt.addProperty("pack_sha256", sha(p));
+        receipt.addProperty("mappings_sha256", sha(i));
+        receipt.addProperty("blocks_sha256", sha(b));
+        Files.writeString(root.resolve("voxelcore-publication.json"), receipt.toString());
+        assertEquals(PublicationVerifier.Status.VERIFIED_ON_DISK, PublicationVerifier.inspect(root).status());
+        Files.writeString(blocks, "{}");
+        assertEquals(PublicationVerifier.Status.MISMATCH, PublicationVerifier.inspect(root).status());
+    }
+
     @Test public void rejectsCorruptManifestRatherThanAssumingLoaded() throws Exception {
         Path root=temp.newFolder().toPath();
         Files.writeString(root.resolve("voxelcore-publication.json"),"{broken",StandardCharsets.UTF_8);

@@ -38,6 +38,7 @@ public final class GeyserPackPublisherTest {
         assertTrue(Files.isRegularFile(geyser.resolve("voxelcore-publication.json")));
         assertTrue(Files.isRegularFile(geyser.resolve("packs/voxelcore.mcpack")));
         assertTrue(Files.isRegularFile(geyser.resolve("custom_mappings/voxelcore-items.json")));
+        assertTrue(Files.isRegularFile(geyser.resolve("custom_mappings/voxelcore-blocks.json")));
         Files.write(geyser.resolve("custom_mappings/voxelcore-items.json"), "{}".getBytes(StandardCharsets.UTF_8));
         assertEquals("MISMATCH", GeyserPackPublisher.inspect(geyser).status);
     }
@@ -49,6 +50,7 @@ public final class GeyserPackPublisherTest {
         new GeyserPackPublisher().publish(first, geyser);
         byte[] oldPack = Files.readAllBytes(geyser.resolve("packs/voxelcore.mcpack"));
         byte[] oldMapping = Files.readAllBytes(geyser.resolve("custom_mappings/voxelcore-items.json"));
+        byte[] oldBlocks = Files.readAllBytes(geyser.resolve("custom_mappings/voxelcore-blocks.json"));
         byte[] oldReceipt = Files.readAllBytes(geyser.resolve("voxelcore-publication.json"));
         Path texture = root.resolve("demo/assets/demo/textures/item/token.png");
         java.awt.image.BufferedImage changed = new java.awt.image.BufferedImage(16,16,2);
@@ -67,6 +69,7 @@ public final class GeyserPackPublisherTest {
         }
         assertArrayEquals(oldPack, Files.readAllBytes(geyser.resolve("packs/voxelcore.mcpack")));
         assertArrayEquals(oldMapping, Files.readAllBytes(geyser.resolve("custom_mappings/voxelcore-items.json")));
+        assertArrayEquals(oldBlocks, Files.readAllBytes(geyser.resolve("custom_mappings/voxelcore-blocks.json")));
         assertArrayEquals(oldReceipt, Files.readAllBytes(geyser.resolve("voxelcore-publication.json")));
         assertEquals("VERIFIED_ON_DISK", GeyserPackPublisher.inspect(geyser).status);
         assertEquals(first.revision, GeyserPackPublisher.inspect(geyser).revision);
@@ -79,7 +82,7 @@ public final class GeyserPackPublisherTest {
         Path geyser = temp.newFolder().toPath();
         try {
             new GeyserPackPublisher(step -> {
-                if (step == 3) throw new IOException("receipt write failed");
+                if (step == 4) throw new IOException("receipt write failed");
             }).publish(result, geyser);
             fail("Deployment must fail");
         } catch (IOException expected) {
@@ -87,6 +90,7 @@ public final class GeyserPackPublisherTest {
         }
         assertFalse(Files.exists(geyser.resolve("packs/voxelcore.mcpack")));
         assertFalse(Files.exists(geyser.resolve("custom_mappings/voxelcore-items.json")));
+        assertFalse(Files.exists(geyser.resolve("custom_mappings/voxelcore-blocks.json")));
         assertFalse(Files.exists(geyser.resolve("voxelcore-publication.json")));
     }
 
