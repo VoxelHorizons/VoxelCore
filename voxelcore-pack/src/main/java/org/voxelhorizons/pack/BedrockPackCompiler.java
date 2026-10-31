@@ -25,6 +25,13 @@ public final class BedrockPackCompiler {
     private BuildProgress progress = BuildProgress.NONE;
     private boolean overrideControllerGlyphPages;
     private BedrockGlyphAtlas.Shrink glyphShrink = BedrockGlyphAtlas.Shrink.AREA;
+    private int oversizedGlyphSize = BedrockGlyphAtlas.DEFAULT_OVERSIZED_MAX_SIZE;
+
+    /** Longest side in page pixels that glyphs taller than 32 Java pixels are reduced to (16..256). */
+    public BedrockPackCompiler withOversizedGlyphSize(int size) {
+        oversizedGlyphSize = Math.max(BedrockGlyphAtlas.MIN_CELL, Math.min(BedrockGlyphAtlas.MAX_CELL, size));
+        return this;
+    }
 
     /** area (default), nearest or native: how glyphs taller than their Bedrock size are reduced. */
     public BedrockPackCompiler withGlyphShrink(String mode) {
@@ -145,7 +152,7 @@ public final class BedrockPackCompiler {
                 if (!javaAssets.containsKey(vanilla.getKey())) javaAssets.put(vanilla.getKey(), vanilla.getValue());
         int mappedGlyphs = glyphAllocationManifest == null ? 0
                 : BedrockGlyphAtlas.append(contentRoot, glyphAllocationManifest, javaAssets, assets, unsupported,
-                        overrideControllerGlyphPages, glyphShrink);
+                        overrideControllerGlyphPages, glyphShrink, oversizedGlyphSize);
         progress.report("Bedrock: " + mappedGlyphs + " font glyphs placed"
                 + (unsupported.isEmpty() ? "" : "; " + unsupported.size() + " glyphs skipped (see unsupported-items.txt)"));
         int menuBackgrounds = glyphAllocationManifest == null ? 0

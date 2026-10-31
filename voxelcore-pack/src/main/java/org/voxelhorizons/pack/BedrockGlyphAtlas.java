@@ -35,6 +35,10 @@ final class BedrockGlyphAtlas {
     static final int MAX_CELL = 256;
     /** Vanilla bitmap glyphs are 8px; twice that height counts as large inline artwork. */
     static final int LARGE_GLYPH_HEIGHT = 16;
+    /** Java heights above this are oversized artwork (logos, banners) that must be reduced to fit a page cell. */
+    static final int INLINE_MAX_HEIGHT = 32;
+    /** Default longest side for an oversized glyph without an explicit Bedrock size. */
+    static final int DEFAULT_OVERSIZED_MAX_SIZE = 128;
 
     static int append(Path contentRoot, Path allocationManifest, Map<String, byte[]> javaAssets,
                       Map<String, byte[]> bedrockAssets) throws IOException {
@@ -47,6 +51,13 @@ final class BedrockGlyphAtlas {
         return append(contentRoot, allocationManifest, javaAssets, bedrockAssets, skipped, false, Shrink.AREA);
     }
 
+    static int append(Path contentRoot, Path allocationManifest, Map<String, byte[]> javaAssets,
+                      Map<String, byte[]> bedrockAssets, java.util.List<String> skipped,
+                      boolean overrideControllerPages, Shrink shrink) throws IOException {
+        return append(contentRoot, allocationManifest, javaAssets, bedrockAssets, skipped,
+                overrideControllerPages, shrink, DEFAULT_OVERSIZED_MAX_SIZE);
+    }
+
     /**
      * How a glyph taller than its Bedrock target is reduced. Bedrock draws a glyph-page pixel at
      * a fixed size, so a 16px flag shown 10px tall cannot keep every pixel: AREA keeps all detail
@@ -56,13 +67,18 @@ final class BedrockGlyphAtlas {
     enum Shrink { AREA, NEAREST, NATIVE }
 
     /**
+     * @param oversizedMaxSize longest side, in page pixels, an oversized glyph (Java height above
+     *        {@link #INLINE_MAX_HEIGHT}) is reduced to; the page cell grows to match, so a lower value
+     *        keeps the glyph page smaller. A glyph with {@code bedrock_height} or {@code bedrock_scale}
+     *        may use up to {@link #MAX_CELL} regardless.
      * @param overrideControllerPages also write authored glyphs at U+E000..U+E1FF (Bedrock's
      *        controller-icon pages glyph_E0/E1), as the Kafal converter does: the glyphs show,
      *        but Bedrock's own button icons on a written page are replaced for every player
      */
     static int append(Path contentRoot, Path allocationManifest, Map<String, byte[]> javaAssets,
                       Map<String, byte[]> bedrockAssets, java.util.List<String> skipped,
-                      boolean overrideControllerPages, Shrink shrink) throws IOException {
+                      boolean overrideControllerPages, Shrink shrink, int oversizedMaxSize) throws IOException {
+        int oversizedLimit = Math.max(MIN_CELL, Math.min(MAX_CELL, oversizedMaxSize));
         UiGlyphRegistry glyphs = new UiGlyphLoader().load(contentRoot, allocationManifest, false);
         Map<Integer, Glyph> pending = new TreeMap<Integer, Glyph>();
         int count = 0;
@@ -70,7 +86,7 @@ final class BedrockGlyphAtlas {
             String label = "glyph " + glyph.id();
             // GUI overlays (menu backgrounds) and tall pictures are Java screen art, not inline text.
             if (glyph.gui()) continue;
-            if (glyph.scaleRatio() > 32) { skipped.add(label + ": Java height " + glyph.scaleRatio() + " is too tall for a Bedrock text glyph"); continue; }
+            boolean oversized = glyph.scaleRatio() > INLINE_MAX_HEIGHT;
             int codePoint = glyph.codePoint();
             if (codePoint < 0xE200 || codePoint > 0xF3FF) { skipped.add(label + ": codepoint outside U+E200..U+F3FF"); continue; }
             String[] ref = glyph.texture().split(":", 2);
@@ -85,26 +101,39 @@ final class BedrockGlyphAtlas {
             // Use the untrimmed source height to distinguish native-resolution large
             // glyphs from font bitmaps that Java explicitly downscales. Cropping must not
             // affect this decision.
-            Glyph sized = new Glyph(reduceBlocks(icon),
-                    visibleHeight(glyph.scaleRatio(), icon.getHeight(), original.getHeight()),
-                    (double) original.getHeight() / glyph.scaleRatio(), glyph.scaleRatio(),
-                    javaVerticalOffset(glyph.scaleRatio(), glyph.ascent(), original.getHeight(),
-                            transparentTopRows(original), icon.getHeight()));
+            Glyph sized;
+            if (oversized || glyph.bedrockHeight() > 0 || glyph.bedrockScale() > 0) {
+                int full = oversizedHeight(glyph.scaleRatio(), glyph.bedrockHeight(), glyph.bedrockScale());
+                boolean explicit = glyph.bedrockHeight() > 0 || glyph.bedrockScale() > 0;
+                sized = Glyph.oversized(reduceBlocks(icon),
+                        visibleHeight(full, icon.getHeight(), original.getHeight()),
+                        explicit ? MAX_CELL : oversizedLimit);
+            } else {
+                sized = new Glyph(reduceBlocks(icon),
+                        visibleHeight(glyph.scaleRatio(), icon.getHeight(), original.getHeight()),
+                        (double) original.getHeight() / glyph.scaleRatio(), glyph.scaleRatio(),
+                        javaVerticalOffset(glyph.scaleRatio(), glyph.ascent(), original.getHeight(),
+                                transparentTopRows(original), icon.getHeight()));
+            }
             if (pending.containsKey(Integer.valueOf(codePoint)) || occupiedByAuthoredPage(bedrockAssets, codePoint))
                 throw new IOException("Bedrock font cell U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT)
                         + " is already occupied (managed glyph " + glyph.id() + ")");
             pending.put(Integer.valueOf(codePoint), sized);
             count++;
         }
-        count += appendAuthored(contentRoot, javaAssets, pending, bedrockAssets, skipped, overrideControllerPages);
+        count += appendAuthored(contentRoot, javaAssets, pending, bedrockAssets, skipped, overrideControllerPages, oversizedLimit);
         double ratio = pixelRatio(pending.values());
         Map<Integer, BufferedImage> drawn = new TreeMap<Integer, BufferedImage>();
         Map<Integer, Integer> verticalOffsets = new TreeMap<Integer, Integer>();
         for (Map.Entry<Integer, Glyph> entry : pending.entrySet()) {
             Glyph glyph = entry.getValue();
+            // The oversized path is deliberately independent of the normal-font ascent calibration.
             double glyphRatio = effectiveRatio(glyph, ratio);
-            drawn.put(entry.getKey(), sized(glyph.art, glyph.javaHeight, glyphRatio, shrink));
-            verticalOffsets.put(entry.getKey(), Integer.valueOf((int) Math.round(glyph.javaVerticalOffset * glyphRatio)));
+            drawn.put(entry.getKey(), glyph.maxSide > 0
+                    ? sizedOversized(glyph.art, glyph.javaHeight, glyph.maxSide, shrink)
+                    : sized(glyph.art, glyph.javaHeight, glyphRatio, shrink));
+            verticalOffsets.put(entry.getKey(), Integer.valueOf(glyph.maxSide > 0 ? 0
+                    : (int) Math.round(glyph.javaVerticalOffset * glyphRatio)));
         }
         writePages(drawn, verticalOffsets, bedrockAssets);
         return count;
@@ -120,72 +149,103 @@ final class BedrockGlyphAtlas {
     static int appendAuthored(Path contentRoot, Map<String, byte[]> javaAssets, Map<Integer, Glyph> pending,
                               Map<String, byte[]> bedrockAssets, java.util.List<String> skipped,
                               boolean overrideControllerPages) throws IOException {
+        return appendAuthored(contentRoot, javaAssets, pending, bedrockAssets, skipped,
+                overrideControllerPages, DEFAULT_OVERSIZED_MAX_SIZE);
+    }
+
+    /**
+     * Also reads custom font files ({@code assets/<namespace>/font/*.json}). Bedrock has one
+     * font, so their private-use characters are written to the same glyph pages. Providers
+     * taller than {@link #INLINE_MAX_HEIGHT} in a custom font are logos and are reduced to
+     * {@code oversizedLimit}; providers with a negative ascent are drawn below the text line
+     * (screen overlays) and are skipped.
+     */
+    static int appendAuthored(Path contentRoot, Map<String, byte[]> javaAssets, Map<Integer, Glyph> pending,
+                              Map<String, byte[]> bedrockAssets, java.util.List<String> skipped,
+                              boolean overrideControllerPages, int oversizedLimit) throws IOException {
         int count = 0;
         for (org.voxelhorizons.content.pack.ContentPack pack : new org.voxelhorizons.content.pack.ContentPackDiscovery().discover(contentRoot)) {
-            Path font = pack.root().resolve("assets/minecraft/font/default.json");
-            if (!java.nio.file.Files.isRegularFile(font)) continue;
-            com.google.gson.JsonObject root;
-            try {
-                root = com.google.gson.JsonParser.parseString(new String(java.nio.file.Files.readAllBytes(font),
-                        java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
-            } catch (RuntimeException invalid) {
-                continue; // The Java build reports malformed fonts; never block Bedrock on them.
-            }
-            if (!root.has("providers") || !root.get("providers").isJsonArray()) continue;
-            for (com.google.gson.JsonElement element : root.getAsJsonArray("providers")) {
-                if (!element.isJsonObject()) continue;
-                com.google.gson.JsonObject provider = element.getAsJsonObject();
-                if (!provider.has("type") || !"bitmap".equals(provider.get("type").getAsString())
-                        || !provider.has("file") || !provider.has("chars")) continue;
-                String file = provider.get("file").getAsString();
-                int javaHeight = provider.has("height") ? provider.get("height").getAsInt() : 8;
-                // Java screen art (menu backgrounds) is drawn tall; it is not inline text.
-                if (javaHeight > 32) continue;
-                String[] ref = file.contains(":") ? file.split(":", 2) : new String[]{"minecraft", file};
-                String path = ref[1].endsWith(".png") ? ref[1] : ref[1] + ".png";
-                byte[] bytes = javaAssets.get("assets/" + ref[0] + "/textures/" + path);
-                if (bytes == null) continue;
-                BufferedImage bitmap = ImageIO.read(new ByteArrayInputStream(bytes));
-                if (bitmap == null) continue;
-                java.util.List<int[]> rows = new java.util.ArrayList<int[]>();
-                int columns = 0;
-                for (com.google.gson.JsonElement row : provider.getAsJsonArray("chars")) {
-                    int[] codePoints = row.getAsString().codePoints().toArray();
-                    rows.add(codePoints);
-                    columns = Math.max(columns, codePoints.length);
+            java.util.List<Path> fonts = new java.util.ArrayList<Path>();
+            Path assets = pack.root().resolve("assets");
+            if (java.nio.file.Files.isDirectory(assets)) {
+                try (java.util.stream.Stream<Path> walk = java.nio.file.Files.walk(assets, 3)) {
+                    walk.filter(f -> f.getParent() != null && f.getParent().getFileName() != null
+                            && "font".equals(f.getParent().getFileName().toString())
+                            && f.getFileName().toString().endsWith(".json")
+                            && java.nio.file.Files.isRegularFile(f)).forEach(fonts::add);
                 }
-                if (rows.isEmpty() || columns == 0) continue;
-                int cellWidth = bitmap.getWidth() / columns, cellHeight = bitmap.getHeight() / rows.size();
-                if (cellWidth < 1 || cellHeight < 1) continue;
-                int javaAscent = provider.has("ascent") ? provider.get("ascent").getAsInt() : Math.min(7, javaHeight);
-                for (int r = 0; r < rows.size(); r++) {
-                    int[] codePoints = rows.get(r);
-                    for (int c = 0; c < codePoints.length; c++) {
-                        int codePoint = codePoints[c];
-                        if (codePoint == 0 || codePoint == ' ' || codePoint > 0xFFFF) continue;
-                        if (codePoint >= 0xE000 && codePoint <= 0xE1FF && !overrideControllerPages) {
-                            skipped.add("font glyph U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT)
-                                    + " (" + file + "): in Bedrock's controller-icon pages; enable "
-                                    + "bedrock.override_controller_glyph_pages or migrate it with /voxelcore admin pack glyphs");
-                            continue;
+            }
+            java.util.Collections.sort(fonts);
+            Path defaultFont = assets.resolve("minecraft/font/default.json");
+            for (Path font : fonts) {
+                boolean custom = !font.equals(defaultFont);
+                com.google.gson.JsonObject root;
+                try {
+                    root = com.google.gson.JsonParser.parseString(new String(java.nio.file.Files.readAllBytes(font),
+                            java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+                } catch (RuntimeException invalid) {
+                    continue; // The Java build reports malformed fonts; never block Bedrock on them.
+                }
+                if (!root.has("providers") || !root.get("providers").isJsonArray()) continue;
+                for (com.google.gson.JsonElement element : root.getAsJsonArray("providers")) {
+                    if (!element.isJsonObject()) continue;
+                    com.google.gson.JsonObject provider = element.getAsJsonObject();
+                    if (!provider.has("type") || !"bitmap".equals(provider.get("type").getAsString())
+                            || !provider.has("file") || !provider.has("chars")) continue;
+                    String file = provider.get("file").getAsString();
+                    int javaHeight = provider.has("height") ? provider.get("height").getAsInt() : 8;
+                    // Java screen art (menu backgrounds) is drawn tall; it is not inline text.
+                    boolean oversized = javaHeight > INLINE_MAX_HEIGHT;
+                    if (oversized && !custom) continue;
+                    if (custom && provider.has("ascent") && provider.get("ascent").getAsInt() < 0) continue;
+                    String[] ref = file.contains(":") ? file.split(":", 2) : new String[]{"minecraft", file};
+                    String path = ref[1].endsWith(".png") ? ref[1] : ref[1] + ".png";
+                    byte[] bytes = javaAssets.get("assets/" + ref[0] + "/textures/" + path);
+                    if (bytes == null) continue;
+                    BufferedImage bitmap = ImageIO.read(new ByteArrayInputStream(bytes));
+                    if (bitmap == null) continue;
+                    java.util.List<int[]> rows = new java.util.ArrayList<int[]>();
+                    int columns = 0;
+                    for (com.google.gson.JsonElement row : provider.getAsJsonArray("chars")) {
+                        int[] codePoints = row.getAsString().codePoints().toArray();
+                        rows.add(codePoints);
+                        columns = Math.max(columns, codePoints.length);
+                    }
+                    if (rows.isEmpty() || columns == 0) continue;
+                    int cellWidth = bitmap.getWidth() / columns, cellHeight = bitmap.getHeight() / rows.size();
+                    if (cellWidth < 1 || cellHeight < 1) continue;
+                    int javaAscent = provider.has("ascent") ? provider.get("ascent").getAsInt() : Math.min(7, javaHeight);
+                    for (int r = 0; r < rows.size(); r++) {
+                        int[] codePoints = rows.get(r);
+                        for (int c = 0; c < codePoints.length; c++) {
+                            int codePoint = codePoints[c];
+                            if (codePoint == 0 || codePoint == ' ' || codePoint > 0xFFFF) continue;
+                            if (codePoint >= 0xE000 && codePoint <= 0xE1FF && !overrideControllerPages) {
+                                skipped.add("font glyph U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT)
+                                        + " (" + file + "): in Bedrock's controller-icon pages; enable "
+                                        + "bedrock.override_controller_glyph_pages or migrate it with /voxelcore admin pack glyphs");
+                                continue;
+                            }
+                            if (codePoint < 0xE000) continue; // Ordinary text keeps Bedrock's own font.
+                            if (pending.containsKey(Integer.valueOf(codePoint)) || occupiedByAuthoredPage(bedrockAssets, codePoint)) continue;
+                            BufferedImage sourceCell = bitmap.getSubimage(c * cellWidth, r * cellHeight, cellWidth, cellHeight);
+                            BufferedImage icon = trim(sourceCell);
+                            if (icon == null) continue;
+                            String unfit = unfit(icon);
+                            if (unfit != null) {
+                                skipped.add("font glyph U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT)
+                                        + " (" + file + "): " + unfit);
+                                continue;
+                            }
+                            pending.put(Integer.valueOf(codePoint), oversized
+                                    ? Glyph.oversized(reduceBlocks(icon),
+                                            visibleHeight(javaHeight, icon.getHeight(), cellHeight), oversizedLimit)
+                                    : new Glyph(reduceBlocks(icon), visibleHeight(javaHeight, icon.getHeight(), cellHeight),
+                                            (double) cellHeight / javaHeight, javaHeight,
+                                            javaVerticalOffset(javaHeight, javaAscent, cellHeight,
+                                                    transparentTopRows(sourceCell), icon.getHeight())));
+                            count++;
                         }
-                        if (codePoint < 0xE000) continue; // Ordinary text keeps Bedrock's own font.
-                        if (pending.containsKey(Integer.valueOf(codePoint)) || occupiedByAuthoredPage(bedrockAssets, codePoint)) continue;
-                        BufferedImage sourceCell = bitmap.getSubimage(c * cellWidth, r * cellHeight, cellWidth, cellHeight);
-                        BufferedImage icon = trim(sourceCell);
-                        if (icon == null) continue;
-                        String unfit = unfit(icon);
-                        if (unfit != null) {
-                            skipped.add("font glyph U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT)
-                                    + " (" + file + "): " + unfit);
-                            continue;
-                        }
-                        pending.put(Integer.valueOf(codePoint),
-                                new Glyph(reduceBlocks(icon), visibleHeight(javaHeight, icon.getHeight(), cellHeight),
-                                        (double) cellHeight / javaHeight, javaHeight,
-                                        javaVerticalOffset(javaHeight, javaAscent, cellHeight,
-                                                transparentTopRows(sourceCell), icon.getHeight())));
-                        count++;
                     }
                 }
             }
@@ -247,15 +307,25 @@ final class BedrockGlyphAtlas {
         final int javaHeight;
         final double sourcePixelsPerJavaPixel;
         final int providerHeight;
+        /** Longest allowed side for an oversized glyph baked at exactly javaHeight; 0 for ordinary glyphs. */
+        final int maxSide;
         final double javaVerticalOffset;
+        static Glyph oversized(BufferedImage art, int bakedHeight, int maxSide) {
+            return new Glyph(art, bakedHeight, Double.POSITIVE_INFINITY, bakedHeight, maxSide, 0.0);
+        }
         Glyph(BufferedImage art, int javaHeight) {
             this(art, javaHeight, Double.POSITIVE_INFINITY, javaHeight);
         }
         Glyph(BufferedImage art, int javaHeight, double sourcePixelsPerJavaPixel, int providerHeight) {
-            this(art, javaHeight, sourcePixelsPerJavaPixel, providerHeight, 0.0);
+            this(art, javaHeight, sourcePixelsPerJavaPixel, providerHeight, 0, 0.0);
         }
         Glyph(BufferedImage art, int javaHeight, double sourcePixelsPerJavaPixel,
               int providerHeight, double javaVerticalOffset) {
+            this(art, javaHeight, sourcePixelsPerJavaPixel, providerHeight, 0, javaVerticalOffset);
+        }
+        private Glyph(BufferedImage art, int javaHeight, double sourcePixelsPerJavaPixel,
+                      int providerHeight, int maxSide, double javaVerticalOffset) {
+            this.maxSide = maxSide;
             this.art = art;
             this.javaHeight = Math.max(1, javaHeight <= 0 ? 8 : javaHeight);
             this.sourcePixelsPerJavaPixel = sourcePixelsPerJavaPixel;
@@ -287,6 +357,7 @@ final class BedrockGlyphAtlas {
     static double pixelRatio(java.util.Collection<Glyph> glyphs) {
         java.util.List<Double> tags = new java.util.ArrayList<Double>(), all = new java.util.ArrayList<Double>();
         for (Glyph glyph : glyphs) {
+            if (glyph.maxSide > 0) continue; // Oversized art is fitted separately and says nothing about tag scale.
             double ratio = (double) glyph.art.getHeight() / glyph.javaHeight;
             if (ratio > 4) continue; // Large images are resampled anyway.
             if (glyph.art.getHeight() < 4) continue; // Flat colour reduces to ~1px: says nothing about scale.
@@ -327,6 +398,40 @@ final class BedrockGlyphAtlas {
             out = scaled(out, Math.max(1, (int) (out.getWidth() * fit)), Math.max(1, (int) (out.getHeight() * fit)));
         }
         return out;
+    }
+
+    /**
+     * Full baked height of an oversized glyph in page pixels: an explicit {@code bedrockHeight}
+     * wins, then {@code javaHeight * bedrockScale}, else the Java height. Always within 1..MAX_CELL.
+     */
+    static int oversizedHeight(int javaHeight, int bedrockHeight, double bedrockScale) {
+        double height = bedrockHeight > 0 ? bedrockHeight
+                : bedrockScale > 0 ? Math.round(javaHeight * bedrockScale) : javaHeight;
+        return (int) Math.max(1, Math.min(MAX_CELL, height));
+    }
+
+    /**
+     * Fits large artwork to {@code targetHeight} page pixels tall with its aspect ratio kept,
+     * then shrinks both sides further when the longest exceeds {@code maxSide}. Reduction uses
+     * area averaging (or nearest with {@link Shrink#NEAREST}); enlarging uses nearest.
+     */
+    static BufferedImage sizedOversized(BufferedImage art, int targetHeight, int maxSide, Shrink shrink) {
+        int limit = Math.max(1, Math.min(MAX_CELL, maxSide));
+        double aspect = (double) art.getWidth() / art.getHeight();
+        double height = Math.max(1, targetHeight);
+        double width = height * aspect;
+        double longest = Math.max(width, height);
+        if (longest > limit) {
+            double fit = limit / longest;
+            width *= fit;
+            height *= fit;
+        }
+        int w = Math.max(1, (int) Math.round(width)), h = Math.max(1, (int) Math.round(height));
+        w = Math.min(w, limit);
+        h = Math.min(h, limit);
+        if (w == art.getWidth() && h == art.getHeight()) return art;
+        boolean shrinking = w < art.getWidth() || h < art.getHeight();
+        return shrinking && shrink != Shrink.NEAREST ? areaAverage(art, w, h) : nearest(art, w, h);
     }
 
     /** Box-filter downscale weighting each source pixel by its covered area, in premultiplied alpha. */
