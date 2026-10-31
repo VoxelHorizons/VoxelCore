@@ -82,6 +82,29 @@ jobs:
           unzip -Z1 "$ext" | grep -Fx 'org/voxelhorizons/geyser/VoxelCoreGeyserExtension.class'
           unzip -Z1 "$ext" | grep -Fx 'org/voxelhorizons/geyser/PublicationVerifier.class'
 
+      - name: Capture resolved Maven dependency trees
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn --batch-mode --no-transfer-progress org.apache.maven.plugins:maven-dependency-plugin:3.11.0:tree -Dverbose -DoutputType=text -DoutputFile=target/security-dependency-tree.txt
+          mkdir -p dependency-audit/dependency-trees
+          for module in voxelcore-common voxelcore-pack voxelcore-plugin voxelcore-v1_12 voxelcore-v1_14 voxelcore-v1_19_4 voxelcore-v1_20_5 voxelcore-v1_21_4 voxelcore-v26_2 voxelcore-v26_3 voxelcore-geyser-extension; do
+            file="$module/target/security-dependency-tree.txt"
+            test -s "$file" || { echo "Missing dependency tree: $file"; exit 1; }
+            cp "$file" "dependency-audit/dependency-trees/$module.txt"
+          done
+
+      - name: Audit actual shaded JAR contents
+        run: python3 .github/scripts/audit-release-dependencies.py
+
+      - name: Upload dependency and artifact audit evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: VoxelCore-Dependency-Audit
+          path: dependency-audit/
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Upload VoxelCore Geyser Extension
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
