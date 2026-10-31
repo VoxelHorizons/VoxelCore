@@ -63,6 +63,9 @@ jobs:
           cache: maven
       - name: Build and test tagged source
         run: mvn -B --no-transfer-progress clean verify
+      - name: Audit tagged release JAR contents
+        run: python3 .github/scripts/audit-release-dependencies.py
+
       - name: Assemble plugin distributions, Geyser extension, and hashes
         env:
           RELEASE_VERSION: ${{ needs.validate.outputs.version }}
