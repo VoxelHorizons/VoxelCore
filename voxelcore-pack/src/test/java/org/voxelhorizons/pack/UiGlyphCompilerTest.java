@@ -188,6 +188,46 @@ public class UiGlyphCompilerTest {
     }
 
     @Test
+    public void parsesAndValidatesBedrockSizeKeys() throws Exception {
+        File contentRoot = temporaryFolder.newFolder("bedrock-size-content");
+        File pack = new File(contentRoot, "voxel");
+        assertTrue(new File(pack, "content").mkdirs());
+        File texture = new File(pack, "assets/voxel/textures/ui/logo.png");
+        assertTrue(texture.getParentFile().mkdirs());
+        writePng(texture, 256, 117);
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
+        File definition = new File(pack, "content/ui.yml");
+        String head = "ui:\n  logo:\n    path: ui/logo.png\n    scale_ratio: 128\n";
+
+        write(definition, head + "    bedrock_height: 96\n    bedrock_scale: 0.5\n");
+        UiGlyphDefinition glyph = new UiGlyphLoader().load(contentRoot.toPath(),
+                temporaryFolder.newFolder("ok-build").toPath().resolve("glyphs.yml"), false)
+                .get(ContentID.of("voxel", "logo")).get();
+        assertEquals(96, glyph.bedrockHeight());
+        assertEquals(0.5D, glyph.bedrockScale(), 0.0D);
+
+        write(definition, head);
+        glyph = new UiGlyphLoader().load(contentRoot.toPath(),
+                temporaryFolder.newFolder("default-build").toPath().resolve("glyphs.yml"), false)
+                .get(ContentID.of("voxel", "logo")).get();
+        assertEquals(0, glyph.bedrockHeight());
+        assertEquals(0.0D, glyph.bedrockScale(), 0.0D);
+
+        String[] invalid = {"    bedrock_height: 300\n", "    bedrock_height: 0\n",
+                "    bedrock_scale: 0\n", "    bedrock_scale: 9\n", "    bedrock_scale: big\n"};
+        for (int i = 0; i < invalid.length; i++) {
+            write(definition, head + invalid[i]);
+            try {
+                new UiGlyphLoader().load(contentRoot.toPath(),
+                        temporaryFolder.newFolder("bad-build-" + i).toPath().resolve("glyphs.yml"), false);
+                fail("Expected " + invalid[i].trim() + " to fail");
+            } catch (RuntimeException exception) {
+                assertTrue(exception.getMessage(), exception.getMessage().contains("bedrock_"));
+            }
+        }
+    }
+
+    @Test
     public void defaultsScaleAndPositionAndRejectsInvalidPosition() throws Exception {
         File contentRoot = temporaryFolder.newFolder("explicit-content");
         File pack = new File(contentRoot, "voxel");

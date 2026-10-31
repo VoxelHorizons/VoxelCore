@@ -577,6 +577,7 @@ public final class PackCommand implements SubCommand {
                             localGeyserDataDirectory(plugin));
             final boolean controllerGlyphPages = plugin.getConfig().getBoolean("bedrock.override_controller_glyph_pages", true);
             final String glyphShrink = plugin.getConfig().getString("bedrock.glyph_shrink", "area");
+            final int oversizedGlyphSize = plugin.getConfig().getInt("bedrock.oversized_glyph_size", 128);
             final int bedrockRetainedRevisions = plugin.getConfig().getInt("bedrock.generated_pack_retention", 2);
             final long startingRevision = plugin.getContentRuntime().current().revision();
             sender.sendMessage("VoxelCore " + scope.label() + " pack build for " + target.id()
@@ -589,7 +590,7 @@ public final class PackCommand implements SubCommand {
                     final org.voxelhorizons.pack.BuildProgress progress = buildProgress(plugin, sender, job);
                     try {
                         run(plugin, sender, job, buildScope, target, currentServerTarget, bedrockEnabled, remoteSecret,
-                                geyserDestination, controllerGlyphPages, glyphShrink, bedrockRetainedRevisions,
+                                geyserDestination, controllerGlyphPages, glyphShrink, oversizedGlyphSize, bedrockRetainedRevisions,
                                 startingRevision, progress);
                     } catch (org.voxelhorizons.pack.BuildProgress.Cancelled stopped) {
                         plugin.getLogger().info("[pack build] Stopped (" + stopped.getMessage() + "); nothing was published.");
@@ -612,7 +613,8 @@ public final class PackCommand implements SubCommand {
         private void run(VoxelCore plugin, CommandSender sender, BuildJob job, BuildScope scope, JavaPackTarget target,
                          boolean currentServerTarget, boolean bedrockEnabled, byte[] remoteSecret,
                          org.voxelhorizons.pack.GeyserPackPublisher.Destination geyserDestination,
-                         boolean controllerGlyphPages, String glyphShrink, int bedrockRetainedRevisions,
+                         boolean controllerGlyphPages, String glyphShrink, int oversizedGlyphSize,
+                         int bedrockRetainedRevisions,
                          long startingRevision,
                          org.voxelhorizons.pack.BuildProgress progress) {
             JavaPackBuildResult output = null;
@@ -626,7 +628,7 @@ public final class PackCommand implements SubCommand {
             String bedrockStatus = "";
             if (scope.bedrock() && currentServerTarget && bedrockEnabled) {
                 bedrockStatus = buildBedrock(plugin, target, progress, geyserDestination, remoteSecret,
-                        controllerGlyphPages, glyphShrink, bedrockRetainedRevisions);
+                        controllerGlyphPages, glyphShrink, oversizedGlyphSize, bedrockRetainedRevisions);
             }
             // No checkpoint past here: once Bedrock publishing has started the build completes, so
             // the Java and Bedrock packs never end up from different runs.
@@ -702,7 +704,7 @@ public final class PackCommand implements SubCommand {
         private String buildBedrock(VoxelCore plugin, JavaPackTarget target, org.voxelhorizons.pack.BuildProgress progress,
                                     org.voxelhorizons.pack.GeyserPackPublisher.Destination geyserDestination,
                                     byte[] remoteSecret, boolean controllerGlyphPages, String glyphShrink,
-                                    int bedrockRetainedRevisions) {
+                                    int oversizedGlyphSize, int bedrockRetainedRevisions) {
             try {
                 // 1.21.4+: item_model definitions; 1.14-1.21.3: Geyser legacy custom_model_data definitions.
                 String vanillaNote = "";
@@ -721,6 +723,7 @@ public final class PackCommand implements SubCommand {
                                 .withProgress(progress)
                                 .withControllerGlyphPages(controllerGlyphPages)
                                 .withGlyphShrink(glyphShrink)
+                                .withOversizedGlyphSize(oversizedGlyphSize)
                                 .compile(
                                 plugin.getPackManager().contentRoot(),
                                 plugin.getPackManager().outputRoot().resolve("bedrock"),
