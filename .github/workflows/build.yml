@@ -93,6 +93,12 @@ jobs:
             test -s "$file" || { echo "Missing dependency tree: $file"; exit 1; }
             cp "$file" "dependency-audit/dependency-trees/$module.txt"
           done
+          echo '::group::Resolved security-relevant Maven dependency paths'
+          for tree in dependency-audit/dependency-trees/*.txt; do
+            echo "--- $tree ---"
+            grep -E 'com.google.guava:guava|com.google.code.gson:gson|org.yaml:snakeyaml|io.netty:netty-(handler|codec-haproxy|transport-classes-epoll|transport)|io.airlift:aircompressor|org.codehaus.plexus:plexus-utils' "$tree" || true
+          done
+          echo '::endgroup::'
 
       - name: Audit actual shaded JAR contents
         run: python3 .github/scripts/audit-release-dependencies.py
