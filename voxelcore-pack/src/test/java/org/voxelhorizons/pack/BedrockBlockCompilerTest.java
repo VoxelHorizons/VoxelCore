@@ -83,7 +83,7 @@ public final class BedrockBlockCompilerTest {
         }
         try (ZipFile pack = new ZipFile(result.directory.resolve("voxelcore.mcpack").toFile())) {
             assertNotNull(pack.getEntry("textures/terrain_texture.json"));
-            JsonObject terrain = json(pack.getInputStream(pack.getEntry("textures/terrain_texture.json")).readAllBytes());
+            JsonObject terrain = json(readAll(pack.getInputStream(pack.getEntry("textures/terrain_texture.json"))));
             assertEquals(2, terrain.getAsJsonObject("texture_data").size());
             assertEquals(2, pack.stream().filter(e -> e.getName().startsWith("textures/voxelcore/b_")).count());
         }
@@ -121,12 +121,22 @@ public final class BedrockBlockCompilerTest {
         Files.delete(root.resolve("demo/assets/demo/textures/block/ore/ruby_ore.png"));
         BedrockPackCompiler.Result result = new BedrockPackCompiler().compile(root, temp.newFolder().toPath(), glyphs);
         assertEquals(1, result.mappedBlocks);
-        String unsupported = Files.readString(result.directory.resolve("unsupported-items.txt"));
+        String unsupported = new String(Files.readAllBytes(result.directory.resolve("unsupported-items.txt")),
+                StandardCharsets.UTF_8);
         assertTrue(unsupported, unsupported.contains("block demo:ruby_ore: missing Java block texture"));
         JsonObject blocks = json(Files.readAllBytes(result.directory.resolve("voxelcore-blocks.json")))
                 .getAsJsonObject("blocks");
         assertEquals(1, blocks.getAsJsonObject("minecraft:brown_mushroom_block")
                 .getAsJsonObject("state_overrides").size());
+    }
+
+    private static byte[] readAll(java.io.InputStream input) throws java.io.IOException {
+        try (java.io.InputStream in = input; java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+            byte[] buffer = new byte[4096];
+            int count;
+            while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+            return out.toByteArray();
+        }
     }
 
     private static JsonObject json(byte[] data) {
