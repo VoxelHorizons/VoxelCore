@@ -435,6 +435,40 @@ public class BedrockPackCompilerTest {
         assertEquals("64px cells", 64 * 16, glyphPage(smaller).getWidth());
     }
 
+    @Test public void customFontLogoIsConvertedButScreenOverlaysAreNot() throws Exception {
+        Path root = fixture(), out = temp.newFolder().toPath();
+        Path dir = root.resolve("demo/assets/demo/textures/brand");
+        Files.createDirectories(dir);
+        for (String name : new String[]{"logo", "overlay"}) {
+            java.awt.image.BufferedImage bitmap = new java.awt.image.BufferedImage(256, 117, 2);
+            for (int y = 0; y < 117; y++) for (int x = 0; x < 256; x++) bitmap.setRGB(x, y, 0xffdd8800);
+            javax.imageio.ImageIO.write(bitmap, "png", dir.resolve(name + ".png").toFile());
+        }
+        write(root.resolve("demo/assets/demo/font/branding.json"), "{\"providers\":["
+                + "{\"type\":\"bitmap\",\"file\":\"demo:brand/logo.png\",\"ascent\":32,\"height\":48,\"chars\":[\"\\uef00\"]},"
+                + "{\"type\":\"bitmap\",\"file\":\"demo:brand/overlay.png\",\"ascent\":-108,\"height\":50,\"chars\":[\"\\uef01\"]}]}");
+        Path allocations = temp.newFolder("glyph-custom-font").toPath().resolve("glyph-allocations.yml");
+        BedrockPackCompiler.Result result = new BedrockPackCompiler().compile(root, out, allocations);
+        assertEquals(1, result.mappedGlyphs);
+        try (ZipFile zip = new ZipFile(result.directory.resolve("voxelcore.mcpack").toFile())) {
+            assertNotNull("Custom font logo gets a glyph page", zip.getEntry("font/glyph_EF.png"));
+            try (java.io.InputStream image = zip.getInputStream(zip.getEntry("font/glyph_EF.png"))) {
+                java.awt.image.BufferedImage atlas = javax.imageio.ImageIO.read(image);
+                int cell = atlas.getWidth() / 16;
+                int x0 = 0, y0 = 0, minX = cell, maxX = -1;
+                for (int y = 0; y < cell; y++) for (int x = 0; x < cell; x++)
+                    if ((atlas.getRGB(x0 + x, y0 + y) >>> 24) != 0) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); }
+                assertTrue("logo sits in slot 0 of U+EF00", maxX >= 0);
+                assertTrue("logo fits its cell", maxX - minX + 1 <= cell);
+                int overlay = 1, ox = (overlay % 16) * cell;
+                boolean any = false;
+                for (int y = 0; y < cell; y++) for (int x = 0; x < cell; x++)
+                    if ((atlas.getRGB(ox + x, y) >>> 24) != 0) any = true;
+                assertFalse("negative-ascent overlay stays Java only", any);
+            }
+        }
+    }
+
     @Test public void explicitBedrockHeightOverridesTheDefaultLimit() throws Exception {
         String yaml = "ui:\n  branding_logo:\n    path: ui/logo.png\n    scale_ratio: 128\n    bedrock_height: 200\n";
         BedrockPackCompiler.Result result = compileLogo(256, 117, yaml, c -> c);

@@ -119,7 +119,7 @@ final class BedrockGlyphAtlas {
             pending.put(Integer.valueOf(codePoint), sized);
             count++;
         }
-        count += appendAuthored(contentRoot, javaAssets, pending, bedrockAssets, skipped, overrideControllerPages);
+        count += appendAuthored(contentRoot, javaAssets, pending, bedrockAssets, skipped, overrideControllerPages, oversizedLimit);
         double ratio = pixelRatio(pending.values());
         Map<Integer, BufferedImage> drawn = new TreeMap<Integer, BufferedImage>();
         for (Map.Entry<Integer, Glyph> entry : pending.entrySet()) {
@@ -142,68 +142,99 @@ final class BedrockGlyphAtlas {
     static int appendAuthored(Path contentRoot, Map<String, byte[]> javaAssets, Map<Integer, Glyph> pending,
                               Map<String, byte[]> bedrockAssets, java.util.List<String> skipped,
                               boolean overrideControllerPages) throws IOException {
+        return appendAuthored(contentRoot, javaAssets, pending, bedrockAssets, skipped,
+                overrideControllerPages, DEFAULT_OVERSIZED_MAX_SIZE);
+    }
+
+    /**
+     * Also reads custom font files ({@code assets/<namespace>/font/*.json}). Bedrock has one
+     * font, so their private-use characters are written to the same glyph pages. Providers
+     * taller than {@link #INLINE_MAX_HEIGHT} in a custom font are logos and are reduced to
+     * {@code oversizedLimit}; providers with a negative ascent are drawn below the text line
+     * (screen overlays) and are skipped.
+     */
+    static int appendAuthored(Path contentRoot, Map<String, byte[]> javaAssets, Map<Integer, Glyph> pending,
+                              Map<String, byte[]> bedrockAssets, java.util.List<String> skipped,
+                              boolean overrideControllerPages, int oversizedLimit) throws IOException {
         int count = 0;
         for (org.voxelhorizons.content.pack.ContentPack pack : new org.voxelhorizons.content.pack.ContentPackDiscovery().discover(contentRoot)) {
-            Path font = pack.root().resolve("assets/minecraft/font/default.json");
-            if (!java.nio.file.Files.isRegularFile(font)) continue;
-            com.google.gson.JsonObject root;
-            try {
-                root = com.google.gson.JsonParser.parseString(new String(java.nio.file.Files.readAllBytes(font),
-                        java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
-            } catch (RuntimeException invalid) {
-                continue; // The Java build reports malformed fonts; never block Bedrock on them.
-            }
-            if (!root.has("providers") || !root.get("providers").isJsonArray()) continue;
-            for (com.google.gson.JsonElement element : root.getAsJsonArray("providers")) {
-                if (!element.isJsonObject()) continue;
-                com.google.gson.JsonObject provider = element.getAsJsonObject();
-                if (!provider.has("type") || !"bitmap".equals(provider.get("type").getAsString())
-                        || !provider.has("file") || !provider.has("chars")) continue;
-                String file = provider.get("file").getAsString();
-                int javaHeight = provider.has("height") ? provider.get("height").getAsInt() : 8;
-                // Java screen art (menu backgrounds) is drawn tall; it is not inline text.
-                if (javaHeight > 32) continue;
-                String[] ref = file.contains(":") ? file.split(":", 2) : new String[]{"minecraft", file};
-                String path = ref[1].endsWith(".png") ? ref[1] : ref[1] + ".png";
-                byte[] bytes = javaAssets.get("assets/" + ref[0] + "/textures/" + path);
-                if (bytes == null) continue;
-                BufferedImage bitmap = ImageIO.read(new ByteArrayInputStream(bytes));
-                if (bitmap == null) continue;
-                java.util.List<int[]> rows = new java.util.ArrayList<int[]>();
-                int columns = 0;
-                for (com.google.gson.JsonElement row : provider.getAsJsonArray("chars")) {
-                    int[] codePoints = row.getAsString().codePoints().toArray();
-                    rows.add(codePoints);
-                    columns = Math.max(columns, codePoints.length);
+            java.util.List<Path> fonts = new java.util.ArrayList<Path>();
+            Path assets = pack.root().resolve("assets");
+            if (java.nio.file.Files.isDirectory(assets)) {
+                try (java.util.stream.Stream<Path> walk = java.nio.file.Files.walk(assets, 3)) {
+                    walk.filter(f -> f.getParent() != null && f.getParent().getFileName() != null
+                            && "font".equals(f.getParent().getFileName().toString())
+                            && f.getFileName().toString().endsWith(".json")
+                            && java.nio.file.Files.isRegularFile(f)).forEach(fonts::add);
                 }
-                if (rows.isEmpty() || columns == 0) continue;
-                int cellWidth = bitmap.getWidth() / columns, cellHeight = bitmap.getHeight() / rows.size();
-                if (cellWidth < 1 || cellHeight < 1) continue;
-                for (int r = 0; r < rows.size(); r++) {
-                    int[] codePoints = rows.get(r);
-                    for (int c = 0; c < codePoints.length; c++) {
-                        int codePoint = codePoints[c];
-                        if (codePoint == 0 || codePoint == ' ' || codePoint > 0xFFFF) continue;
-                        if (codePoint >= 0xE000 && codePoint <= 0xE1FF && !overrideControllerPages) {
-                            skipped.add("font glyph U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT)
-                                    + " (" + file + "): in Bedrock's controller-icon pages; enable "
-                                    + "bedrock.override_controller_glyph_pages or migrate it with /voxelcore admin pack glyphs");
-                            continue;
+            }
+            java.util.Collections.sort(fonts);
+            Path defaultFont = assets.resolve("minecraft/font/default.json");
+            for (Path font : fonts) {
+                boolean custom = !font.equals(defaultFont);
+                com.google.gson.JsonObject root;
+                try {
+                    root = com.google.gson.JsonParser.parseString(new String(java.nio.file.Files.readAllBytes(font),
+                            java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+                } catch (RuntimeException invalid) {
+                    continue; // The Java build reports malformed fonts; never block Bedrock on them.
+                }
+                if (!root.has("providers") || !root.get("providers").isJsonArray()) continue;
+                for (com.google.gson.JsonElement element : root.getAsJsonArray("providers")) {
+                    if (!element.isJsonObject()) continue;
+                    com.google.gson.JsonObject provider = element.getAsJsonObject();
+                    if (!provider.has("type") || !"bitmap".equals(provider.get("type").getAsString())
+                            || !provider.has("file") || !provider.has("chars")) continue;
+                    String file = provider.get("file").getAsString();
+                    int javaHeight = provider.has("height") ? provider.get("height").getAsInt() : 8;
+                    // Java screen art (menu backgrounds) is drawn tall; it is not inline text.
+                    boolean oversized = javaHeight > INLINE_MAX_HEIGHT;
+                    if (oversized && !custom) continue;
+                    if (custom && provider.has("ascent") && provider.get("ascent").getAsInt() < 0) continue;
+                    String[] ref = file.contains(":") ? file.split(":", 2) : new String[]{"minecraft", file};
+                    String path = ref[1].endsWith(".png") ? ref[1] : ref[1] + ".png";
+                    byte[] bytes = javaAssets.get("assets/" + ref[0] + "/textures/" + path);
+                    if (bytes == null) continue;
+                    BufferedImage bitmap = ImageIO.read(new ByteArrayInputStream(bytes));
+                    if (bitmap == null) continue;
+                    java.util.List<int[]> rows = new java.util.ArrayList<int[]>();
+                    int columns = 0;
+                    for (com.google.gson.JsonElement row : provider.getAsJsonArray("chars")) {
+                        int[] codePoints = row.getAsString().codePoints().toArray();
+                        rows.add(codePoints);
+                        columns = Math.max(columns, codePoints.length);
+                    }
+                    if (rows.isEmpty() || columns == 0) continue;
+                    int cellWidth = bitmap.getWidth() / columns, cellHeight = bitmap.getHeight() / rows.size();
+                    if (cellWidth < 1 || cellHeight < 1) continue;
+                    for (int r = 0; r < rows.size(); r++) {
+                        int[] codePoints = rows.get(r);
+                        for (int c = 0; c < codePoints.length; c++) {
+                            int codePoint = codePoints[c];
+                            if (codePoint == 0 || codePoint == ' ' || codePoint > 0xFFFF) continue;
+                            if (codePoint >= 0xE000 && codePoint <= 0xE1FF && !overrideControllerPages) {
+                                skipped.add("font glyph U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT)
+                                        + " (" + file + "): in Bedrock's controller-icon pages; enable "
+                                        + "bedrock.override_controller_glyph_pages or migrate it with /voxelcore admin pack glyphs");
+                                continue;
+                            }
+                            if (codePoint < 0xE000) continue; // Ordinary text keeps Bedrock's own font.
+                            if (pending.containsKey(Integer.valueOf(codePoint)) || occupiedByAuthoredPage(bedrockAssets, codePoint)) continue;
+                            BufferedImage icon = trim(bitmap.getSubimage(c * cellWidth, r * cellHeight, cellWidth, cellHeight));
+                            if (icon == null) continue;
+                            String unfit = unfit(icon);
+                            if (unfit != null) {
+                                skipped.add("font glyph U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT)
+                                        + " (" + file + "): " + unfit);
+                                continue;
+                            }
+                            pending.put(Integer.valueOf(codePoint), oversized
+                                    ? Glyph.oversized(reduceBlocks(icon),
+                                            visibleHeight(javaHeight, icon.getHeight(), cellHeight), oversizedLimit)
+                                    : new Glyph(reduceBlocks(icon), visibleHeight(javaHeight, icon.getHeight(), cellHeight),
+                                            (double) cellHeight / javaHeight, javaHeight));
+                            count++;
                         }
-                        if (codePoint < 0xE000) continue; // Ordinary text keeps Bedrock's own font.
-                        if (pending.containsKey(Integer.valueOf(codePoint)) || occupiedByAuthoredPage(bedrockAssets, codePoint)) continue;
-                        BufferedImage icon = trim(bitmap.getSubimage(c * cellWidth, r * cellHeight, cellWidth, cellHeight));
-                        if (icon == null) continue;
-                        String unfit = unfit(icon);
-                        if (unfit != null) {
-                            skipped.add("font glyph U+" + Integer.toHexString(codePoint).toUpperCase(java.util.Locale.ROOT)
-                                    + " (" + file + "): " + unfit);
-                            continue;
-                        }
-                        pending.put(Integer.valueOf(codePoint),
-                                new Glyph(reduceBlocks(icon), visibleHeight(javaHeight, icon.getHeight(), cellHeight),
-                                        (double) cellHeight / javaHeight, javaHeight));
-                        count++;
                     }
                 }
             }
