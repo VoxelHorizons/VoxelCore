@@ -21,7 +21,7 @@ import java.util.Locale;
  * B17 producer: exports the built Bedrock pair with a signed {@code remote.json} for a
  * Geyser running on a proxy or another host (consumer: the Geyser extension's
  * RemotePublicationSync). Signature = HMAC-SHA256(secret,
- * "voxelcore-bedrock-remote|1|revision|pack_sha256|mappings_sha256|issued_at").
+ * "voxelcore-bedrock-remote|2|revision|pack_sha256|mappings_sha256|blocks_sha256|issued_at").
  * Pulls authenticate with a bearer token = HMAC-SHA256(secret, "voxelcore-bedrock-pull|1"),
  * so the secret itself never crosses the network.
  */
@@ -29,8 +29,9 @@ public final class RemoteBedrockBundle {
     public static final String DESCRIPTOR = "remote.json";
     public static final String PACK = "voxelcore.mcpack";
     public static final String MAPPINGS = "voxelcore-items.json";
-    public static final List<String> FILES = Collections.unmodifiableList(Arrays.asList(DESCRIPTOR, PACK, MAPPINGS));
-    static final String PROTOCOL = "voxelcore-bedrock-remote|1|";
+    public static final String BLOCKS = "voxelcore-blocks.json";
+    public static final List<String> FILES = Collections.unmodifiableList(Arrays.asList(DESCRIPTOR, PACK, MAPPINGS, BLOCKS));
+    static final String PROTOCOL = "voxelcore-bedrock-remote|2|";
     static final String PULL_TOKEN_MESSAGE = "voxelcore-bedrock-pull|1";
 
     private RemoteBedrockBundle() {}
@@ -49,19 +50,23 @@ public final class RemoteBedrockBundle {
         if (result == null || result.directory == null) throw new IOException("No Bedrock build result to export");
         byte[] pack = Files.readAllBytes(result.directory.resolve(PACK));
         byte[] mappings = Files.readAllBytes(result.directory.resolve(MAPPINGS));
+        byte[] blocks = Files.readAllBytes(result.directory.resolve(BLOCKS));
         String packHash = hex(MessageDigestHolder.sha256(pack)), mappingsHash = hex(MessageDigestHolder.sha256(mappings));
+        String blocksHash = hex(MessageDigestHolder.sha256(blocks));
         JsonObject descriptor = new JsonObject();
-        descriptor.addProperty("schema", 1);
+        descriptor.addProperty("schema", 2);
         descriptor.addProperty("revision", result.revision);
         descriptor.addProperty("pack_sha256", packHash);
         descriptor.addProperty("mappings_sha256", mappingsHash);
+        descriptor.addProperty("blocks_sha256", blocksHash);
         descriptor.addProperty("issued_at", issuedAt);
         descriptor.addProperty("signature", hex(hmac(secret,
-                PROTOCOL + result.revision + "|" + packHash + "|" + mappingsHash + "|" + issuedAt)));
+                PROTOCOL + result.revision + "|" + packHash + "|" + mappingsHash + "|" + blocksHash + "|" + issuedAt)));
         if (Files.isSymbolicLink(exportDir)) throw new IOException("Bedrock remote export directory is a symlink");
         Files.createDirectories(exportDir);
         replace(exportDir.resolve(PACK), pack);
         replace(exportDir.resolve(MAPPINGS), mappings);
+        replace(exportDir.resolve(BLOCKS), blocks);
         replace(exportDir.resolve(DESCRIPTOR), descriptor.toString().getBytes(StandardCharsets.UTF_8));
     }
 

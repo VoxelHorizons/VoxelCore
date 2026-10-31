@@ -12,6 +12,30 @@ public final class BlockCarrierStates {
 
     private BlockCarrierStates() {}
 
+    /**
+     * A deliberately narrow pool for NEW modern custom blocks: a pair of opposite
+     * horizontal cap/stem faces is exposed while the perpendicular pair is hidden.
+     * The vanilla giant-mushroom cap and stem generators do not form these opposed,
+     * isolated pairs. This excludes naturally grown mushrooms and the all-true
+     * block placed from a vanilla inventory; commands/debug sticks can still make
+     * ANY valid Java blockstate, so this is not a universal noncollision guarantee.
+     *
+     * Existing allocations remain stable even if they predate this reservation policy.
+     */
+    public static boolean reservedMushroomSlot(int slot) {
+        if (slot < 0 || slot >= 189) return false;
+        int bits = (slot % 63) + 1;
+        boolean east = bit(bits, 1), north = bit(bits, 2);
+        boolean south = bit(bits, 3), west = bit(bits, 5);
+        return (east && west && !north && !south) || (north && south && !east && !west);
+    }
+
+    /** Note blocks have no states provably unused by normal vanilla music mechanics. */
+    public static boolean safeForNewAllocation(BlockMethod method, int slot, boolean modern) {
+        if (!modern) return method == BlockMethod.MUSHROOM && slot >= 0 && slot < capacity(method, false);
+        return method == BlockMethod.MUSHROOM && reservedMushroomSlot(slot);
+    }
+
     public static int capacity(BlockMethod method, boolean modern) {
         if (method == BlockMethod.SOLID) return modern ? INSTRUMENTS.length * 25 : LEGACY_MUSHROOM_DATA.length * 2;
         if (method == BlockMethod.MUSHROOM) return modern ? 189 : LEGACY_MUSHROOM_DATA.length * 2;

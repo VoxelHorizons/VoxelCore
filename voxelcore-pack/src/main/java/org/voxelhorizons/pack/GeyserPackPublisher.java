@@ -28,6 +28,7 @@ public final class GeyserPackPublisher {
     private static final Gson JSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String PACK = "packs/voxelcore.mcpack";
     private static final String MAPPINGS = "custom_mappings/voxelcore-items.json";
+    private static final String BLOCK_MAPPINGS = "custom_mappings/voxelcore-blocks.json";
     private static final String RECEIPT = "voxelcore-publication.json";
     private static final String LOCK = ".voxelcore-publish.lock";
 
@@ -84,11 +85,13 @@ public final class GeyserPackPublisher {
     public static PublicationState inspect(Path root) throws IOException {
         if (root == null || !Files.isDirectory(root))
             return new PublicationState("MISSING_DIRECTORY", "", String.valueOf(root));
-        Path pack = root.resolve(PACK), mappings = root.resolve(MAPPINGS), receipt = root.resolve(RECEIPT);
-        if (Files.isSymbolicLink(pack) || Files.isSymbolicLink(mappings) || Files.isSymbolicLink(receipt))
+        Path pack = root.resolve(PACK), mappings = root.resolve(MAPPINGS), blocks = root.resolve(BLOCK_MAPPINGS),
+                receipt = root.resolve(RECEIPT);
+        if (Files.isSymbolicLink(pack) || Files.isSymbolicLink(mappings)
+                || Files.isSymbolicLink(blocks) || Files.isSymbolicLink(receipt))
             return new PublicationState("UNSAFE_SYMLINK", "", "VoxelCore publication paths cannot be symlinks");
         if (!Files.isRegularFile(receipt)) {
-            String status = Files.exists(pack) || Files.exists(mappings) ? "UNTRACKED" : "NOT_PUBLISHED";
+            String status = Files.exists(pack) || Files.exists(mappings) || Files.exists(blocks) ? "UNTRACKED" : "NOT_PUBLISHED";
             return new PublicationState(status, "", "No VoxelCore publication receipt");
         }
         JsonObject record;
@@ -98,15 +101,21 @@ public final class GeyserPackPublisher {
             String revision = record.get("revision").getAsString();
             String expectedPack = record.get("pack_sha256").getAsString();
             String expectedMappings = record.get("mappings_sha256").getAsString();
-            if (!validSha256(revision) || !validSha256(expectedPack) || !validSha256(expectedMappings))
+            boolean hasBlocks = record.has("blocks_sha256");
+            String expectedBlocks = hasBlocks ? record.get("blocks_sha256").getAsString() : "";
+            if (!validSha256(revision) || !validSha256(expectedPack) || !validSha256(expectedMappings)
+                    || (hasBlocks && !validSha256(expectedBlocks)))
                 throw new IllegalArgumentException("Invalid receipt digest");
-            if (!Files.isRegularFile(pack) || !Files.isRegularFile(mappings))
-                return new PublicationState("MISMATCH", revision, "Pack and mappings must both be present");
+            if (!Files.isRegularFile(pack) || !Files.isRegularFile(mappings)
+                    || (hasBlocks && !Files.isRegularFile(blocks)))
+                return new PublicationState("MISMATCH", revision, "Published pack and mapping files are missing");
             if (!expectedPack.equals(digest(Files.readAllBytes(pack)))
-                    || !expectedMappings.equals(digest(Files.readAllBytes(mappings))))
-                return new PublicationState("MISMATCH", revision, "Pack/mappings SHA-256 differs from receipt");
-            return new PublicationState("VERIFIED_ON_DISK", revision,
-                    "Both artifacts match the receipt. Restart Geyser and reconnect Bedrock to activate.");
+                    || !expectedMappings.equals(digest(Files.readAllBytes(mappings)))
+                    || (hasBlocks && !expectedBlocks.equals(digest(Files.readAllBytes(blocks)))))
+                return new PublicationState("MISMATCH", revision, "Pack/mapping SHA-256 differs from receipt");
+            return new PublicationState("VERIFIED_ON_DISK", revision, hasBlocks
+                    ? "All three artifacts match the receipt. Restart Geyser and reconnect Bedrock to activate."
+                    : "Legacy pack/item pair verified; no block mapping is covered by this receipt.");
         } catch (RuntimeException invalid) {
             return new PublicationState("CORRUPT_RECEIPT", "", invalid.getMessage());
         }
@@ -127,21 +136,24 @@ public final class GeyserPackPublisher {
 
         Path pack = geyserRoot.resolve(PACK);
         Path mappings = geyserRoot.resolve(MAPPINGS);
+        Path blocks = geyserRoot.resolve(BLOCK_MAPPINGS);
         Path receipt = geyserRoot.resolve(RECEIPT);
         Path lock = geyserRoot.resolve(LOCK);
-        for (Path target : new Path[]{pack, mappings, receipt, lock}) {
+        for (Path target : new Path[]{pack, mappings, blocks, receipt, lock}) {
             if (Files.isSymbolicLink(target)) throw new IOException("Geyser publication target is a symlink: " + target);
         }
 
         // Validate the pair BEFORE touching the installation.
         byte[] nextPack = Files.readAllBytes(result.directory.resolve("voxelcore.mcpack"));
         byte[] nextMappings = Files.readAllBytes(result.directory.resolve("voxelcore-items.json"));
-        verifySource(result.revision, nextPack, nextMappings);
+        byte[] nextBlocks = Files.readAllBytes(result.directory.resolve("voxelcore-blocks.json"));
+        verifySource(result.revision, nextPack, nextMappings, nextBlocks);
         JsonObject record = new JsonObject();
         record.addProperty("schema", 1);
         record.addProperty("revision", result.revision);
         record.addProperty("pack_sha256", digest(nextPack));
         record.addProperty("mappings_sha256", digest(nextMappings));
+        record.addProperty("blocks_sha256", digest(nextBlocks));
         byte[] nextReceipt = JSON.toJson(record).getBytes(StandardCharsets.UTF_8);
 
         Files.createDirectories(pack.getParent());
@@ -154,22 +166,25 @@ public final class GeyserPackPublisher {
             }
             if (hold == null) throw new IOException("Another Bedrock publication holds " + lock);
             try (FileLock acquired = hold) {
-                for (Path target : new Path[]{pack, mappings, receipt}) {
+                for (Path target : new Path[]{pack, mappings, blocks, receipt}) {
                     if (Files.isSymbolicLink(target)) throw new IOException("Geyser publication target changed to symlink: " + target);
                 }
                 byte[] oldPack = readOrNull(pack);
                 byte[] oldMappings = readOrNull(mappings);
+                byte[] oldBlocks = readOrNull(blocks);
                 byte[] oldReceipt = readOrNull(receipt);
                 try {
                     hook.beforeInstall(1); replace(pack, nextPack);
                     hook.beforeInstall(2); replace(mappings, nextMappings);
-                    hook.beforeInstall(3); replace(receipt, nextReceipt);
+                    hook.beforeInstall(3); replace(blocks, nextBlocks);
+                    hook.beforeInstall(4); replace(receipt, nextReceipt);
                     PublicationState state = inspect(geyserRoot);
                     if (!"VERIFIED_ON_DISK".equals(state.status))
                         throw new IOException("Published Bedrock pack pair failed verification: " + state);
                 } catch (IOException failure) {
                     restoreWithSuppression(pack, oldPack, failure);
                     restoreWithSuppression(mappings, oldMappings, failure);
+                    restoreWithSuppression(blocks, oldBlocks, failure);
                     restoreWithSuppression(receipt, oldReceipt, failure);
                     throw failure;
                 }
@@ -177,13 +192,20 @@ public final class GeyserPackPublisher {
         }
     }
 
-    private static void verifySource(String revision, byte[] archive, byte[] mapping) throws IOException {
+    private static void verifySource(String revision, byte[] archive, byte[] mapping, byte[] blocks) throws IOException {
         try {
             JsonObject root = JsonParser.parseString(new String(mapping, StandardCharsets.UTF_8)).getAsJsonObject();
             if (root.get("format_version").getAsInt() != 2 || !root.get("items").isJsonObject())
                 throw new IOException("Unsupported Geyser custom item mapping format");
         } catch (RuntimeException failure) {
-            throw new IOException("Invalid Geyser custom mappings JSON", failure);
+            throw new IOException("Invalid Geyser custom item mappings JSON", failure);
+        }
+        try {
+            JsonObject root = JsonParser.parseString(new String(blocks, StandardCharsets.UTF_8)).getAsJsonObject();
+            if (root.get("format_version").getAsInt() != 1 || !root.get("blocks").isJsonObject())
+                throw new IOException("Unsupported Geyser custom block mapping format");
+        } catch (RuntimeException failure) {
+            throw new IOException("Invalid Geyser custom block mappings JSON", failure);
         }
         // Inspect actual ZIP rather than relying on the output directory naming.
         Path temporary = Files.createTempFile("voxelcore-validate-", ".mcpack");
