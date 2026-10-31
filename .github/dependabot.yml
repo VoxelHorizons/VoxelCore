@@ -1,5 +1,6 @@
-# Scheduled review-only dependency update proposals.
-# No automatic merges, version bumps, releases or secret access are granted.
+# Dependabot security alerts and security-update pull requests remain enabled.
+# Routine version-update PRs are disabled for Maven and GitHub Actions.
+# No automatic merges, releases, or secret access are granted.
 version: 2
 updates:
   - package-ecosystem: "maven"
@@ -9,7 +10,7 @@ updates:
       day: "monday"
       time: "06:00"
       timezone: "Australia/Melbourne"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     groups:
       maven-build-plugins:
         patterns:
@@ -25,7 +26,7 @@ updates:
       day: "monday"
       time: "06:00"
       timezone: "Australia/Melbourne"
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
     groups:
       github-owned-actions:
         patterns:
