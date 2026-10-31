@@ -34,6 +34,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          EXPECTED_PLUGIN_VERSION=$(python3 -c 'import xml.etree.ElementTree as ET; print(ET.parse("pom.xml").getroot().find("{http://maven.apache.org/POM/4.0.0}version").text)')
           verify_api_version() {
             local jar_pattern="$1"
             local expected="$2"
@@ -41,6 +42,7 @@ jobs:
             jar=$(compgen -G "$jar_pattern" | head -n 1)
             test -n "$jar"
             unzip -p "$jar" plugin.yml | grep -Fx "api-version: '$expected'"
+            unzip -p "$jar" plugin.yml | grep -Fx "version: $EXPECTED_PLUGIN_VERSION"
             local provider
             provider=$(unzip -p "$jar" META-INF/services/org.voxelhorizons.platform.PlatformProvider)
             test -n "$provider"
@@ -79,6 +81,8 @@ jobs:
           test -n "$ext"
           unzip -p "$ext" extension.yml | grep -Fx 'api: 2.11.0'
           unzip -p "$ext" extension.yml | grep -Fx 'id: voxelcore'
+          EXPECTED_PLUGIN_VERSION=$(python3 -c 'import xml.etree.ElementTree as ET; print(ET.parse("pom.xml").getroot().find("{http://maven.apache.org/POM/4.0.0}version").text)')
+          unzip -p "$ext" extension.yml | grep -Fx "version: $EXPECTED_PLUGIN_VERSION"
           unzip -Z1 "$ext" | grep -Fx 'org/voxelhorizons/geyser/VoxelCoreGeyserExtension.class'
           unzip -Z1 "$ext" | grep -Fx 'org/voxelhorizons/geyser/PublicationVerifier.class'
 
