@@ -402,6 +402,46 @@ public class BedrockPackCompilerTest {
             assertTrue("Keyed by the glyph's title character", screen.contains(glyph.character()));
         }
     }
+    private BedrockPackCompiler.Result compileLogo(int width, int height, String yaml, java.util.function.Function<BedrockPackCompiler, BedrockPackCompiler> configure) throws Exception {
+        Path root = fixture(), out = temp.newFolder().toPath();
+        write(root.resolve("demo/content/ui.yml"), yaml);
+        Path file = root.resolve("demo/assets/demo/textures/ui/logo.png");
+        Files.createDirectories(file.getParent());
+        java.awt.image.BufferedImage bitmap = new java.awt.image.BufferedImage(width, height, 2);
+        for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) bitmap.setRGB(x, y, 0xffdd8800);
+        javax.imageio.ImageIO.write(bitmap, "png", file.toFile());
+        Path allocations = temp.newFolder().toPath().resolve("glyph-allocations.yml");
+        new UiGlyphLoader().load(root, allocations, true);
+        return configure.apply(new BedrockPackCompiler()).compile(root, out, allocations);
+    }
+
+    private static java.awt.image.BufferedImage glyphPage(BedrockPackCompiler.Result result) throws Exception {
+        try (ZipFile zip = new ZipFile(result.directory.resolve("voxelcore.mcpack").toFile());
+             java.io.InputStream image = zip.getInputStream(zip.getEntry("font/glyph_E2.png"))) {
+            return javax.imageio.ImageIO.read(image);
+        }
+    }
+
+    @Test public void oversizedLogoIsDownscaledIntoAGlyphPageInsteadOfSkipped() throws Exception {
+        String yaml = "ui:\n  branding_logo:\n    path: ui/logo.png\n    scale_ratio: 128\n";
+        BedrockPackCompiler.Result result = compileLogo(256, 117, yaml, c -> c);
+        assertEquals(1, result.mappedGlyphs);
+        String unsupported = new String(Files.readAllBytes(result.directory.resolve("unsupported-items.txt")), StandardCharsets.UTF_8);
+        assertFalse(unsupported.contains("too tall"));
+        assertFalse(unsupported.contains("branding_logo"));
+        assertEquals("128px cells, 16 per row", 128 * 16, glyphPage(result).getWidth());
+
+        BedrockPackCompiler.Result smaller = compileLogo(256, 117, yaml, c -> c.withOversizedGlyphSize(64));
+        assertEquals("64px cells", 64 * 16, glyphPage(smaller).getWidth());
+    }
+
+    @Test public void explicitBedrockHeightOverridesTheDefaultLimit() throws Exception {
+        String yaml = "ui:\n  branding_logo:\n    path: ui/logo.png\n    scale_ratio: 128\n    bedrock_height: 200\n";
+        BedrockPackCompiler.Result result = compileLogo(256, 117, yaml, c -> c);
+        assertEquals(1, result.mappedGlyphs);
+        assertEquals("fits a 256px cell", 256 * 16, glyphPage(result).getWidth());
+    }
+
     @Test public void highResolutionManagedGlyphIsScaledAndExtremeTagIsReported() throws Exception {
         Path root = fixture(), out = temp.newFolder().toPath();
         write(root.resolve("demo/content/ui.yml"), "ui:\n  rank_player:\n    path: ui/player.png\n    scale_ratio: 9\n"

@@ -141,7 +141,8 @@ public final class UiGlyphLoader {
         for (ContentID id : ids) {
             RawGlyph glyph = raw.get(id);
             resolved.put(id, new UiGlyphDefinition(id, glyph.texture, glyph.scaleRatio, glyph.yPosition,
-                    glyph.advance, glyph.gui, active.get(id).intValue()));
+                    glyph.advance, glyph.gui, active.get(id).intValue(),
+                    glyph.bedrockHeight, glyph.bedrockScale));
         }
         if (persist) {
             if (!migrated.isEmpty()) backupLegacyAllocations(allocationFile);
@@ -180,7 +181,8 @@ public final class UiGlyphLoader {
     }
 
     private static RawGlyph parseGlyph(ContentPack pack, Path file, ContentID id, Map<?, ?> map) {
-        rejectUnknown(map, file, id.toString(), "path", "scale_ratio", "y_position", "symbol", "gui");
+        rejectUnknown(map, file, id.toString(), "path", "scale_ratio", "y_position", "symbol", "gui",
+                "bedrock_height", "bedrock_scale");
         String authoredPath = requireString(map.get("path"), "path", id, file).replace('\\', '/');
         if (authoredPath.startsWith("/") || authoredPath.contains("..")
                 || !authoredPath.toLowerCase(java.util.Locale.ROOT).endsWith(".png")
@@ -222,6 +224,25 @@ public final class UiGlyphLoader {
         boolean gui = map.containsKey("gui") && requireBoolean(map.get("gui"), "gui", id, file);
         int advance = (int) Math.floor(((double) image.getWidth() * scaleRatio / image.getHeight()) + 0.5D) + 1;
 
+        int bedrockHeight = 0;
+        if (map.containsKey("bedrock_height")) {
+            bedrockHeight = requireInteger(map.get("bedrock_height"), "bedrock_height", id, file);
+            if (bedrockHeight < 1 || bedrockHeight > 256) {
+                throw new ContentLoadException("bedrock_height must be between 1 and 256 for " + id);
+            }
+        }
+        double bedrockScale = 0.0D;
+        if (map.containsKey("bedrock_scale")) {
+            Object value = map.get("bedrock_scale");
+            if (!(value instanceof Number)) {
+                throw new ContentLoadException("bedrock_scale must be a number for " + id + " in " + file);
+            }
+            bedrockScale = ((Number) value).doubleValue();
+            if (!(bedrockScale > 0.0D) || bedrockScale > 8.0D) {
+                throw new ContentLoadException("bedrock_scale must be greater than 0 and at most 8 for " + id);
+            }
+        }
+
         Integer explicit = null;
         if (map.containsKey("symbol")) {
             String symbol = requireString(map.get("symbol"), "symbol", id, file);
@@ -232,7 +253,7 @@ public final class UiGlyphLoader {
             requirePrivateUse(explicit.intValue(), id);
         }
         return new RawGlyph(pack.manifest().namespace() + ":" + resourcePath, scaleRatio, yPosition,
-                advance, gui, explicit);
+                advance, gui, explicit, bedrockHeight, bedrockScale);
     }
 
     private static void ensureVisible(BufferedImage image, ContentID id) {
@@ -435,10 +456,13 @@ public final class UiGlyphLoader {
         private final int advance;
         private final boolean gui;
         private final Integer explicitCodePoint;
+        private final int bedrockHeight;
+        private final double bedrockScale;
         private RawGlyph(String texture, int scaleRatio, int yPosition, int advance,
-                         boolean gui, Integer explicitCodePoint) {
+                         boolean gui, Integer explicitCodePoint, int bedrockHeight, double bedrockScale) {
             this.texture = texture; this.scaleRatio = scaleRatio; this.yPosition = yPosition;
             this.advance = advance; this.gui = gui; this.explicitCodePoint = explicitCodePoint;
+            this.bedrockHeight = bedrockHeight; this.bedrockScale = bedrockScale;
         }
     }
 
