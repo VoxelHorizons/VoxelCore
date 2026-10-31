@@ -107,7 +107,8 @@ final class BlockPackCompiler {
         }
     }
 
-    private static String modelJson(BlockDefinition definition) {
+    /** The same generated Java block model must be used by the Java and Bedrock compilers. */
+    static String modelJson(BlockDefinition definition) {
         Map<String, String> textures = definition.textures();
         StringBuilder out = new StringBuilder("{\n  \"parent\": \"");
         if (definition.model() == BlockModelPreset.CUBE_ALL) {

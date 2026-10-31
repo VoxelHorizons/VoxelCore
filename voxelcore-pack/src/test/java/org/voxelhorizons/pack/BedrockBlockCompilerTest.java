@@ -91,6 +91,122 @@ public final class BedrockBlockCompilerTest {
         assertEquals("The block mapping must be deterministic", result.revision, repeat.revision);
     }
 
+
+    @Test public void generatedBlockModelsBecomeInventoryIconsAndGeyserItemMappings() throws Exception {
+        Path root = fixture(), glyphs = manifest(root), out = temp.newFolder().toPath();
+        BedrockPackCompiler.Result first = new BedrockPackCompiler().compile(root, out, glyphs);
+        assertEquals("Both implicit block items must be exported as Bedrock inventory icons", 2, first.mappedItems);
+        assertEquals("Placed blocks still have their own mappings", 2, first.mappedBlocks);
+
+        JsonObject mapping = json(Files.readAllBytes(first.directory.resolve("voxelcore-items.json")));
+        JsonObject items = mapping.getAsJsonObject("items");
+        com.google.gson.JsonArray paper = items.getAsJsonArray("minecraft:paper");
+        assertNotNull("The implicit block items use the standard stackable carrier", paper);
+        assertEquals(2, paper.size());
+
+        try (ZipFile pack = new ZipFile(first.directory.resolve("voxelcore.mcpack").toFile())) {
+            JsonObject atlas = json(readAll(pack.getInputStream(pack.getEntry("textures/item_texture.json"))))
+                    .getAsJsonObject("texture_data");
+            java.util.Set<String> uniqueKeys = new java.util.HashSet<String>();
+            Map<String,Integer> colours = new LinkedHashMap<String,Integer>();
+            colours.put("ruby_ore", 0xffe00024);
+            colours.put("deepslate_ruby_ore", 0xffb40033);
+            for (Map.Entry<String,Integer> ore : colours.entrySet()) {
+                String model = "demo:block/" + ore.getKey();
+                JsonObject entry = null;
+                for (com.google.gson.JsonElement element : paper) {
+                    JsonObject candidate = element.getAsJsonObject();
+                    if (model.equals(candidate.get("model").getAsString())) entry = candidate;
+                }
+                assertNotNull("Missing Geyser item mapping for " + model, entry);
+                assertEquals("definition", entry.get("type").getAsString());
+                String iconKey = entry.getAsJsonObject("bedrock_options").get("icon").getAsString();
+                assertTrue("Distinct blocks must get distinct atlas entries", uniqueKeys.add(iconKey));
+                JsonObject texture = atlas.getAsJsonObject(iconKey);
+                assertNotNull("Missing Bedrock icon atlas entry " + iconKey, texture);
+                String iconPath = texture.get("textures").getAsString() + ".png";
+                assertNotNull("Missing generated 2D icon PNG " + iconPath, pack.getEntry(iconPath));
+                BufferedImage icon = ImageIO.read(new java.io.ByteArrayInputStream(
+                        readAll(pack.getInputStream(pack.getEntry(iconPath)))));
+                assertEquals("Block items use the same rendered 64px preview pipeline as furniture",64,icon.getWidth());
+                assertEquals(64,icon.getHeight());
+                boolean coloured = false, transparent = false;
+                for (int y = 0; y < icon.getHeight(); y++) for (int x = 0; x < icon.getWidth(); x++) {
+                    int pixel = icon.getRGB(x, y);
+                    if ((pixel >>> 24) == 0) transparent = true;
+                    else {
+                        assertEquals("This block preview must contain its own ore texture, not paper",
+                                ore.getValue().intValue(), pixel);
+                        coloured = true;
+                    }
+                }
+                assertTrue("Icon must contain visible block geometry",coloured);
+                assertTrue("The rendered cube preview retains transparent background",transparent);
+            }
+        }
+        BedrockPackCompiler.Result rebuilt = new BedrockPackCompiler().compile(root, out, glyphs);
+        assertEquals("Generating block icons must not randomize pack revisions", first.revision, rebuilt.revision);
+        assertArrayEquals(Files.readAllBytes(first.directory.resolve("voxelcore-items.json")),
+                Files.readAllBytes(rebuilt.directory.resolve("voxelcore-items.json")));
+    }
+
+    @Test public void generatedCubeColumnAndSixFaceBlocksGetIconsWithoutVanillaClientJar() throws Exception {
+        Path root = fixture(), glyphs = manifest(root);
+        write(root.resolve("demo/content/blocks.yml"),
+                "blocks:\n"
+                + "  ruby_log:\n    model: cube_column\n    textures:\n"
+                + "      side: demo:block/ore/ruby_ore\n"
+                + "      top: demo:block/ore/deepslate_ruby_ore\n"
+                + "      bottom: demo:block/ore/ruby_ore\n"
+                + "  six_face_ore:\n    model: cube\n    textures:\n"
+                + "      north: demo:block/ore/ruby_ore\n"
+                + "      south: demo:block/ore/ruby_ore\n"
+                + "      east: demo:block/ore/ruby_ore\n"
+                + "      west: demo:block/ore/ruby_ore\n"
+                + "      up: demo:block/ore/deepslate_ruby_ore\n"
+                + "      down: demo:block/ore/ruby_ore\n");
+        // Allocate against this modified content snapshot, not the original fixture.
+        glyphs = manifest(root);
+        BedrockPackCompiler.Result result = new BedrockPackCompiler().compile(root, temp.newFolder().toPath(), glyphs);
+        assertEquals(2,result.mappedItems);
+        assertEquals(2,result.mappedBlocks);
+        JsonObject mapping = json(Files.readAllBytes(result.directory.resolve("voxelcore-items.json")));
+        com.google.gson.JsonArray items = mapping.getAsJsonObject("items").getAsJsonArray("minecraft:paper");
+        assertEquals(2,items.size());
+        try (ZipFile pack = new ZipFile(result.directory.resolve("voxelcore.mcpack").toFile())) {
+            JsonObject textures = json(readAll(pack.getInputStream(pack.getEntry("textures/item_texture.json"))))
+                    .getAsJsonObject("texture_data");
+            for (com.google.gson.JsonElement item : items) {
+                JsonObject def = item.getAsJsonObject();
+                assertTrue(def.get("model").getAsString(),
+                        def.get("model").getAsString().startsWith("demo:block/"));
+                String icon = def.getAsJsonObject("bedrock_options").get("icon").getAsString();
+                String texture = textures.getAsJsonObject(icon).get("textures").getAsString();
+                assertNotNull(pack.getEntry(texture + ".png"));
+            }
+        }
+    }
+
+    @Test public void authoredItemOverrideForBlockKeepsItsOwnMaterialModelAndIcon() throws Exception {
+        Path root = fixture(), glyphs = manifest(root);
+        write(root.resolve("demo/content/overrides.yml"),
+                "items:\n  ruby_ore:\n    material: minecraft:stick\n    render:\n"
+                + "      model: demo:item/custom_ore\n");
+        write(root.resolve("demo/assets/demo/models/item/custom_ore.json"),
+                "{\"parent\":\"minecraft:item/generated\",\"textures\":{\"layer0\":\"demo:block/ore/ruby_ore\"}}");
+        BedrockPackCompiler.Result result = new BedrockPackCompiler().compile(root,temp.newFolder().toPath(),glyphs);
+        assertEquals(2,result.mappedItems);
+        assertEquals(2,result.mappedBlocks);
+        JsonObject mappings = json(Files.readAllBytes(result.directory.resolve("voxelcore-items.json")))
+                .getAsJsonObject("items");
+        assertEquals("Explicit item definition must win over the implicit block item",
+                "demo:item/custom_ore",mappings.getAsJsonArray("minecraft:stick").get(0).getAsJsonObject()
+                        .get("model").getAsString());
+        assertEquals("The remaining implicit block item retains its paper carrier",
+                "demo:block/deepslate_ruby_ore",mappings.getAsJsonArray("minecraft:paper").get(0)
+                        .getAsJsonObject().get("model").getAsString());
+    }
+
     @Test public void originalNoteAllocationsStayMappedWithoutReassigningWorldBlocks() throws Exception {
         Path root = fixture(), glyphs = manifest(root);
         Path allocationsPath = glyphs.resolveSibling("block-allocations.yml");
