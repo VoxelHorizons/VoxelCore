@@ -3,10 +3,8 @@ package org.voxelhorizons.geyser;
 import org.geysermc.geyser.api.entity.custom.CustomEntityDefinition;
 import org.geysermc.geyser.entity.BedrockEntityDefinition;
 import org.geysermc.geyser.entity.EntityTypeBase;
-import org.geysermc.geyser.entity.GeyserEntityType;
 import org.geysermc.geyser.entity.VanillaEntityType;
 import org.geysermc.geyser.entity.type.Entity;
-import org.geysermc.geyser.registry.Registries;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.MetadataTypes;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.type.EntityType;
 
@@ -28,9 +26,6 @@ final class ItemDisplayRegistration {
 
     /** @return null when registered, otherwise why not (another extension owns item_display). */
     static String register(CustomEntityDefinition placeholder) {
-        GeyserEntityType type = GeyserEntityType.ofVanilla(EntityType.ITEM_DISPLAY);
-        if (Registries.JAVA_ENTITY_TYPES.get(type) != null)
-            return "another extension (e.g. GeyserDisplayEntity) already handles item_display";
         EntityTypeBase<Entity> entityBase = EntityTypeBase.baseBuilder(Entity.class)
                 .addTranslator(MetadataTypes.BYTE, Entity::setFlags)
                 .addTranslator(MetadataTypes.INT, Entity::setAir)
@@ -49,7 +44,18 @@ final class ItemDisplayRegistration {
         // brightness, view range, shadow radius/strength, width, height, glow colour; then the
         // item stack and item display transform. All ignored (the projection feed is authoritative).
         for (int i = 0; i < 17; i++) builder.addTranslator(null);
-        Registries.JAVA_ENTITY_TYPES.register(type, builder.build());
+        // Geyser 2.12.1 registers this type inside VanillaEntityType.Builder.build().
+        // Its new built-in Java registry is mutable at this lifecycle phase and cannot
+        // be queried until frozen; detect duplicate registration from the builder.
+        try {
+            builder.build();
+        } catch (IllegalStateException incompatible) {
+            if (incompatible.getMessage() != null
+                    && incompatible.getMessage().contains("Duplicate entry registered")) {
+                return "another extension (e.g. GeyserDisplayEntity) already handles item_display";
+            }
+            throw incompatible;
+        }
         return null;
     }
 }
