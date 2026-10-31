@@ -59,6 +59,8 @@ ui:
 
 Glyphs that set either key may use up to 256 pixels on their longest side whatever `oversized_glyph_size` says. Both keys affect Bedrock only.
 
+Bitmap providers in custom font files such as `assets/<namespace>/font/branding.json` are converted too, because Bedrock has one font and shows their private-use characters from the same glyph pages. A custom-font provider taller than 32 pixels is reduced as above; one with a negative `ascent` is a Java screen overlay and is not converted.
+
 On Bedrock (Geyser), every `gui: true` definition is also exported as a chest-screen background: the Bedrock pack's `ui/chest_screen.json` shows the image whenever an inventory title contains that glyph, sized by `scale_ratio`, aligned for the conventional `:offset_-8:` prefix and placed vertically by `y_position`, and hides the default Bedrock title text for that menu. On those menus Bedrock's grey chest frame and close button are replaced by the Java container texture (`assets/minecraft/textures/gui/container/generic_54.png` from your packs, else vanilla), so a partly transparent retexture looks the same as on Java. This applies to Bedrock's Classic UI chest screen; the Pocket UI layout is unchanged. No server-side change is needed; a content pack that supplies its own `ui/chest_screen.json` keeps it and the generated backgrounds are skipped (listed in `unsupported-items.txt`).
 
 Menu rows are deliberately not configuration data. The same cropped overlay can cover any subset of slots in a 1–6 row inventory; its vertical placement is controlled only by `scale_ratio` and `y_position`.
