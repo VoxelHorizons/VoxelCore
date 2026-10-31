@@ -104,7 +104,7 @@ jobs:
         run: python3 .github/scripts/audit-release-dependencies.py
 
       - name: Upload dependency and artifact audit evidence
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: VoxelCore-Dependency-Audit
           path: dependency-audit/
@@ -112,49 +112,49 @@ jobs:
           retention-days: 30
 
       - name: Upload VoxelCore Geyser Extension
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: VoxelCore-GeyserExtension
           path: voxelcore-geyser-extension/target/VoxelCore-GeyserExtension-*.jar
 
       - name: Upload Minecraft 1.12-1.13 artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: VoxelCore-mc1.12-1.13
           path: voxelcore-v1_12/target/VoxelCore-*.jar
 
       - name: Upload Minecraft 1.14-1.19.3 artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: VoxelCore-mc1.14-1.19.3
           path: voxelcore-v1_14/target/VoxelCore-*.jar
 
       - name: Upload Minecraft 1.19.4-1.20.4 artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: VoxelCore-mc1.19.4-1.20.4
           path: voxelcore-v1_19_4/target/VoxelCore-*.jar
 
       - name: Upload Minecraft 1.20.5-1.21.3 artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: VoxelCore-mc1.20.5-1.21.3
           path: voxelcore-v1_20_5/target/VoxelCore-*.jar
 
       - name: Upload Minecraft 1.21.4 artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: VoxelCore-mc1.21.4
           path: voxelcore-v1_21_4/target/VoxelCore-*.jar
 
       - name: Upload Minecraft 26.3 artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: VoxelCore-mc26.3
           path: voxelcore-v26_3/target/VoxelCore-*.jar
 
       - name: Upload Minecraft 26.2 artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: VoxelCore-mc26.2
           path: voxelcore-v26_2/target/VoxelCore-*.jar
