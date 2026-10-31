@@ -1,7 +1,7 @@
 package org.voxelhorizons.content.render;
 
 import org.voxelhorizons.content.ContentID;
-import org.yaml.snakeyaml.Yaml;
+import org.voxelhorizons.content.pack.ContentPackDiscovery;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,7 +35,7 @@ public final class RenderAllocationStore {
         if (!Files.exists(path)) return RenderAllocationRegistry.empty();
         Object loaded;
         try (InputStream input = Files.newInputStream(path)) {
-            loaded = new Yaml().load(input);
+            loaded = ContentPackDiscovery.yaml().load(input);
         } catch (IOException exception) {
             throw new IllegalStateException("Unable to read render allocation manifest " + path, exception);
         }
