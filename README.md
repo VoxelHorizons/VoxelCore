@@ -17,7 +17,7 @@ The repository has implemented its core foundation, content/item runtime, Java p
 - deterministic Java resource-pack validation and compilation
 - compact cropped UI glyph definitions, stable private-use codepoints, generated bitmap/spacing font providers, white-safe UI/offset placeholders, and admin glyph lookup/copy commands
 - exact real-server smoke coverage from Minecraft 1.12.2 through Minecraft 26.3
-- snapshot JAR publication from `main`
+- read-only CI artifacts and owner-approved draft GitHub Releases
 - reusable item and placed-block actions (including `set_block`, `command`, `give_item`, `drop_item`, `message` and `cancel`)
 - carrier-backed custom blocks with placeable items, harvesting/tool rules, selected native hardness support and Creative pick-block
 - configurable item/block browser inventory titles, GUI glyphs and runtime tooltip overlays
@@ -235,7 +235,7 @@ Or one family and its dependencies:
 mvn -pl voxelcore-v1_21_4 -am clean package
 ```
 
-Every successful push to `main` updates the prerelease tag `v1.0-SNAPSHOT` with all six version-family JARs. Pull-request builds also upload each distribution as a workflow artifact.
+Pull requests and `main` builds upload seven Minecraft-version distributions plus the Geyser extension as temporary CI artifacts. They do **not** move version tags or publish releases. An owner-initiated workflow can create a **draft** GitHub Release for a version such as `1.0.0` from its protected tag; publication is manual after acceptance. See [release engineering](docs/RELEASING.md).
 
 ## Runtime directory
 
