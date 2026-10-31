@@ -13,7 +13,7 @@
     <properties>
         <!-- Geyser 26.2+ requires Java 17+; Java 21 is supported on current Paper 26.3. -->
         <maven.compiler.release>21</maven.compiler.release>
-        <geyser.api.version>2.12.0-SNAPSHOT</geyser.api.version>
+        <geyser.api.version>2.12.1-SNAPSHOT</geyser.api.version>
     </properties>
     <repositories>
         <repository>
