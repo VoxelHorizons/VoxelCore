@@ -36,7 +36,7 @@
         <spigot.v1_21_4>1.21.4-R0.1-SNAPSHOT</spigot.v1_21_4>
         <paper.v26_2>26.2.build.123-stable</paper.v26_2>
         <paper.v26_3>26.3.build.209-stable</paper.v26_3>
-        <placeholderapi.version>2.11.6</placeholderapi.version>
+        <placeholderapi.version>2.12.3</placeholderapi.version>
         <shopgui.api.version>3.2.0</shopgui.api.version>
     </properties>
 
