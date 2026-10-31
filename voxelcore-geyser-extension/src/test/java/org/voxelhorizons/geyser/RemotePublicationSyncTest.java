@@ -38,11 +38,33 @@ public final class RemotePublicationSyncTest {
         descriptor.addProperty("mappings_sha256", sha(mappings));
         descriptor.addProperty("issued_at", issuedAt);
         descriptor.addProperty("signature", HexFormat.of().formatHex(RemotePublicationSync.hmac(key,
-                RemotePublicationSync.PROTOCOL + revision + "|" + sha(pack) + "|" + sha(mappings) + "|" + issuedAt)));
+                RemotePublicationSync.LEGACY_PROTOCOL + revision + "|" + sha(pack) + "|" + sha(mappings) + "|" + issuedAt)));
         Map<String, byte[]> files = new HashMap<>();
         files.put("remote.json", descriptor.toString().getBytes(StandardCharsets.UTF_8));
         files.put("voxelcore.mcpack", pack);
         files.put("voxelcore-items.json", mappings);
+        return files;
+    }
+
+    /** Version 2 authenticates all three published files, including custom block mappings. */
+    private static Map<String, byte[]> bundleV2(String seed, byte[] pack, byte[] items, byte[] blocks,
+                                                 long issuedAt, byte[] key) throws Exception {
+        String revision = sha(seed.getBytes(StandardCharsets.UTF_8));
+        JsonObject descriptor = new JsonObject();
+        descriptor.addProperty("schema", 2);
+        descriptor.addProperty("revision", revision);
+        descriptor.addProperty("pack_sha256", sha(pack));
+        descriptor.addProperty("mappings_sha256", sha(items));
+        descriptor.addProperty("blocks_sha256", sha(blocks));
+        descriptor.addProperty("issued_at", issuedAt);
+        descriptor.addProperty("signature", HexFormat.of().formatHex(RemotePublicationSync.hmac(key,
+                RemotePublicationSync.PROTOCOL + revision + "|" + sha(pack) + "|" + sha(items)
+                        + "|" + sha(blocks) + "|" + issuedAt)));
+        Map<String, byte[]> files = new HashMap<>();
+        files.put("remote.json", descriptor.toString().getBytes(StandardCharsets.UTF_8));
+        files.put("voxelcore.mcpack", pack);
+        files.put("voxelcore-items.json", items);
+        files.put("voxelcore-blocks.json", blocks);
         return files;
     }
 
@@ -61,6 +83,20 @@ public final class RemotePublicationSyncTest {
         assertEquals(PublicationVerifier.Status.VERIFIED_ON_DISK, PublicationVerifier.inspect(geyser).status());
         assertArrayEquals(new byte[]{1, 2, 3}, Files.readAllBytes(geyser.resolve("packs/voxelcore.mcpack")));
         assertEquals(RemotePublicationSync.Outcome.UP_TO_DATE, RemotePublicationSync.sync(geyser, state, SECRET, from(files), 3000));
+    }
+
+    @Test public void installsAndValidatesRemoteCustomBlockMappings() throws Exception {
+        Path geyser = temp.newFolder().toPath(), state = geyser.resolve("state.json");
+        byte[] blocks = "{\"format_version\":1,\"blocks\":{}}".getBytes(StandardCharsets.UTF_8);
+        Map<String, byte[]> files = bundleV2("blocks", new byte[]{1, 3}, new byte[]{5}, blocks, 1000, SECRET);
+        assertEquals(RemotePublicationSync.Outcome.INSTALLED,
+                RemotePublicationSync.sync(geyser, state, SECRET, from(files), 2000));
+        assertArrayEquals(blocks, Files.readAllBytes(geyser.resolve("custom_mappings/voxelcore-blocks.json")));
+        assertEquals(PublicationVerifier.Status.VERIFIED_ON_DISK, PublicationVerifier.inspect(geyser).status());
+        Files.writeString(geyser.resolve("custom_mappings/voxelcore-blocks.json"), "tampered");
+        assertEquals(PublicationVerifier.Status.MISMATCH, PublicationVerifier.inspect(geyser).status());
+        files.put("voxelcore-blocks.json", new byte[]{9});
+        assertRejected(geyser, state, files, 3000, "do not match");
     }
 
     @Test public void rejectsWrongKeyTamperedArtifactsAndFutureIssueTime() throws Exception {
@@ -87,9 +123,9 @@ public final class RemotePublicationSyncTest {
         // Same vectors as voxelcore-pack RemoteBedrockBundleTest: producer and consumer agree.
         assertEquals("24336555692103e27e0cf955be34ed0e2df6c5ba59ca07c609fd662bddb48bb2",
                 RemotePublicationSync.pullToken(SECRET));
-        assertEquals("5358605609bff6471d6ccb4b4037d12e5009c38d36f89e2ea1da1871c74ca9ab",
+        assertEquals("c8d45b2688d3b68b24587e12804c6ce4b1183d21140b4810b8ef754d353a74e9",
                 HexFormat.of().formatHex(RemotePublicationSync.hmac(SECRET, RemotePublicationSync.PROTOCOL
-                        + "a".repeat(64) + "|" + "b".repeat(64) + "|" + "c".repeat(64) + "|1700000000000")));
+                        + "a".repeat(64) + "|" + "b".repeat(64) + "|" + "c".repeat(64) + "|" + "c".repeat(64) + "|1700000000000")));
     }
 
     @Test public void shortSecretsAreRefused() throws Exception {

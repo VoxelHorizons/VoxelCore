@@ -730,7 +730,8 @@ public final class PackCommand implements SubCommand {
                                 plugin.getPackManager().glyphAllocationManifest(),
                                 target.mode());
                 String bedrockStatus = "Bedrock built: " + bedrock.directory + "; " + bedrock.mappedItems
-                        + " mapped items; " + bedrock.mappedGlyphs + " Bedrock inline glyphs; "
+                        + " mapped items; " + bedrock.mappedBlocks + " Bedrock custom blocks; "
+                        + bedrock.mappedGlyphs + " Bedrock inline glyphs; "
                         + bedrock.nativeGeometryCount + " native 3D attachables; "
                         + bedrock.unsupportedGeometryCount + " 3D limitations (unsupported-geometry.txt); "
                         + bedrock.unsupportedItems + " items unsupported (unsupported-items.txt)."

@@ -22,7 +22,7 @@ import java.util.Set;
  */
 public final class BedrockPackRetention {
     private static final Set<String> GENERATED_FILES = new HashSet<>(Arrays.asList(
-            "voxelcore.mcpack", "voxelcore-items.json",
+            "voxelcore.mcpack", "voxelcore-items.json", "voxelcore-blocks.json",
             "unsupported-items.txt", "unsupported-geometry.txt"));
 
     private BedrockPackRetention() { }

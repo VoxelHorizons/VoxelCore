@@ -56,8 +56,11 @@ public final class BlockAllocationRegistry {
         });
         for (BlockDefinition definition : definitions) {
             if (definition.abstractDefinition()) continue;
+            // AUTO now prefers conservative mushroom states; note-block instrument/pitch
+            // states are all possible in vanilla, so never silently fall back to them.
+            // Previously persisted allocations (including SOLID) are never renumbered.
             BlockMethod requested = definition.method() == BlockMethod.AUTO
-                    ? (modern ? BlockMethod.SOLID : BlockMethod.MUSHROOM) : definition.method();
+                    ? BlockMethod.MUSHROOM : definition.method();
             if (BlockCarrierStates.capacity(requested, modern) == 0) {
                 throw new IllegalArgumentException("Block method " + requested.name().toLowerCase(java.util.Locale.ROOT)
                         + " is not supported for " + definition.id() + " on this target");
@@ -77,10 +80,15 @@ public final class BlockAllocationRegistry {
             }
             int slot = 0;
             Set<Integer> used = reserved.get(requested);
-            while (used.contains(Integer.valueOf(slot))) slot++;
+            while (slot < BlockCarrierStates.capacity(requested, modern)
+                    && (used.contains(Integer.valueOf(slot))
+                    || !BlockCarrierStates.safeForNewAllocation(requested, slot, modern))) slot++;
             if (slot >= BlockCarrierStates.capacity(requested, modern)) {
-                throw new IllegalArgumentException("No " + requested.name().toLowerCase(java.util.Locale.ROOT)
-                        + " carrier states remain for " + definition.id());
+                throw new IllegalArgumentException("No conservatively reserved "
+                        + requested.name().toLowerCase(java.util.Locale.ROOT) + " carrier states remain for "
+                        + definition.id() + (requested == BlockMethod.SOLID && modern
+                        ? "; note-block states are vanilla-reachable and are not allocated for new custom blocks"
+                        : "; no automatic note-block fallback is permitted"));
             }
             used.add(Integer.valueOf(slot));
             next.put(definition.id(), new BlockAllocation(requested, slot, true));
