@@ -102,4 +102,48 @@ public class BedrockGlyphAtlasTest {
         assertEquals(10, out.getWidth());
         assertEquals(8, out.getHeight());
     }
+
+    private static BufferedImage solid(int width, int height) {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) image.setRGB(x, y, 0xff3366ff);
+        return image;
+    }
+
+    @Test public void oversizedHeightPrefersExactThenScaleThenJavaHeight() {
+        assertEquals(128, BedrockGlyphAtlas.oversizedHeight(128, 0, 0));
+        assertEquals(64, BedrockGlyphAtlas.oversizedHeight(128, 0, 0.5));
+        assertEquals(90, BedrockGlyphAtlas.oversizedHeight(128, 90, 0.5));
+        assertEquals(BedrockGlyphAtlas.MAX_CELL, BedrockGlyphAtlas.oversizedHeight(256, 0, 8));
+        assertEquals(1, BedrockGlyphAtlas.oversizedHeight(1, 0, 0.1));
+    }
+
+    @Test public void oversizedGlyphKeepsProportionsWithinTheLongestSideLimit() {
+        BufferedImage logo = solid(256, 117);
+        BufferedImage fitted = BedrockGlyphAtlas.sizedOversized(logo, 128, 128, BedrockGlyphAtlas.Shrink.AREA);
+        assertEquals(128, fitted.getWidth());
+        assertEquals(58, fitted.getHeight());
+        BufferedImage larger = BedrockGlyphAtlas.sizedOversized(logo, 128, 256, BedrockGlyphAtlas.Shrink.AREA);
+        assertEquals(256, larger.getWidth());
+        assertEquals(117, larger.getHeight());
+        BufferedImage exact = BedrockGlyphAtlas.sizedOversized(logo, 60, 256, BedrockGlyphAtlas.Shrink.AREA);
+        assertEquals(60, exact.getHeight());
+        assertEquals(131, exact.getWidth());
+    }
+
+    @Test public void oversizedGlyphNeverExceedsTheLimitEvenWhenShrinkingIsNative() {
+        for (BedrockGlyphAtlas.Shrink mode : BedrockGlyphAtlas.Shrink.values()) {
+            BufferedImage out = BedrockGlyphAtlas.sizedOversized(solid(40, 200), 200, 64, mode);
+            assertTrue(mode + " width", out.getWidth() <= 64);
+            assertEquals(mode + " height", 64, out.getHeight());
+        }
+    }
+
+    @Test public void oversizedGlyphsDoNotAffectRankTagCalibration() {
+        java.util.List<BedrockGlyphAtlas.Glyph> glyphs = new java.util.ArrayList<BedrockGlyphAtlas.Glyph>();
+        glyphs.add(new BedrockGlyphAtlas.Glyph(tag(1), 11));
+        double alone = BedrockGlyphAtlas.pixelRatio(glyphs);
+        glyphs.add(BedrockGlyphAtlas.Glyph.oversized(solid(256, 64), 2, 128));
+        glyphs.add(BedrockGlyphAtlas.Glyph.oversized(solid(256, 64), 2, 128));
+        assertEquals(alone, BedrockGlyphAtlas.pixelRatio(glyphs), 0.0);
+    }
 }

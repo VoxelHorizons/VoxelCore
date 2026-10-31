@@ -152,6 +152,12 @@ bedrock:
   # slightly soft. nearest: correct size, crisp, thin details may vanish. native: never shrink
   # (crisp, but up to 2x larger than on Java).
   glyph_shrink: area
+  # Glyphs taller than 32 Java pixels (logos, banners) are reduced to fit a Bedrock glyph page,
+  # keeping their proportions. This is the longest side in page pixels (16..256) they are reduced to.
+  # The whole page's cells grow to the largest glyph on it (128 = a 2048px page, 256 = 4096px),
+  # so lower this to keep pages small. A glyph can override it in its ui: entry with
+  # 'bedrock_height' (exact baked height in pixels) or 'bedrock_scale' (multiplier on scale_ratio).
+  oversized_glyph_size: 128
   # Extra folders (relative to plugins/) scanned by '/voxelcore admin pack glyphs'
   # for literal glyphs in Bedrock's reserved U+E000..U+E1FF controller range.
   # VoxelCore content is always included. Migration rewrites fonts and references together.
