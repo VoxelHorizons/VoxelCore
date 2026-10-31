@@ -6,7 +6,7 @@ This project uses read-only CI for pull requests and branch pushes. A normal com
 
 - Adopt independent [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`, with pre-releases such as `1.0.0-rc.1`.
 - Minecraft server versions belong in distribution JAR names and the tested compatibility table, **not** in the plugin's SemVer.
-- Retain the existing Maven `-SNAPSHOT` version until the product passes its release checks; do not mark an unverified build stable merely to exercise the workflow.
+- On normal development branches, retain a `-SNAPSHOT` version. A reviewed release-candidate branch may temporarily set an explicit `-rc.N` version for complete CI and acceptance testing. **Do not merge or tag that candidate until the acceptance gates are met.** Do not mark an unverified build stable merely to exercise the workflow.
 - Before a release, update every module/parent `pom.xml` as appropriate. Check plugin descriptor versions, supported server versions, dependencies, and current changelog.
 - Keep the JARs produced by a single reviewed release build together with a `SHA256SUMS` file.
 
@@ -37,3 +37,9 @@ gh secret set DISCORD_RELEASE_WEBHOOK_URL -R VoxelHorizons/VoxelCore
 When prompted, paste the Discord webhook URL privately. The workflow accepts the ordinary Discord URL or the GitHub-compatible variant ending in `/github`; it removes that suffix because it sends a formatted Discord message rather than the raw GitHub payload. Verify the name exists with `gh secret list -R VoxelHorizons/VoxelCore`. Never commit the URL, add it to release notes, or include it in a support log.
 
 Do not also create a native GitHub repository webhook to the same Discord channel: it would produce duplicate notifications and GitHub's native `release` event subscription includes release activities other than publication. Discord notifications do not publish releases; they run only *after* publication, so a notification failure cannot unpublish or block the GitHub Release.
+
+## VoxelCore 1.0.0-rc.1 gate
+
+This proposed pre-release is a **candidate**, not a declaration of 1.0 or automatic publication. Before merging the version PR and creating `v1.0.0-rc.1`, verify the full Maven reactor build, all eight required Minecraft smoke tests, Java and Bedrock runtime acceptance on the VoxelHorizons server, generated pack integrity, compatibility of the separately distributed Geyser extension, and any blockers tracked in [ROADMAP.md](../ROADMAP.md). Record which client/server versions and pack builds were checked.
+
+The Geyser extension uses upstream `2.12.0-SNAPSHOT` build-time dependencies; investigate reproducible dependency pinning before any certified stable release. Confirm the RC was built from the exact source commit that will be tagged. Do not publish draft release assets or Discord announcements without manually reviewing the release notes and downloads.
