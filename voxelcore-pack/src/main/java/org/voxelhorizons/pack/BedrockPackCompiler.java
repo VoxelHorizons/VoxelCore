@@ -148,14 +148,14 @@ public final class BedrockPackCompiler {
             }
         }
         for (String ambiguous : ambiguousAssets) javaAssets.remove(ambiguous);
-        ContentDefinitions definitions = new ContentLoader().loadDefinitions(contentRoot);
+        ContentDefinitions contentDefinitions = new ContentLoader().loadDefinitions(contentRoot);
         // Java's block models are generated, not authored assets, so reading content-pack
         // assets alone leaves the implicit block items without a renderable model.
         // Share the exact Java model template here before hashing the icon cache and
         // creating Geyser's inventory item mappings. The world's block state mapping
         // continues to be generated separately by BedrockBlockCompiler.
         int generatedBlockModels = 0;
-        for (BlockDefinition block : definitions.blocks().entries().values()) {
+        for (BlockDefinition block : contentDefinitions.blocks().entries().values()) {
             if (block.abstractDefinition()) continue;
             String modelPath = "assets/" + block.id().namespace() + "/models/block/"
                     + block.id().value() + ".json";
@@ -193,7 +193,7 @@ public final class BedrockPackCompiler {
         BedrockGeometryCompiler geometry = new BedrockGeometryCompiler(javaAssets);
         Map<String, byte[]> rendered = new HashMap<String, byte[]>();
         int count = 0;
-        ItemDefinitionRegistry itemRegistry = definitions.items();
+        ItemDefinitionRegistry itemRegistry = contentDefinitions.items();
         RenderAllocationRegistry renderAllocations = renderAllocations(itemRegistry, glyphAllocationManifest);
         BuildProgress.Step itemStep = progress.step("Bedrock: converting items (icons + 3D models)",
                 itemRegistry.entries().size());
