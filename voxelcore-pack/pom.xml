@@ -6,7 +6,7 @@
 
     <parent>
         <groupId>org.voxelhorizons</groupId>
-        <artifactId>VoxelCore</artifactId>
+        <artifactId>voxelcore</artifactId>
         <version>1.0.0</version>
     </parent>
 
