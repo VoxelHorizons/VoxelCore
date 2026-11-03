@@ -44,3 +44,7 @@ These plugins have their own configuration and compatibility requirements. Voxel
 ## Contributing and support
 
 Please report reproducible defects via [GitHub Issues](https://github.com/VoxelHorizons/VoxelCore/issues), including your server version, installed JAR filename, logs and reproduction steps. Follow [SECURITY.md](SECURITY.md) for private security disclosures. Maintainers can consult the [build and release guide](https://github.com/VoxelHorizons/VoxelCore/wiki/Building-and-Releasing).
+
+## License
+
+VoxelCore is **free to use and source-available**, not OSI-approved open-source software. You may run and privately customise it on your own servers, including monetised servers. Unauthorised redistribution, mirrors, reuploads, repackaging and resale are prohibited, subject to applicable GitHub/authorised-platform rights. See the [Voxel Horizons Community Use License 1.0](LICENSE.md).
