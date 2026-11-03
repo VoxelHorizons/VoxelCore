@@ -92,8 +92,30 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  create-draft:
+  publish-maven:
     needs: [validate, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          server-id: github
+      - name: Publish VoxelCore Maven dependencies
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mvn -B --no-transfer-progress -pl voxelcore-plugin -am deploy -DskipTests
+
+  create-draft:
+    needs: [validate, build, publish-maven]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: release
