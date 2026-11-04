@@ -2,6 +2,9 @@ package org.voxelhorizons.pack;
 
 import org.voxelhorizons.content.ContentID;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Composes a popup using ordinary, content-defined UI glyphs. Each glyph advance
  * includes Minecraft's trailing one-pixel spacing; overlap removes that seam.
@@ -15,6 +18,7 @@ public final class TooltipLayout {
     private final int xOffset;
     private final int letterSpacing;
     private final int wordSpacing;
+    private final Map<Integer, Integer> fontAdvances;
 
     public TooltipLayout(UiGlyphRegistry registry, String leftId, String centerId, String rightId,
                          int overlap, int padding, int xOffset) {
@@ -37,6 +41,11 @@ public final class TooltipLayout {
         this.xOffset = xOffset;
         this.letterSpacing = letterSpacing;
         this.wordSpacing = wordSpacing;
+        Map<Integer, Integer> known = new HashMap<Integer, Integer>(UiSpacingGlyphs.advances());
+        for (UiGlyphDefinition definition : registry.entries().values()) {
+            known.put(Integer.valueOf(definition.codePoint()), Integer.valueOf(definition.advance()));
+        }
+        this.fontAdvances = java.util.Collections.unmodifiableMap(known);
     }
 
     private static UiGlyphDefinition required(UiGlyphRegistry registry, String id) {
@@ -51,8 +60,12 @@ public final class TooltipLayout {
 
     public String compose(String line1, String line2, String line3) {
         String[] lines = {line1 == null ? "" : line1, line2 == null ? "" : line2, line3 == null ? "" : line3};
-        int maxWidth = Math.max(TooltipGlyphs.width(lines[0], letterSpacing, wordSpacing),
-                Math.max(TooltipGlyphs.width(lines[1], letterSpacing, wordSpacing), TooltipGlyphs.width(lines[2], letterSpacing, wordSpacing)));
+        int[] measured = {
+                TooltipGlyphs.width(lines[0], letterSpacing, wordSpacing, fontAdvances),
+                TooltipGlyphs.width(lines[1], letterSpacing, wordSpacing, fontAdvances),
+                TooltipGlyphs.width(lines[2], letterSpacing, wordSpacing, fontAdvances)
+        };
+        int maxWidth = Math.max(measured[0], Math.max(measured[1], measured[2]));
         int requestedWidth = maxWidth + 2 * padding;
         int boxWidth = left.advance() + right.advance() - overlap;
         int step = center.advance() - overlap;
@@ -70,7 +83,7 @@ public final class TooltipLayout {
         output.append(UiSpacingGlyphs.charactersForOffset(-boxWidth + padding));
         for (int line = 1; line <= 3; line++) {
             output.append(TooltipGlyphs.translateLine(lines[line - 1], line, letterSpacing, wordSpacing));
-            output.append(UiSpacingGlyphs.charactersForOffset(-TooltipGlyphs.width(lines[line - 1], letterSpacing, wordSpacing)));
+            output.append(UiSpacingGlyphs.charactersForOffset(-measured[line - 1]));
         }
         output.append(UiSpacingGlyphs.charactersForOffset(boxWidth - xOffset - padding));
         return output.toString();

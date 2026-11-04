@@ -113,4 +113,47 @@ public class TooltipGlyphsTest {
         assertTrue(compactText.startsWith(UiSpacingGlyphs.charactersForOffset(30)));
     }
 
+    @Test public void measuresActualCustomIconsAndNegativeSpacingGlyphs() {
+        Map<Integer, Integer> advances = new LinkedHashMap<Integer, Integer>(UiSpacingGlyphs.advances());
+        advances.put(Integer.valueOf(0xE780), Integer.valueOf(24)); // Coin icon
+        advances.put(Integer.valueOf(0xE781), Integer.valueOf(22)); // Token icon
+        String coin = new String(Character.toChars(0xE780));
+        String token = new String(Character.toChars(0xE781));
+        String twoPrices = "\u00A76" + "30" + coin + " or 5" + token
+                + UiSpacingGlyphs.charactersForOffset(-2);
+        assertEquals(TooltipGlyphs.width("30 or 5") + 24 + 22 - 2,
+                TooltipGlyphs.width(twoPrices, 0, 0, advances));
+        String background = coin + UiSpacingGlyphs.charactersForOffset(-24);
+        assertEquals(0, TooltipGlyphs.width(background, 0, 0, advances));
+        assertEquals(24 + 4, TooltipGlyphs.width(coin + "x", 0, 0, advances));
+    }
+
+    @Test public void tooltipResetsCursorByActualResolvedPriceGlyphWidth() {
+        Map<ContentID, UiGlyphDefinition> definitions = new LinkedHashMap<ContentID, UiGlyphDefinition>();
+        for (String name : new String[]{"left", "center", "right"}) {
+            ContentID id = ContentID.of("voxel", "tooltip_" + name);
+            definitions.put(id, new UiGlyphDefinition(id, "voxel:ui/tooltip/" + name,
+                    19, 7, 2, false, 0xE100 + definitions.size()));
+        }
+        ContentID coinId = ContentID.of("voxel", "shop_coin_tooltip");
+        ContentID tokenId = ContentID.of("voxel", "shop_token");
+        definitions.put(coinId, new UiGlyphDefinition(coinId, "voxel:ui/coin", 16, 0, 24, false, 0xE780));
+        definitions.put(tokenId, new UiGlyphDefinition(tokenId, "voxel:ui/token", 16, 0, 22, false, 0xE781));
+        UiGlyphRegistry registry = new UiGlyphRegistry(definitions);
+        TooltipLayout layout = new TooltipLayout(registry,
+                "voxel:tooltip_left", "voxel:tooltip_center", "voxel:tooltip_right",
+                1, 4, 55, -1, -1);
+        String line2 = "\u00A76" + "30" + (char) 0xE780 + " or 5" + (char) 0xE781
+                + UiSpacingGlyphs.charactersForOffset(-2);
+        Map<Integer, Integer> advances = new LinkedHashMap<Integer, Integer>(UiSpacingGlyphs.advances());
+        advances.put(Integer.valueOf(0xE780), Integer.valueOf(24));
+        advances.put(Integer.valueOf(0xE781), Integer.valueOf(22));
+        int measured = TooltipGlyphs.width(line2, -1, -1, advances);
+        String result = layout.compose("Striped Spruce Log Table", line2, "Click to Buy");
+        String secondLineWithExactReset = TooltipGlyphs.translateLine(line2, 2, -1, -1)
+                + UiSpacingGlyphs.charactersForOffset(-measured);
+        assertTrue("The third line must begin from the same left edge after two prices",
+                result.contains(secondLineWithExactReset));
+    }
+
 }
