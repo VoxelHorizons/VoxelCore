@@ -1,6 +1,7 @@
 package org.voxelhorizons.pack;
 
 import java.util.Collections;
+import java.util.Map;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -128,6 +129,16 @@ public final class TooltipGlyphs {
 
     /** Measure the exact same added offsets that translateLine emits. */
     public static int width(String input, int letterSpacing, int wordSpacing) {
+        return width(input, letterSpacing, wordSpacing, Collections.<Integer, Integer>emptyMap());
+    }
+
+    /**
+     * Measure resolved custom font glyphs and spacing controls using their
+     * *actual* resource-pack advances. Falling back to four pixels for those
+     * codepoints made the next tooltip row drift as currencies/icons were added.
+     */
+    public static int width(String input, int letterSpacing, int wordSpacing,
+                            Map<Integer, Integer> advances) {
         if (input == null || input.isEmpty()) return 0;
         int width = 0;
         boolean previousAscii = false;
@@ -146,7 +157,8 @@ public final class TooltipGlyphs {
                 width += ASCII_ADVANCES[0] + wordSpacing;
                 previousAscii = false;
             } else {
-                width += 4; // Conservative non-ASCII fallback, matching existing behavior.
+                Integer actual = advances.get(Integer.valueOf(codePoint));
+                width += actual == null ? 4 : actual.intValue(); // Unregistered glyph fallback.
                 previousAscii = false;
             }
         }
