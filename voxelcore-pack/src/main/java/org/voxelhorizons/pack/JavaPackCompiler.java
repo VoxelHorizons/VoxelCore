@@ -260,6 +260,11 @@ public final class JavaPackCompiler {
                 entries.put(asset.path, AtlasCompatibility.merge(previous, bytes, asset.path));
             } else if (previous != null && BlockStateCompatibility.isBlockState(asset.path)) {
                 entries.put(asset.path, BlockStateCompatibility.merge(previous, bytes, asset.path));
+            } else if (previous != null && isVanillaBlockModel(asset.path)) {
+                // Vanilla block models are complete definitions. Replacing their parent or textures
+                // is intentional; recursively merging the two models produces an invalid hybrid.
+                JsonAssetCompatibility.validate(bytes, asset.path);
+                entries.put(asset.path, bytes);
             } else if (previous != null && JsonAssetCompatibility.isJsonAsset(asset.path)) {
                 entries.put(asset.path, JsonAssetCompatibility.merge(previous, bytes, asset.path));
             } else if (previous != null && !Arrays.equals(previous, bytes)) {
@@ -268,6 +273,10 @@ public final class JavaPackCompiler {
         }
         if (target.packFormat() >= 88) AtlasCompatibility.repair(entries);
         writeDeterministicZip(outputZip, entries);
+    }
+
+    private static boolean isVanillaBlockModel(String path) {
+        return path.startsWith("assets/minecraft/models/block/") && path.endsWith(".json");
     }
 
     private static TreeMap<String, byte[]> readZip(Path zipPath) {
