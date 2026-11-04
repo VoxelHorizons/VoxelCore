@@ -1,5 +1,6 @@
 package org.voxelhorizons.pack;
 
+import com.google.gson.JsonParser;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -51,8 +52,10 @@ public class VanillaBlockModelOverrideTest {
         Path output = build.resolve("pack.zip");
         new JavaPackCompiler().compile(root, output, build.resolve("render-allocations.yml"), JavaPackTarget.MC_26_3);
 
-        assertEquals(acacia, zipText(output, "assets/minecraft/models/block/acacia_leaves.json"));
-        assertEquals(mangrove, zipText(output, "assets/minecraft/models/block/mangrove_leaves.json"));
+        assertEquals(JsonParser.parseString(acacia),
+                JsonParser.parseString(zipText(output, "assets/minecraft/models/block/acacia_leaves.json")));
+        assertEquals(JsonParser.parseString(mangrove),
+                JsonParser.parseString(zipText(output, "assets/minecraft/models/block/mangrove_leaves.json")));
         String language = zipText(output, "assets/minecraft/lang/en_us.json");
         assertTrue(language.contains("\"test.original\":\"Original\""));
         assertTrue(language.contains("\"test.custom\":\"Custom\""));
