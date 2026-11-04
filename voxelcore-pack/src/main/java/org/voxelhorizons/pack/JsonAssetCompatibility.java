@@ -26,6 +26,11 @@ final class JsonAssetCompatibility {
         return path.endsWith(".json") || path.endsWith(".mcmeta");
     }
 
+    /** Reject malformed or duplicate-key authored JSON before allowing a complete model replacement. */
+    static void validate(byte[] bytes, String path) {
+        parse(bytes, path);
+    }
+
     /**
      * Combines object members and appends arrays. Equal object values are kept once; incompatible
      * values at the same location fail with a JSON path so the source conflict is actionable.
