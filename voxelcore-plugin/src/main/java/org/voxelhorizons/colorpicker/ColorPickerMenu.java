@@ -135,9 +135,14 @@ public final class ColorPickerMenu implements Listener {
             ColorPickerSettings.Palette p = config.palettes.get(i);
             int rgb = p.buttonColor;
             String name = substitute(config.colorName, p, rgb);
-            if (i == session.paletteIndex && !name.isEmpty())
+            boolean selectedPalette = i == session.paletteIndex;
+            if (selectedPalette && !name.isEmpty())
                 name = config.selectedPrefix + name;
-            session.inventory.setItem(p.slot, icon(activeColorMaterial, rgb,
+            // Selected primary palette uses the same 18x18 selection model as
+            // the active shade, with the representative palette RGB tint.
+            String iconId = selectedPalette && !activeSelectedMaterial.isEmpty()
+                    ? activeSelectedMaterial : activeColorMaterial;
+            session.inventory.setItem(p.slot, icon(iconId, rgb,
                     name, config.colorLore, p));
         }
         for (int i = 0; i < config.shadeSlots.size(); i++) {
@@ -227,9 +232,9 @@ public final class ColorPickerMenu implements Listener {
         ItemStack stack = isCustomButton(materialName)
                 ? createButtonItem(materialName)
                 : new ItemStack(resolveMaterial(materialName));
-        // The tintable model's first generated texture layer is white in the
-        // central square; the frame lives on layer1 and is never tinted.
-        // One shared model/texture pair works for all nine palettes and shades.
+        // Each model references one original PNG. Its element faces apply
+        // tintindex 0 only to the inner square, white outline and bottom shade;
+        // the selected outer grey/black border remains untinted.
         if (isCustomButton(materialName) && items.isDyeable(stack))
             stack = items.setDyeColor(stack, rgb);
         ItemMeta meta = stack.getItemMeta();
@@ -309,23 +314,34 @@ public final class ColorPickerMenu implements Listener {
             return;
         }
         if (raw == config.outputSlot) {
-            // The output is a virtual live preview; taking it is the sole commit action.
-            if (!ordinaryClick(event.getClick())) return;
+            // Only output collection commits the tint; the displayed item is a
+            // virtual preview and must never be transferred by vanilla logic.
+            boolean shift = shiftOutputClick(event.getClick());
+            if (!shift && !ordinaryClick(event.getClick())) return;
             ItemStack source = top.getItem(config.inputSlot);
             ItemStack result = preview(source, session);
             if (result == null) {
                 send(player, config, "no-input", "&cPlace a dyeable item in the input slot.");
                 return;
             }
-            if (!isEmpty(event.getCursor())) {
-                send(player, config, "clear-cursor", "&cEmpty your cursor before collecting the result.");
-                return;
+            if (shift) {
+                // One result (amount 1) may merge with an existing stack even
+                // when no empty slot exists. Try the inventory transfer BEFORE
+                // consuming input so a full inventory does not lose the item.
+                Map<Integer, ItemStack> overflow = player.getInventory().addItem(result.clone());
+                if (!overflow.isEmpty()) {
+                    send(player, config, "inventory-full", "&cMake room in your inventory first.");
+                    return;
+                }
+            } else {
+                if (!isEmpty(event.getCursor())) {
+                    send(player, config, "clear-cursor", "&cEmpty your cursor before collecting the result.");
+                    return;
+                }
             }
-            // Consume exactly one input BEFORE handing over the painted output, preventing
-            // a cloned preview and the original item from ever being taken together.
             top.setItem(config.inputSlot, null);
             top.setItem(config.outputSlot, null);
-            event.setCursor(result);
+            if (!shift) event.setCursor(result);
             paint(session);
             send(player, config, "painted", "&aItem recoloured to {hex}.", session.color());
             return;
@@ -349,6 +365,11 @@ public final class ColorPickerMenu implements Listener {
                 return;
             }
         }
+    }
+
+    /** Only allow the two intentional quick-move clicks, not drop/creative swaps. */
+    static boolean shiftOutputClick(ClickType click) {
+        return click == ClickType.SHIFT_LEFT || click == ClickType.SHIFT_RIGHT;
     }
 
     private static boolean ordinaryClick(ClickType click) {
