@@ -7,14 +7,10 @@ input-slot: 19
 output-slot: 25
 shade-slots: [36, 37, 38, 39, 40, 41, 42, 43, 44]
 
-titles:
-  # Optional animated/bitmap inventory background. Register these nine aliases
-  # via your voxel content pack's UI glyph entries (see docs/example).
-  # Automatically falls back to the plain title when the glyph does not exist.
-  java: '&f:offset_-8::colorpicker_{palette}:'
-  fallback: '&8Color Picker - {name}'
-  # Bedrock doesn't support Java bitmap-font inventory backgrounds.
-  bedrock: '&8Color Picker - {name}'
+# Shared title for Java and Bedrock. VoxelCore/Geyser handles the UI
+# conversion; do not supply separate client-specific titles.
+# Register colorpicker_<palette> glyph aliases in your VoxelCore content pack.
+title: '&f:offset_-8::colorpicker_{palette}:'
 
 buttons:
   # Accepts a Bukkit material (FIREWORK_STAR) OR a VoxelCore renderable item
