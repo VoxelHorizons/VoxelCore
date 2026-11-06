@@ -2,10 +2,9 @@
 # Separate file so palettes, texts, slots and styling can be edited without rebuilding.
 # Run /vc admin reload after changing this file. All slots are top-inventory indices (0-based).
 enabled: true
-size: 45  # Five chest rows, nine columns. Supports Java and Geyser/Bedrock.
-input-slot: 10
-output-slot: 16
-apply-slot: 31
+size: 54  # Six chest rows, nine columns. Supports Java and Geyser/Bedrock.
+input-slot: 19
+output-slot: 25
 shade-slots: [36, 37, 38, 39, 40, 41, 42, 43, 44]
 
 titles:
@@ -21,10 +20,8 @@ buttons:
   # FIREWORK_STAR's effect component displays exact RGB colours on Java.
   # On older servers FIREWORK_CHARGE is used as the equivalent material.
   color-material: FIREWORK_STAR
-  apply-material: ANVIL
   color-name: '&f{name}'
   shade-name: '&f{name} &7- &f{hex}'
-  apply-name: '&aPaint Item'
   selected-prefix: '&e▶ '
 
 messages:
@@ -40,40 +37,41 @@ messages:
 # magenta / white / purple, green / cyan / blue.
 # Each entry has its own configurable button slot and 1-9 RGB shades.
 # The first shade is the default when selecting the palette.
+# Selecting a shade updates the output preview. Taking the output applies it.
 palettes:
   red:
     name: 'Red'
-    slot: 3
+    slot: 12
     shades: ['#991E1E', '#B87575', '#BF9999', '#991E37', '#99371E', '#7A4949', '#6B1515', '#4C1B15', '#3A2525']
   orange:
     name: 'Orange'
-    slot: 4
+    slot: 13
     shades: ['#CC6A28', '#F5C09C', '#FFE0CC', '#CC4928', '#CC8B28', '#A37C62', '#8F4A1C', '#66411C', '#4E3D31']
   yellow:
     name: 'Yellow'
-    slot: 5
+    slot: 14
     shades: ['#CCB028', '#F5E69C', '#FFF6CC', '#CC8F28', '#C7CC28', '#A39862', '#8F7B1C', '#66611C', '#4E4931']
   magenta:
     name: 'Magenta'
-    slot: 12
+    slot: 21
     shades: ['#CC28B6', '#F59CE9', '#FFCCF8', '#C128CC', '#CC2895', '#A3629A', '#8F1C7F', '#661C55', '#4E314A']
   white:
     name: 'White / Greyscale'
-    slot: 13
+    slot: 22
     shades: ['#CCCCCC', '#ECE8DC', '#D6E0EC', '#B0B0B0', '#96928C', '#7A7E84', '#606060', '#424246', '#28282A']
   green:
     name: 'Green'
-    slot: 21
+    slot: 30
     shades: ['#59CC28', '#B7F59C', '#DBFFCC', '#7ACC28', '#38CC28', '#75A362', '#3E8F1C', '#2B661C', '#3A4E31']
   purple:
     name: 'Purple'
-    slot: 14
+    slot: 23
     shades: ['#9828CC', '#D99CF5', '#EFCCFF', '#7728CC', '#B928CC', '#8E62A3', '#6A1C8F', '#561C66', '#45314E']
   blue:
     name: 'Blue'
-    slot: 23
+    slot: 32
     shades: ['#2841CC', '#9CAAF5', '#CCD4FF', '#2862CC', '#3028CC', '#626CA3', '#1C2D8F', '#1C2066', '#31364E']
   cyan:
     name: 'Cyan'
-    slot: 22
+    slot: 31
     shades: ['#28CCCC', '#9CF5F5', '#CCFFFF', '#28CCAB', '#28ABCC', '#62A3A3', '#1C8F8F', '#1C5F66', '#314E4E']
