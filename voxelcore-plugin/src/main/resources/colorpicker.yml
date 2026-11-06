@@ -17,8 +17,11 @@ titles:
   bedrock: '&8Color Picker - {name}'
 
 buttons:
-  # FIREWORK_STAR's effect component displays exact RGB colours on Java.
-  # On older servers FIREWORK_CHARGE is used as the equivalent material.
+  # Accepts a Bukkit material (FIREWORK_STAR) OR a VoxelCore renderable item
+  # ID (for example voxel:ui/blank, resolving to voxel:ui-blank).
+  # Use an invisible/blank custom model if the GUI background already draws
+  # the swatches. This also supports abstract, display-only UI item definitions.
+  # Custom content IDs must already be loaded into the VoxelCore item registry.
   color-material: FIREWORK_STAR
   color-name: '&f{name}'
   shade-name: '&f{name} &7- &f{hex}'
