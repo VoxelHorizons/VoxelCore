@@ -24,7 +24,9 @@ public final class ColorPickerSettings {
     public final String colorMaterial;
     public final String selectedShadeMaterial;
     public final String colorName;
+    public final List<String> colorLore;
     public final String shadeName;
+    public final List<String> shadeLore;
     public final String selectedPrefix;
     public final Map<String, String> messages;
 
@@ -45,7 +47,9 @@ public final class ColorPickerSettings {
         colorMaterial = config.getString("buttons.color-material", "FIREWORK_STAR");
         selectedShadeMaterial = config.getString("buttons.selected-shade-material", "").trim();
         colorName = config.getString("buttons.color-name", "&e{palette}");
+        colorLore = lore(config, "buttons.color-lore");
         shadeName = config.getString("buttons.shade-name", "&f{palette} &7- &f{hex}");
+        shadeLore = lore(config, "buttons.shade-lore");
         selectedPrefix = config.getString("buttons.selected-prefix", "&e▶ ");
         ConfigurationSection section = config.getConfigurationSection("palettes");
         if (section == null || section.getKeys(false).isEmpty())
@@ -81,6 +85,35 @@ public final class ColorPickerSettings {
 
     public static ColorPickerSettings from(Configuration configuration) {
         return new ColorPickerSettings(configuration);
+    }
+
+    /**
+     * Lore accepts a list, a single line, or '' / [] to disable it entirely.
+     * Missing keys retain the previous behaviour (#RRGGBB lore) for old configs.
+     */
+    private static List<String> lore(Configuration config, String path) {
+        if (!config.isSet(path)) return Collections.singletonList("&7{hex}");
+        Object raw = config.get(path);
+        if (raw == null) return Collections.emptyList();
+        if (raw instanceof String) {
+            String line = (String) raw;
+            return line.isEmpty() ? Collections.<String>emptyList()
+                    : Collections.singletonList(line);
+        }
+        if (!(raw instanceof List)) {
+            throw new IllegalArgumentException("colorpicker." + path
+                    + " must be a list of lines or an empty string");
+        }
+        List<String> lines = new ArrayList<String>();
+        for (Object entry : (List<?>) raw) {
+            if (!(entry instanceof String)) {
+                throw new IllegalArgumentException("colorpicker." + path
+                        + " entries must be strings");
+            }
+            // An empty lore entry must not turn into a visible blank tooltip line.
+            if (!((String) entry).isEmpty()) lines.add((String) entry);
+        }
+        return Collections.unmodifiableList(lines);
     }
 
     public static int parseHex(String input) {
