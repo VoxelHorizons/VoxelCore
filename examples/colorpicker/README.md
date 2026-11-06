@@ -9,12 +9,13 @@ Put dyeable VoxelCore furniture/cosmetics into the input, click one of the nine 
 3. For the nine background variants, copy the **nine bundled** PNG files from `examples/colorpicker/assets/voxel/textures/ui/colorpicker/` to `plugins/VoxelCore/content/voxel/assets/voxel/textures/ui/colorpicker/<palette>.png` and merge `ui-colorpicker.yml` into the pack's `content/` directory. Don't load the UI definitions until the images exist: VoxelCore validates references at pack-load time.
 4. Rebuild/send the resource pack with `/vc admin pack build`. Run `/vc admin reload` after editing the palettes/config, or restart to pick up changes.
 
-The Java menu title defaults to `&f:offset_-8::colorpicker_{palette}:`. It swaps the corresponding PNG when a different primary palette is selected (if the server version supports InventoryView#setTitle). When no matching glyph is installed, it uses the configurable plain title. Bedrock has its own readable title because Java inventory-title bitmap art is not supported by Bedrock. **Bedrock opens the same five-row inventory**, rather than the one-row purchase UI used by VoxelFurnitureShop.
+The Java menu title defaults to `&f:offset_-8::colorpicker_{palette}:`. Switching primary palettes creates a replacement GUI with the newly selected title on the following server tick. This avoids Paper 1.21.1+'s deprecated/broken `InventoryView#setTitle` implementation, and it transfers the actual input into the replacement menu without consuming or returning it. When no matching glyph is installed, the menu uses the configurable plain title. Bedrock has its own readable title because Java bitmap-title backgrounds are unsupported there. **Bedrock opens the same six-row inventory** (54 slots).
 
 ## Permissions
 
-- `/vc colorpicker` requires `voxelcore.use` **and** `voxelcore.colorpicker.self` (both operator by default).
-- `/vc colorpicker <player>` requires `voxelcore.use` **and** `voxelcore.colorpicker.others` (operator by default). Console actions bypass player permissions. Do not grant the targeted permission to normal players.
+- `/vc colorpicker` requires `voxelcore.colorpicker.self` (operator by default), checked by the Color Picker command handler. Ordinary players receive a use-the-bench message.
+- `/vc colorpicker <player>` requires `voxelcore.colorpicker.others` (operator by default), and can be dispatched by console. Console actions bypass player permissions. Do not grant the targeted permission to normal players.
+- Other `/vc` subcommands still require the existing `voxelcore.use` root permission; their admin permissions are unchanged.
 - The built-in block action executes `vc colorpicker {player}` **as console** on a main-hand right click, so visitors can use the bench even though neither colorpicker permission is granted to them.
 - The command opens a menu for the specified online player; it never automatically applies a colour to an arbitrary held item.
 
@@ -41,3 +42,26 @@ renderable material and model. When a custom icon is selected, the configured
 firework-star swatch colour effect is not used (your GUI texture supplies the
 coloured artwork). Invalid or unknown custom item IDs are reported when
 the picker config loads, rather than silently falling back to PAPER.
+
+### Selected-shade outline and live palette backgrounds
+
+The custom **18×18 selection outline** supplied with this feature is packaged as:
+
+- `examples/colorpicker/assets/voxel/textures/item/ui/colorpicker_selected.png` (original, unmodified);
+- `examples/colorpicker/assets/voxel/models/item/ui/colorpicker_selected.json` (flat generated item with 1.125 GUI scale);
+- `examples/colorpicker/content/colorpicker_selected.yml` (abstract display-only VoxelCore item, `render.oversized_in_gui: true`).
+
+Copy the assets and the item content definition into your existing `voxel` content pack. The resulting content ID is `voxel:ui-colorpicker_selected`. Enable the overlay in `plugins/VoxelCore/colorpicker.yml` after the content has been installed:
+
+```yaml
+buttons:
+  color-material: 'voxel:ui/blank'
+  selected-shade-material: 'voxel:ui/colorpicker_selected'
+  color-name: '&f{name}'
+  shade-name: '&f{name} &7- &f{hex}'
+  selected-prefix: '&e▶ '
+```
+
+`selected-shade-material` is optional (empty by default). When configured, only the **selected** shade uses the transparent-centred 18×18 outline icon; all other shade buttons use the regular `color-material`. Your selected palette's baked-in colour swatches remain visible through the transparent centre. The nine separately registered UI glyphs must be named `colorpicker_red`, `colorpicker_orange`, etc., matching the palette keys. Each palette switch now opens the new title background without using unsupported `setTitle`. Changing **shades** does not reopen the inventory.
+
+**Reload order:** add the custom item/model/texture first, reload the VoxelCore content and rebuild/send the resource pack, then set the selection model in `colorpicker.yml` and reload the picker configuration or restart. Unknown custom model IDs are deliberately reported as errors rather than silently replaced with paper icons.
