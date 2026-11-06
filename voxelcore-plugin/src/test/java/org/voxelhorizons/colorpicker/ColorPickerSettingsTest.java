@@ -162,6 +162,14 @@ public final class ColorPickerSettingsTest {
                 ColorPickerMenu.buttonContentCandidates("voxel:ui/colorpicker/slot"));
     }
 
+    @Test public void selectedPrimaryAndShadeUseSelectedModelWithFallback() {
+        String normal = "voxel:ui-colorpicker_slot";
+        String selected = "voxel:ui-colorpicker_selected";
+        assertEquals(selected, ColorPickerMenu.selectionIcon(true, normal, selected));
+        assertEquals(normal, ColorPickerMenu.selectionIcon(false, normal, selected));
+        assertEquals(normal, ColorPickerMenu.selectionIcon(true, normal, ""));
+    }
+
     @Test public void completedOutputAcceptsOnlyNormalOrShiftClicks() {
         assertTrue(ColorPickerMenu.shiftOutputClick(org.bukkit.event.inventory.ClickType.SHIFT_LEFT));
         assertTrue(ColorPickerMenu.shiftOutputClick(org.bukkit.event.inventory.ClickType.SHIFT_RIGHT));
