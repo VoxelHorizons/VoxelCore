@@ -24,6 +24,7 @@ public final class ColorPickerSettings {
     public final String fallbackTitle;
     public final String bedrockTitle;
     public final String colorMaterial;
+    public final String selectedShadeMaterial;
     public final String colorName;
     public final String shadeName;
     public final String selectedPrefix;
@@ -43,6 +44,7 @@ public final class ColorPickerSettings {
         fallbackTitle = config.getString("titles.fallback", "&8Color Picker - {palette}");
         bedrockTitle = config.getString("titles.bedrock", "&8Color Picker - {palette}");
         colorMaterial = config.getString("buttons.color-material", "FIREWORK_STAR");
+        selectedShadeMaterial = config.getString("buttons.selected-shade-material", "").trim();
         colorName = config.getString("buttons.color-name", "&e{palette}");
         shadeName = config.getString("buttons.shade-name", "&f{palette} &7- &f{hex}");
         selectedPrefix = config.getString("buttons.selected-prefix", "&e▶ ");
