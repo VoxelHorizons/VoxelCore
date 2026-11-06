@@ -27,3 +27,17 @@ Values were sampled at the centres of the nine shade swatches from the uploaded 
 ## Safety / compatibility
 
 The output is a protected preview, not a separate owned item. Click/drag/shift/number-key transfers in the top menu are blocked, bottom inventory interaction remains usable, and closing returns an unspent item. Dyeing delegates to `ItemManager.setDyeColor` so custom model/tint metadata is preserved. This does not add ProtocolLib or PacketEvents. The RGB item API is only available from Minecraft 1.21.4 onwards, and this version gate is communicated to the player. Each server still requires testing with its own Java resource pack and installed Geyser version.
+
+### Custom button models
+
+`buttons.color-material` accepts either a vanilla item material, such as
+`FIREWORK_STAR`, or a custom VoxelCore item identifier. To use the transparent
+blank UI icon, set `color-material: voxel:ui/blank`. This resource-style
+spelling resolves to the actual content item key `voxel:ui-blank`, matching
+VoxelCore's ShopGUI+ integration. Custom buttons can be **abstract render-only**
+items; they must still be defined in a loaded VoxelCore content pack and have a
+renderable material and model. When a custom icon is selected, the configured
+`color-name`, `shade-name` and `selected-prefix` still apply, but the
+firework-star swatch colour effect is not used (your GUI texture supplies the
+coloured artwork). Invalid or unknown custom item IDs are reported when
+the picker config loads, rather than silently falling back to PAPER.
