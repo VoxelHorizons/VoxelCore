@@ -45,6 +45,15 @@ public final class ColorPickerSettingsTest {
         }
     }
 
+    @Test public void customUiButtonAcceptsResourceStyleItemKeys() {
+        assertEquals(org.voxelhorizons.content.ContentID.of("voxel", "ui-blank"),
+                ColorPickerMenu.parseButtonContentId("voxel:ui/blank"));
+        assertEquals(org.voxelhorizons.content.ContentID.of("voxel", "ui-blank"),
+                ColorPickerMenu.parseButtonContentId("voxel:ui-blank"));
+        assertEquals(org.voxelhorizons.content.ContentID.of("custompack", "paint-icon"),
+                ColorPickerMenu.parseButtonContentId("custompack:paint/icon"));
+    }
+
     @Test public void customRgbIsParsedPrecisely() {
         assertEquals(0x00AABB, ColorPickerSettings.parseHex("#00aAbB"));
         assertEquals("#00AABB", ColorPickerSettings.formatHex(0x00AABB));
