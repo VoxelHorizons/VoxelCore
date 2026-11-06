@@ -9,7 +9,7 @@ Put dyeable VoxelCore furniture/cosmetics into the input, click one of the nine 
 3. For the nine background variants, copy the **nine bundled** PNG files from `examples/colorpicker/assets/voxel/textures/ui/colorpicker/` to `plugins/VoxelCore/content/voxel/assets/voxel/textures/ui/colorpicker/<palette>.png` and merge `ui-colorpicker.yml` into the pack's `content/` directory. Don't load the UI definitions until the images exist: VoxelCore validates references at pack-load time.
 4. Rebuild/send the resource pack with `/vc admin pack build`. Run `/vc admin reload` after editing the palettes/config, or restart to pick up changes.
 
-The Java menu title defaults to `&f:offset_-8::colorpicker_{palette}:`. Switching primary palettes creates a replacement GUI with the newly selected title on the following server tick. This avoids Paper 1.21.1+'s deprecated/broken `InventoryView#setTitle` implementation, and it transfers the actual input into the replacement menu without consuming or returning it. When no matching glyph is installed, the menu uses the configurable plain title. Bedrock has its own readable title because Java bitmap-title backgrounds are unsupported there. **Bedrock opens the same six-row inventory** (54 slots).
+Both Java and Bedrock use **one shared menu title**: `title: '&f:offset_-8::colorpicker_{palette}:'` in `colorpicker.yml`. VoxelCore resolves the configured glyph/offset aliases for every player, and its existing Geyser integration handles Bedrock rendering; do not introduce separate Bedrock titles or bypass alias resolution. Switching palettes creates a replacement 54-slot GUI with the newly selected title on the next server tick (rather than relying on Paper's unsupported live `InventoryView#setTitle`) and preserves the input item. When an authored `colorpicker_<palette>` alias is missing, the implementation falls back to a plain title to avoid exposing raw placeholders. Both clients use the same six-row inventory (54 slots). Existing configurations with `titles.java` are read as a legacy fallback when the new `title` key is absent; `titles.bedrock` and `titles.fallback` are obsolete and ignored.
 
 ## Permissions
 
@@ -21,7 +21,7 @@ The Java menu title defaults to `&f:offset_-8::colorpicker_{palette}:`. Switchin
 
 ## Configuration
 
-`colorpicker.yml` defines the 54-slot menu (input slot 19, output slot 25, nine primary palette buttons, and shade slots 36–44), material/display names, title variants, messages, and 81 editable `#RRGGBB` shades. You can change the palette names, the primary button positions and order, shades and number of active palettes. All occupied positions must be unique and within the GUI.
+`colorpicker.yml` defines the 54-slot menu (input slot 19, output slot 25, nine primary palette buttons, and shade slots 36–44), material/display names, a single shared title, messages, and 81 editable `#RRGGBB` shades. You can change the palette names, the primary button positions and order, shades and number of active palettes. All occupied positions must be unique and within the GUI.
 
 Values were sampled at the centres of the nine shade swatches from the uploaded 176×138 PNGs (not estimates). The primary grid matches the PNGs exactly: red/orange/yellow, magenta/white/purple, green/cyan/blue. After changing shade RGB values or moving swatches, adjust the authored background textures too if you want their baked-in pixels to continue matching the configurable item icons. First shade in each palette is selected by default. `white` is the greyscale palette.
 
