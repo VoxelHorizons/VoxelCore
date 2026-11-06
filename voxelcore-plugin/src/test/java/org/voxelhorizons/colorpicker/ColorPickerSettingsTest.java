@@ -29,7 +29,7 @@ public final class ColorPickerSettingsTest {
         assertEquals(19, settings.inputSlot);
         assertEquals(25, settings.outputSlot);
         assertEquals("", settings.selectedShadeMaterial);
-        assertEquals("&f:offset_-8::colorpicker_{palette}:", settings.title);
+        assertEquals("&f:offset_-8::colorpicker_background:", settings.title);
         assertEquals(9, settings.palettes.size());
         assertEquals(9, settings.shadeSlots.size());
         int[][] expected = {
@@ -43,7 +43,27 @@ public final class ColorPickerSettingsTest {
             assertEquals(9, p.shades.size());
             assertEquals(slots[i], p.slot);
             assertEquals(expected[i][0], p.shades.get(0).intValue());
+            assertEquals(expected[i][0], p.buttonColor);
             assertEquals(expected[i][1], p.shades.get(8).intValue());
+        }
+    }
+
+    @Test public void primaryButtonColorOverridesFirstShadeWithoutChangingShades() {
+        YamlConfiguration config = defaults();
+        config.set("palettes.red.button-color", "#1234AB");
+        ColorPickerSettings settings = ColorPickerSettings.from(config);
+        assertEquals(0x1234AB, settings.palettes.get(0).buttonColor);
+        assertEquals(0x991E1E, settings.palettes.get(0).shades.get(0).intValue());
+    }
+
+    @Test public void invalidPrimaryButtonColorIsRejected() {
+        YamlConfiguration config = defaults();
+        config.set("palettes.red.button-color", "not-hex");
+        try {
+            ColorPickerSettings.from(config);
+            fail("Accepted invalid primary tint");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("six-digit RGB"));
         }
     }
 
