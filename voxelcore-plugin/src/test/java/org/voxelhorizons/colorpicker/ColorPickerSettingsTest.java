@@ -25,9 +25,9 @@ public final class ColorPickerSettingsTest {
     @Test public void bundledPalettesMatchNineUploadedTextures() {
         ColorPickerSettings settings = ColorPickerSettings.from(defaults());
         assertTrue(settings.enabled);
-        assertEquals(45, settings.size);
-        assertEquals(10, settings.inputSlot);
-        assertEquals(16, settings.outputSlot);
+        assertEquals(54, settings.size);
+        assertEquals(19, settings.inputSlot);
+        assertEquals(25, settings.outputSlot);
         assertEquals(9, settings.palettes.size());
         assertEquals(9, settings.shadeSlots.size());
         int[][] expected = {
@@ -35,7 +35,7 @@ public final class ColorPickerSettingsTest {
             {0xCC28B6, 0x4E314A}, {0xCCCCCC, 0x28282A}, {0x59CC28, 0x3A4E31},
             {0x9828CC, 0x45314E}, {0x2841CC, 0x31364E}, {0x28CCCC, 0x314E4E}
         };
-        int[] slots = {3,4,5,12,13,21,14,23,22};
+        int[] slots = {12,13,14,21,22,30,23,32,31};
         for (int i = 0; i < expected.length; i++) {
             ColorPickerSettings.Palette p = settings.palettes.get(i);
             assertEquals(9, p.shades.size());
@@ -56,14 +56,14 @@ public final class ColorPickerSettingsTest {
 
     @Test public void overlappingPaletteSlotIsRejected() {
         YamlConfiguration config = defaults();
-        config.set("palettes.red.slot", 10);
+        config.set("palettes.red.slot", 19);
         try { ColorPickerSettings.from(config); fail("Accepted overlapping input and red palette slots"); }
         catch (IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("overlaps")); }
     }
 
     @Test public void rejectsOutOfBoundsShadeSlot() {
         YamlConfiguration config = defaults();
-        config.set("shade-slots", java.util.Arrays.asList(36,37,38,39,40,41,42,43,45));
+        config.set("shade-slots", java.util.Arrays.asList(36,37,38,39,40,41,42,43,54));
         try { ColorPickerSettings.from(config); fail("Accepted out-of-range slot"); }
         catch (IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("out-of-range")); }
     }
