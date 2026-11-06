@@ -25,14 +25,12 @@ import org.voxelhorizons.pack.BedrockPlayers;
 
 import java.io.File;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
 /**
- * Server-side five-row RGB picker. Only one actual item is held in the input; the output is
+ * Server-side six-row RGB picker. Only one actual item is held in the input; the output is
  * a protected preview, not a second owned stack. Input is returned on all normal closes.
  */
 public final class ColorPickerMenu implements Listener {
@@ -103,8 +101,6 @@ public final class ColorPickerMenu implements Listener {
                     : null;
             session.inventory.setItem(config.shadeSlots.get(i).intValue(), swatch);
         }
-        session.inventory.setItem(config.applySlot,
-                icon(config.applyMaterial, -1, config.applyName));
         ItemStack source = session.inventory.getItem(config.inputSlot);
         session.inventory.setItem(config.outputSlot, preview(source, session));
     }
@@ -177,6 +173,9 @@ public final class ColorPickerMenu implements Listener {
         // transfer previews/swatches via shift, number keys, swaps, or creative clicks.
         event.setCancelled(true);
         if (raw == config.inputSlot) {
+            // Only ordinary left/right clicks can transfer the real item. Never interpret
+            // shift-clicks, hotbar swaps, offhand swaps, drops or middle clicks as input.
+            if (!ordinaryClick(event.getClick())) return;
             ItemStack input = top.getItem(config.inputSlot);
             ItemStack cursor = event.getCursor();
             if (isEmpty(cursor)) {
@@ -195,32 +194,24 @@ public final class ColorPickerMenu implements Listener {
             paint(session);
             return;
         }
-        if (raw == config.outputSlot || raw == config.applySlot) {
+        if (raw == config.outputSlot) {
+            // The output is a virtual live preview; taking it is the sole commit action.
+            if (!ordinaryClick(event.getClick())) return;
             ItemStack source = top.getItem(config.inputSlot);
             ItemStack result = preview(source, session);
             if (result == null) {
                 send(player, config, "no-input", "&cPlace a dyeable item in the input slot.");
                 return;
             }
-            if (raw == config.outputSlot && !isEmpty(event.getCursor())) {
+            if (!isEmpty(event.getCursor())) {
                 send(player, config, "clear-cursor", "&cEmpty your cursor before collecting the result.");
                 return;
             }
-            if (raw == config.applySlot && player.getInventory().firstEmpty() < 0) {
-                send(player, config, "inventory-full", "&cMake room in your inventory first.");
-                return;
-            }
-            // Clear the actual input BEFORE delivering a dyed copy to prevent duplication
-            // if inventory hooks close the menu during a handoff.
+            // Consume exactly one input BEFORE handing over the painted output, preventing
+            // a cloned preview and the original item from ever being taken together.
             top.setItem(config.inputSlot, null);
             top.setItem(config.outputSlot, null);
-            if (raw == config.outputSlot) {
-                event.setCursor(result);
-            } else {
-                Map<Integer, ItemStack> overflow = player.getInventory().addItem(result);
-                if (!overflow.isEmpty())
-                    for (ItemStack item : overflow.values()) player.getWorld().dropItemNaturally(player.getLocation(), item);
-            }
+            event.setCursor(result);
             paint(session);
             send(player, config, "painted", "&aItem recoloured to {hex}.", session.color());
             return;
@@ -241,6 +232,10 @@ public final class ColorPickerMenu implements Listener {
                 return;
             }
         }
+    }
+
+    private static boolean ordinaryClick(ClickType click) {
+        return click == ClickType.LEFT || click == ClickType.RIGHT;
     }
 
     private static boolean isEmpty(ItemStack stack) {
