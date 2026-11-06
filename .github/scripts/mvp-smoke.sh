@@ -162,7 +162,9 @@ test -s "$COLORPICKER_CONFIG" || {
 grep -Eq '^size: 54([[:space:]]|$)' "$COLORPICKER_CONFIG"
 grep -Fx 'input-slot: 19' "$COLORPICKER_CONFIG"
 grep -Fx 'output-slot: 25' "$COLORPICKER_CONFIG"
-docker logs "$NAME" 2>&1 | grep -q 'VOXELCORE_COLORPICKER_READY command=/vc colorpicker'
+# The READY polling loop already captured full logs. Avoid docker logs | grep -q
+# under pipefail, where grep can close early and SIGPIPE the docker process (exit 141).
+grep -Fq 'VOXELCORE_COLORPICKER_READY command=/vc colorpicker' <<<"$LOGS"
 COLORPICKER_HELP="$(rcon 'voxelcore colorpicker')"
 echo "$COLORPICKER_HELP"
 grep -Fq 'Usage: /vc colorpicker <player>' <<<"$COLORPICKER_HELP"
