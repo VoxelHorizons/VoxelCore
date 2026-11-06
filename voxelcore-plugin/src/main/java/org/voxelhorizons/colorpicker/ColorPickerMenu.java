@@ -38,6 +38,9 @@ public final class ColorPickerMenu implements Listener {
     private final ItemManager items;
     private final File file;
     private volatile ColorPickerSettings settings;
+    // Unavailable optional UI models use a vanilla icon rather than disabling VoxelCore.
+    private volatile String activeColorMaterial = "FIREWORK_STAR";
+    private volatile String activeSelectedMaterial = "";
 
     public ColorPickerMenu(VoxelCore plugin, ItemManager items) {
         this.plugin = plugin;
@@ -49,28 +52,48 @@ public final class ColorPickerMenu implements Listener {
 
     public void reload() {
         ColorPickerSettings next = ColorPickerSettings.from(YamlConfiguration.loadConfiguration(file));
-        // Resolve authored button icons once at load/reload time. This catches missing
-        // custom definitions immediately, rather than silently showing a PAPER icon.
-        validateButton(next.colorMaterial, "buttons.color-material");
-        if (!next.selectedShadeMaterial.isEmpty())
-            validateButton(next.selectedShadeMaterial, "buttons.selected-shade-material");
+        // Content pack items are optional; an unavailable UI icon must never
+        // take the entire server plugin offline.
+        String normal = availableButton(next.colorMaterial, "buttons.color-material", "FIREWORK_STAR");
+        String selected = next.selectedShadeMaterial.isEmpty() ? ""
+                : availableButton(next.selectedShadeMaterial, "buttons.selected-shade-material", "");
+        activeColorMaterial = normal;
+        activeSelectedMaterial = selected;
         settings = next;
     }
 
-    private void validateButton(String identifier, String key) {
+    private String availableButton(String identifier, String configKey, String fallback) {
         try {
             if (isCustomButton(identifier)) {
-                ItemStack stack = items.createRenderItem(parseButtonContentId(identifier));
+                ItemStack stack = createButtonItem(identifier);
                 if (!items.isDyeable(stack))
-                    plugin.getLogger().warning("Color Picker " + key + " '" + identifier
-                            + "' is not dyeable; RGB swatch tints require the new custom slot model.");
+                    plugin.getLogger().warning("Color Picker " + configKey + " '" + identifier
+                            + "' is not dyeable; RGB swatches require a tintable item model.");
             } else {
                 resolveMaterial(identifier);
             }
+            return identifier;
         } catch (IllegalArgumentException exception) {
-            throw new IllegalArgumentException("Invalid colorpicker.yml " + key + " '"
-                    + identifier + "': " + exception.getMessage(), exception);
+            plugin.getLogger().warning("Color Picker " + configKey + " '" + identifier
+                    + "' could not be loaded (" + exception.getMessage() + "). "
+                    + (fallback.isEmpty() ? "Using the normal slot icon." :
+                       "Falling back to " + fallback + ".")
+                    + " Check plugins/VoxelCore/content/<namespace>/content/ for the item definition.");
+            return fallback;
         }
+    }
+
+    private ItemStack createButtonItem(String identifier) {
+        IllegalArgumentException original = null;
+        for (ContentID candidate : buttonContentCandidates(identifier)) {
+            try {
+                return items.createRenderItem(candidate);
+            } catch (IllegalArgumentException unavailable) {
+                if (original == null) original = unavailable;
+            }
+        }
+        throw new IllegalArgumentException("Unknown item for '" + identifier
+                + "'; tried " + buttonContentCandidates(identifier), original);
     }
 
     public boolean open(Player player) {
@@ -114,7 +137,7 @@ public final class ColorPickerMenu implements Listener {
             String name = substitute(config.colorName, p, rgb);
             if (i == session.paletteIndex && !name.isEmpty())
                 name = config.selectedPrefix + name;
-            session.inventory.setItem(p.slot, icon(config.colorMaterial, rgb,
+            session.inventory.setItem(p.slot, icon(activeColorMaterial, rgb,
                     name, config.colorLore, p));
         }
         for (int i = 0; i < config.shadeSlots.size(); i++) {
@@ -124,8 +147,8 @@ public final class ColorPickerMenu implements Listener {
                 boolean selectedShade = session.shadeIndex == i;
                 // The 18x18 transparent-border model replaces ONLY the selected shade
                 // icon. Its hollow centre leaves the colour painted in the GUI visible.
-                String iconId = selectedShade && !config.selectedShadeMaterial.isEmpty()
-                        ? config.selectedShadeMaterial : config.colorMaterial;
+                String iconId = selectedShade && !activeSelectedMaterial.isEmpty()
+                        ? activeSelectedMaterial : activeColorMaterial;
                 String shadeName = substitute(config.shadeName, selected, rgb);
                 if (selectedShade && !shadeName.isEmpty())
                     shadeName = config.selectedPrefix + shadeName;
@@ -149,9 +172,30 @@ public final class ColorPickerMenu implements Listener {
                 .replace("{hex}", ColorPickerSettings.formatHex(rgb));
     }
 
-    /** Resource-style identifiers (voxel:ui/blank) map to content keys (voxel:ui-blank). */
+    /**
+     * The sample pack declares voxel:ui-colorpicker_slot for the item model
+     * voxel:ui/colorpicker/slot. Nested paths need the final underscore:
+     * voxel:ui/colorpicker/slot -> voxel:ui-colorpicker_slot.
+     * One-level paths retain their historic hyphen mapping.
+     */
     static ContentID parseButtonContentId(String configured) {
-        return ContentID.parse(configured.trim().replace('/', '-'), "voxel");
+        String raw = configured.trim();
+        String normalized = raw.replace('/', '-');
+        if (raw.indexOf('/') >= 0 && raw.indexOf('/') != raw.lastIndexOf('/')) {
+            int last = normalized.lastIndexOf('-');
+            normalized = normalized.substring(0, last) + "_" + normalized.substring(last + 1);
+        }
+        return ContentID.parse(normalized, "voxel");
+    }
+
+    /** Also accept the old all-hyphen aliases if a pack has already used them. */
+    static List<ContentID> buttonContentCandidates(String configured) {
+        List<ContentID> ids = new ArrayList<ContentID>();
+        ContentID preferred = parseButtonContentId(configured);
+        ids.add(preferred);
+        ContentID old = ContentID.parse(configured.trim().replace('/', '-'), "voxel");
+        if (!old.equals(preferred)) ids.add(old);
+        return ids;
     }
 
     private static boolean isCustomButton(String configured) {
@@ -181,7 +225,7 @@ public final class ColorPickerMenu implements Listener {
     private ItemStack icon(String materialName, int rgb, String name, List<String> loreTemplates,
                            ColorPickerSettings.Palette palette) {
         ItemStack stack = isCustomButton(materialName)
-                ? items.createRenderItem(parseButtonContentId(materialName))
+                ? createButtonItem(materialName)
                 : new ItemStack(resolveMaterial(materialName));
         // The tintable model's first generated texture layer is white in the
         // central square; the frame lives on layer1 and is never tinted.
