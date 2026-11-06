@@ -148,6 +148,19 @@ public final class ColorPickerSettingsTest {
                 ColorPickerMenu.parseButtonContentId("custompack:paint/icon"));
     }
 
+    @Test public void nestedResourceIconPathsMatchBundledContentItemIds() {
+        assertEquals(org.voxelhorizons.content.ContentID.of("voxel", "ui-colorpicker_slot"),
+                ColorPickerMenu.parseButtonContentId("voxel:ui/colorpicker/slot"));
+        assertEquals(org.voxelhorizons.content.ContentID.of("voxel", "ui-colorpicker_selected"),
+                ColorPickerMenu.parseButtonContentId("voxel:ui/colorpicker/selected"));
+        assertEquals(org.voxelhorizons.content.ContentID.of("voxel", "ui-colorpicker_slot"),
+                ColorPickerMenu.parseButtonContentId("voxel:ui-colorpicker_slot"));
+        assertEquals(java.util.Arrays.asList(
+                        org.voxelhorizons.content.ContentID.of("voxel", "ui-colorpicker_slot"),
+                        org.voxelhorizons.content.ContentID.of("voxel", "ui-colorpicker-slot")),
+                ColorPickerMenu.buttonContentCandidates("voxel:ui/colorpicker/slot"));
+    }
+
     @Test public void customRgbIsParsedPrecisely() {
         assertEquals(0x00AABB, ColorPickerSettings.parseHex("#00aAbB"));
         assertEquals("#00AABB", ColorPickerSettings.formatHex(0x00AABB));
