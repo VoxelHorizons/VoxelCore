@@ -29,6 +29,7 @@ public final class ColorPickerSettingsTest {
         assertEquals(19, settings.inputSlot);
         assertEquals(25, settings.outputSlot);
         assertEquals("", settings.selectedShadeMaterial);
+        assertEquals("&f:offset_-8::colorpicker_{palette}:", settings.title);
         assertEquals(9, settings.palettes.size());
         assertEquals(9, settings.shadeSlots.size());
         int[][] expected = {
@@ -44,6 +45,22 @@ public final class ColorPickerSettingsTest {
             assertEquals(expected[i][0], p.shades.get(0).intValue());
             assertEquals(expected[i][1], p.shades.get(8).intValue());
         }
+    }
+
+    @Test public void singleTitleAppliesWithoutClientSpecificOverrides() {
+        YamlConfiguration config = defaults();
+        config.set("title", "&f:colorpicker_{palette}:");
+        config.set("titles.java", "&cLegacy Java Title");
+        config.set("titles.bedrock", "&cLegacy Bedrock Title");
+        config.set("titles.fallback", "&cLegacy Fallback Title");
+        assertEquals("&f:colorpicker_{palette}:", ColorPickerSettings.from(config).title);
+    }
+
+    @Test public void olderJavaTitleIsReadWhenSharedTitleIsMissing() {
+        YamlConfiguration config = defaults();
+        config.set("title", null);
+        config.set("titles.java", "&f:old_palette_{palette}:");
+        assertEquals("&f:old_palette_{palette}:", ColorPickerSettings.from(config).title);
     }
 
     @Test public void customSelectedBorderCanBeConfigured() {
