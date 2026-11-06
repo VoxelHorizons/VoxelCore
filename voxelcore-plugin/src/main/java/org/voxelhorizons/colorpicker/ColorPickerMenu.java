@@ -238,6 +238,11 @@ public final class ColorPickerMenu implements Listener {
         return click == ClickType.LEFT || click == ClickType.RIGHT;
     }
 
+    /** Preserve the original inventory-dye feature, but do not let it alter a picker session. */
+    public static boolean isPickerInventory(Inventory inventory) {
+        return inventory != null && inventory.getHolder() instanceof Session;
+    }
+
     private static boolean isEmpty(ItemStack stack) {
         return stack == null || stack.getType() == Material.AIR || stack.getAmount() <= 0;
     }
