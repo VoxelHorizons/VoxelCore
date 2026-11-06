@@ -1,5 +1,5 @@
 {
-  "parent": "minecraft:item/generated",
+  "parent": "minecraft:block/block",
   "ambientocclusion": false,
   "gui_light": "front",
   "textures": {
