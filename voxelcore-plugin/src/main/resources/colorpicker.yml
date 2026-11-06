@@ -37,7 +37,7 @@ messages:
   painted: '&aItem recoloured to {hex}.'
 
 # Primary grid matches your reference: red / orange / yellow,
-# magenta / white / green, purple / blue / cyan.
+# magenta / white / purple, green / cyan / blue.
 # Each entry has its own configurable button slot and 1-9 RGB shades.
 # The first shade is the default when selecting the palette.
 palettes:
@@ -63,17 +63,17 @@ palettes:
     shades: ['#CCCCCC', '#ECE8DC', '#D6E0EC', '#B0B0B0', '#96928C', '#7A7E84', '#606060', '#424246', '#28282A']
   green:
     name: 'Green'
-    slot: 14
+    slot: 21
     shades: ['#59CC28', '#B7F59C', '#DBFFCC', '#7ACC28', '#38CC28', '#75A362', '#3E8F1C', '#2B661C', '#3A4E31']
   purple:
     name: 'Purple'
-    slot: 21
+    slot: 14
     shades: ['#9828CC', '#D99CF5', '#EFCCFF', '#7728CC', '#B928CC', '#8E62A3', '#6A1C8F', '#561C66', '#45314E']
   blue:
     name: 'Blue'
-    slot: 22
+    slot: 23
     shades: ['#2841CC', '#9CAAF5', '#CCD4FF', '#2862CC', '#3028CC', '#626CA3', '#1C2D8F', '#1C2066', '#31364E']
   cyan:
     name: 'Cyan'
-    slot: 23
+    slot: 22
     shades: ['#28CCCC', '#9CF5F5', '#CCFFFF', '#28CCAB', '#28ABCC', '#62A3A3', '#1C8F8F', '#1C5F66', '#314E4E']
