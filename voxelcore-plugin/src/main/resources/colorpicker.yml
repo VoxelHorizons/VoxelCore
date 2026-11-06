@@ -23,6 +23,10 @@ buttons:
   # the swatches. This also supports abstract, display-only UI item definitions.
   # Custom content IDs must already be loaded into the VoxelCore item registry.
   color-material: FIREWORK_STAR
+  # Optional 18x18 selected-shade outline. Install the bundled custom item
+  # before setting this to voxel:ui/colorpicker_selected.
+  # Blank by default so fresh servers do not require that content pack.
+  selected-shade-material: ''
   color-name: '&f{name}'
   shade-name: '&f{name} &7- &f{hex}'
   selected-prefix: '&e▶ '
