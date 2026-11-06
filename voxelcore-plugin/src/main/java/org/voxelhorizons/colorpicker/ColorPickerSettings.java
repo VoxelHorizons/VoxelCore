@@ -20,9 +20,7 @@ public final class ColorPickerSettings {
     public final int outputSlot;
     public final List<Integer> shadeSlots;
     public final List<Palette> palettes;
-    public final String javaTitle;
-    public final String fallbackTitle;
-    public final String bedrockTitle;
+    public final String title;
     public final String colorMaterial;
     public final String selectedShadeMaterial;
     public final String colorName;
@@ -40,9 +38,10 @@ public final class ColorPickerSettings {
         shadeSlots = Collections.unmodifiableList(slots(config.getIntegerList("shade-slots")));
         if (shadeSlots.isEmpty() || shadeSlots.size() > 9)
             throw new IllegalArgumentException("colorpicker.shade-slots must have 1-9 entries");
-        javaTitle = config.getString("titles.java", "&f:offset_-8::colorpicker_{palette}:");
-        fallbackTitle = config.getString("titles.fallback", "&8Color Picker - {palette}");
-        bedrockTitle = config.getString("titles.bedrock", "&8Color Picker - {palette}");
+        // Single title for Java and Bedrock. Read the old Java key for existing
+        // installations; the old Bedrock-specific key is intentionally ignored.
+        title = config.getString("title",
+                config.getString("titles.java", "&f:offset_-8::colorpicker_{palette}:"));
         colorMaterial = config.getString("buttons.color-material", "FIREWORK_STAR");
         selectedShadeMaterial = config.getString("buttons.selected-shade-material", "").trim();
         colorName = config.getString("buttons.color-name", "&e{palette}");
