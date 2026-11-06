@@ -167,9 +167,18 @@ grep -Fx 'output-slot: 25' "$COLORPICKER_CONFIG"
 # The READY polling loop already captured full logs. Avoid docker logs | grep -q
 # under pipefail, where grep can close early and SIGPIPE the docker process (exit 141).
 grep -Fq 'VOXELCORE_COLORPICKER_READY command=/vc colorpicker' <<<"$LOGS"
+# Verify the short alias the actual player uses, as well as the full root.
+# The earlier regression only covered /voxelcore, so a /vc collision was invisible.
 COLORPICKER_HELP="$(rcon 'voxelcore colorpicker')"
 echo "$COLORPICKER_HELP"
 grep -Fq 'Usage: /vc colorpicker <player>' <<<"$COLORPICKER_HELP"
+COLORPICKER_ALIAS="$(rcon 'vc colorpicker')"
+echo "$COLORPICKER_ALIAS"
+grep -Fq 'Usage: /vc colorpicker <player>' <<<"$COLORPICKER_ALIAS"
+# Namespacing is a fallback when another plugin claims the short command.
+COLORPICKER_NAMESPACED="$(rcon 'voxelcore:voxelcore colorpicker')"
+echo "$COLORPICKER_NAMESPACED"
+grep -Fq 'Usage: /vc colorpicker <player>' <<<"$COLORPICKER_NAMESPACED"
 
 CONTENT_INFO="$(rcon 'voxelcore admin content info')"
 echo "$CONTENT_INFO"
