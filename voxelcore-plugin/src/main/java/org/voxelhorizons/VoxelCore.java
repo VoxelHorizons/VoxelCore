@@ -352,6 +352,9 @@ public final class VoxelCore extends JavaPlugin {
         ContentReloadResult result = prepared == null
                 ? contentReloader.reload() : contentReloader.reloadPrepared(prepared);
         if (result.success()) {
+            // The picker resolves optional item IDs from the published content
+            // registry. Revalidate after the new registry becomes active.
+            if (colorPickerMenu != null) colorPickerMenu.reload();
             blockMiningSpeedController.clearAll();
             org.voxelhorizons.pack.UiGlyphRegistry currentGlyphs = packManager.uiGlyphs(true);
             textPlaceholderService.update(currentGlyphs);
@@ -367,7 +370,6 @@ public final class VoxelCore extends JavaPlugin {
     private void reloadRuntimeConfiguration() {
         reloadConfig();
         config = getConfig();
-        if (colorPickerMenu != null) colorPickerMenu.reload();
         if (playerResourcePackService != null) playerResourcePackService.reloadHost();
         if (advancementsMenuOverride != null) advancementsMenuOverride.reload();
         if (inventoryTitlePlaceholderListener != null) {
