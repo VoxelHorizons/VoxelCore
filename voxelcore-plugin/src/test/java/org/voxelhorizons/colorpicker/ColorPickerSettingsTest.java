@@ -63,6 +63,53 @@ public final class ColorPickerSettingsTest {
         assertEquals("&f:old_palette_{palette}:", ColorPickerSettings.from(config).title);
     }
 
+    @Test public void blankButtonNamesAndEmptyLoreAreSupported() {
+        YamlConfiguration config = defaults();
+        config.set("buttons.color-name", "");
+        config.set("buttons.color-lore", java.util.Collections.emptyList());
+        config.set("buttons.shade-name", "");
+        config.set("buttons.shade-lore", "");
+        config.set("buttons.selected-prefix", "");
+        ColorPickerSettings settings = ColorPickerSettings.from(config);
+        assertEquals("", settings.colorName);
+        assertEquals("", settings.shadeName);
+        assertEquals("", settings.selectedPrefix);
+        assertTrue(settings.colorLore.isEmpty());
+        assertTrue(settings.shadeLore.isEmpty());
+        assertTrue(ColorPickerMenu.formatLore(settings.colorLore, settings.palettes.get(0),
+                settings.palettes.get(0).shades.get(0).intValue()).isEmpty());
+    }
+
+    @Test public void multiLineLoreReplacesHexWithRgbAndSupportsColourCodes() {
+        YamlConfiguration config = defaults();
+        config.set("buttons.shade-lore", java.util.Arrays.asList(
+                "&e{name}", "&7{hex}", "", "&6{palette}"));
+        ColorPickerSettings settings = ColorPickerSettings.from(config);
+        assertEquals(java.util.Arrays.asList("§eRed", "§7#991E1E", "§6Red"),
+                ColorPickerMenu.formatLore(settings.shadeLore,
+                        settings.palettes.get(0), 0x991E1E));
+    }
+
+    @Test public void missingLoreSettingKeepsPreviousHexDefault() {
+        YamlConfiguration config = defaults();
+        config.set("buttons.color-lore", null);
+        config.set("buttons.shade-lore", null);
+        ColorPickerSettings settings = ColorPickerSettings.from(config);
+        assertEquals(java.util.Collections.singletonList("&7{hex}"), settings.colorLore);
+        assertEquals(java.util.Collections.singletonList("&7{hex}"), settings.shadeLore);
+    }
+
+    @Test public void numericLoreEntryIsRejected() {
+        YamlConfiguration config = defaults();
+        config.set("buttons.shade-lore", java.util.Arrays.asList(123));
+        try {
+            ColorPickerSettings.from(config);
+            fail("Accepted numeric lore entries");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("entries must be strings"));
+        }
+    }
+
     @Test public void customSelectedBorderCanBeConfigured() {
         YamlConfiguration config = defaults();
         config.set("buttons.color-material", "voxel:ui/blank");
