@@ -8,6 +8,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -159,6 +160,16 @@ public final class ColorPickerSettingsTest {
                         org.voxelhorizons.content.ContentID.of("voxel", "ui-colorpicker_slot"),
                         org.voxelhorizons.content.ContentID.of("voxel", "ui-colorpicker-slot")),
                 ColorPickerMenu.buttonContentCandidates("voxel:ui/colorpicker/slot"));
+    }
+
+    @Test public void completedOutputAcceptsOnlyNormalOrShiftClicks() {
+        assertTrue(ColorPickerMenu.shiftOutputClick(org.bukkit.event.inventory.ClickType.SHIFT_LEFT));
+        assertTrue(ColorPickerMenu.shiftOutputClick(org.bukkit.event.inventory.ClickType.SHIFT_RIGHT));
+        assertFalse(ColorPickerMenu.shiftOutputClick(org.bukkit.event.inventory.ClickType.LEFT));
+        assertFalse(ColorPickerMenu.shiftOutputClick(org.bukkit.event.inventory.ClickType.RIGHT));
+        assertFalse(ColorPickerMenu.shiftOutputClick(org.bukkit.event.inventory.ClickType.DOUBLE_CLICK));
+        assertFalse(ColorPickerMenu.shiftOutputClick(org.bukkit.event.inventory.ClickType.NUMBER_KEY));
+        assertFalse(ColorPickerMenu.shiftOutputClick(org.bukkit.event.inventory.ClickType.DROP));
     }
 
     @Test public void customRgbIsParsedPrecisely() {
