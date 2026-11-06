@@ -17,6 +17,10 @@ buttons:
   # models in your existing voxel pack, then switch both settings to:
   # color-material: 'voxel:ui/colorpicker/slot'
   # selected-shade-material: 'voxel:ui/colorpicker/selected'
+  # Authored content item keys are ui-colorpicker_slot and
+  # ui-colorpicker_selected; slash-style model IDs resolve to those names.
+  # Direct item IDs voxel:ui-colorpicker_slot / voxel:ui-colorpicker_selected
+  # work as well and are useful when diagnosing missing content packs.
   # Their WHITE layer0 centres receive the configured RGB hex values;
   # layer1 retains the untinted black/grey border and white highlights.
   # Vanilla FIREWORK_STAR is the safe initial fallback if the optional
