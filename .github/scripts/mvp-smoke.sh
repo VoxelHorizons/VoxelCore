@@ -29,7 +29,9 @@ console_command() {
   local command="$1"
   local before after output
   before="$(docker logs "$NAME" 2>&1 | wc -l)"
-  docker exec "$NAME" mc-send-to-console "$command" >&2
+  # Newer itzg image tags enforce the Minecraft data user for console-pipe
+  # writes. Legacy RCON sometimes disappears on 1.14.4; explicitly use UID 1000.
+  docker exec --user 1000:1000 "$NAME" mc-send-to-console "$command" >&2
   output=""
   for _ in $(seq 1 15); do
     sleep 1
