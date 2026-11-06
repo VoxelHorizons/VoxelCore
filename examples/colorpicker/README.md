@@ -54,6 +54,28 @@ Names and lore may be blank; a missing lore key preserves legacy hex lore,
 but explicit `[]` removes it. Use `{hex}`, `{name}`, `{palette}`, and
 `&` formatting in any configured button text.
 
+## Item ID resolution and missing pack definitions
+
+The authored **model resource paths** and **content item IDs** are not the same:
+
+| Model resource | Authored content ID | Direct config ID |
+| --- | --- | --- |
+| `voxel:ui/colorpicker/slot` | `ui-colorpicker_slot` | `voxel:ui-colorpicker_slot` |
+| `voxel:ui/colorpicker/selected` | `ui-colorpicker_selected` | `voxel:ui-colorpicker_selected` |
+
+The Color Picker now accepts both the exact content IDs **and** the slash-style
+resource identifiers above. The older all-hyphen naming convention is also
+accepted if such items exist in your pack. If VoxelCore logs "Unknown item",
+check `plugins/VoxelCore/content/voxel/content/colorpicker.yml` (the content
+pack item definitions), **not** the separate top-level
+`plugins/VoxelCore/colorpicker.yml` (the GUI configuration). They serve
+different purposes.
+
+Missing optional custom icon definitions now cause a startup warning and use
+vanilla firework stars for that session instead of disabling VoxelCore. When
+you reload content, icons are re-resolved after the new item registry is
+published.
+
 ## RGB model details
 
 The bundled `content/colorpicker.yml` is based on the user's supplied
