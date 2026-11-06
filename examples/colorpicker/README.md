@@ -58,10 +58,56 @@ buttons:
   color-material: 'voxel:ui/blank'
   selected-shade-material: 'voxel:ui/colorpicker_selected'
   color-name: '&f{name}'
+  color-lore: ['&7{hex}']
   shade-name: '&f{name} &7- &f{hex}'
+  shade-lore: ['&7{hex}']
   selected-prefix: '&e▶ '
 ```
 
 `selected-shade-material` is optional (empty by default). When configured, only the **selected** shade uses the transparent-centred 18×18 outline icon; all other shade buttons use the regular `color-material`. Your selected palette's baked-in colour swatches remain visible through the transparent centre. The nine separately registered UI glyphs must be named `colorpicker_red`, `colorpicker_orange`, etc., matching the palette keys. Each palette switch now opens the new title background without using unsupported `setTitle`. Changing **shades** does not reopen the inventory.
 
 **Reload order:** add the custom item/model/texture first, reload the VoxelCore content and rebuild/send the resource pack, then set the selection model in `colorpicker.yml` and reload the picker configuration or restart. Unknown custom model IDs are deliberately reported as errors rather than silently replaced with paper icons.
+
+### Fully configurable button names and lore
+
+The colour-picker button icons have independent text settings for primary
+colours (`color-*`) and shades (`shade-*`). Each name and lore line supports
+`&` colour codes and `{palette}`, `{name}`, and `{hex}` placeholders.
+Names may be `''` and lore can be `[]` or `''`. All lore is controlled
+by configuration, so **no hard-coded hex line** is appended to the tooltip.
+A zero-length name is deliberately set as a blank custom name rather than
+allowing the icon's underlying PAPER/FIREWORK_STAR/custom item name to reappear.
+The selected prefix is skipped for a blank name.
+
+Example: blank primary and shade button tooltips, leaving the background
+textures and selected-shade outline to provide visual feedback:
+
+```yaml
+buttons:
+  color-material: 'voxel:ui/blank'
+  selected-shade-material: 'voxel:ui/colorpicker_selected'
+  color-name: ''
+  color-lore: []
+  shade-name: ''
+  shade-lore: []
+  selected-prefix: ''
+```
+
+Or retain helpful multi-line lore without changing the rendered icons:
+
+```yaml
+buttons:
+  color-name: '&f{name}'
+  color-lore:
+    - '&7Choose this palette'
+  shade-name: '&f{name}'
+  shade-lore:
+    - '&7RGB: {hex}'
+    - '&eClick to preview'
+```
+
+For existing `colorpicker.yml` files that do not have the new lore keys,
+the previous default `&7{hex}` is preserved for compatibility. Add empty
+lists explicitly to remove it. Names and lore in this section affect only
+the GUI button icons: the input item and the recoloured output keep their
+original item names and metadata.
