@@ -4,20 +4,25 @@
 
 The Color Picker has one **176×138 background** `colorpicker_background`, and
 only **two reusable item models**: a 16×16 slot and an oversized 18×18 selected
-slot. The uploaded source images are split into a pure-white tintable centre
-(layer0) and a neutral untinted border/highlights (layer1). Minecraft applies
-VoxelCore's per-item structured custom model data RGB only to layer0. The
-black, grey and white frame therefore never changes colour.
+slot. Both models use the **original unmodified single PNG** (`slot.png` and
+`selected.png`). Their custom `elements` each reuse the same texture:
+`tintindex: 0` colours the centre, white inner outline and darker bottom
+padding, while the outer black/grey border faces remain untinted. No extra
+texture layers or generated PNGs are necessary.
 
 No nine-per-palette background PNGs or separate textures per hex shade are
 needed. Clicking a primary palette changes the nine live-tinted shade items in
 the existing 54-slot inventory without closing/reopening or flickering. The
-primary buttons use the same slot model and are each tinted with that
-palette's representative RGB. The active shade uses the selected model.
+primary buttons are tinted with their palette's representative RGB. Both
+the active **primary button** and the active **shade button** use the selected
+18×18 model; the remaining buttons use the 16×16 slot model.
 
 The input remains slot **19**, the output remains slot **25**, the primary
 buttons occupy **12–14, 21–23, 30–32**, and the shade items **36–44**. The
-input is only consumed when the recoloured output item is taken. Empty/blank
+input is only consumed when the recoloured output item is taken. **Shift-click
+the output** to place the completed item directly into the player inventory,
+including merging into matching stacks; if there is no space the input remains
+untouched and the configured inventory-full message is shown. Empty/blank
 button names and lore remain configurable.
 
 ## Installation
@@ -32,6 +37,9 @@ button names and lore remain configurable.
    `colorpicker_selected.yml` example if you previously installed them:
    keeping two item definitions with the same ID will prevent content loading.
    The *old PNGs* can be removed from your content pack to reduce pack size.
+   Remove the four obsolete split-layer textures
+   (`slot_tint.png`, `slot_frame.png`, `selected_tint.png`,
+   `selected_frame.png`) if you installed the previous draft version.
 5. Set the **single background title** and **two button item IDs** in
    `plugins/VoxelCore/colorpicker.yml` as below. Leave your palette hex
    arrays and 0-based button slot assignments unchanged.
@@ -85,19 +93,23 @@ configuration. It declares:
   `ui/menu/colorpicker/background.png`, `scale_ratio: 138`,
   `y_position: 13`, `gui: true`
 - `items.ui-colorpicker_slot`: abstract `voxel:ui/colorpicker/slot`
-  generated-item model; 16×16 original dimensions
+  model using the original 16×16 `slot.png`
 - `items.ui-colorpicker_selected`: abstract
-  `voxel:ui/colorpicker/selected` generated-item model;
-  18×18 dimensions with 1.125 GUI scale
+  `voxel:ui/colorpicker/selected` model using the original 18×18
+  `selected.png` with 1.125 GUI scale
 - Both items use `render.oversized_in_gui: true`, structured
   `custom_model_data.color: '#FFFFFF'`, and the existing VoxelCore
   `properties.dyeable` API. The compiler emits a
-  `minecraft:custom_model_data` tint source for layer0.
+  `minecraft:custom_model_data` tint source for `tintindex: 0` faces.
+  Each JSON uses five non-overlapping flat elements: one tintable inner
+  rectangle and four untinted outer-frame strips, UV-mapped onto the same
+  unmodified PNG.
 
 The palette's primary button uses its first configured shade as the RGB tint
 unless `palettes.<name>.button-color: '#RRGGBB'` is explicitly supplied.
-Each of the nine shade icons uses its configured `shades` hex value. Only
-the chosen shade uses the selected icon; all others use the slot icon.
+Each of the nine shade icons uses its configured `shades` hex value.
+The selected primary button and selected shade both use the larger selected
+icon, and all other buttons use the slot icon.
 
 The title is identical for Java and Bedrock; VoxelCore/Geyser handles UI
 translation downstream. **Current compatibility note:** the Java renderer
