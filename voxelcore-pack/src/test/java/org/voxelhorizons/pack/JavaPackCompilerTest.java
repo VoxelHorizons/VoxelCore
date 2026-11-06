@@ -140,10 +140,8 @@ public class JavaPackCompilerTest {
             "content/colorpicker.yml",
             "assets/voxel/models/ui/colorpicker/slot.json",
             "assets/voxel/models/ui/colorpicker/selected.json",
-            "assets/voxel/textures/ui/colorpicker/slot_tint.png",
-            "assets/voxel/textures/ui/colorpicker/slot_frame.png",
-            "assets/voxel/textures/ui/colorpicker/selected_tint.png",
-            "assets/voxel/textures/ui/colorpicker/selected_frame.png",
+            "assets/voxel/textures/ui/colorpicker/slot.png",
+            "assets/voxel/textures/ui/colorpicker/selected.png",
             "assets/voxel/textures/ui/menu/colorpicker/background.png"
         };
         for (String path : samplePaths) {
@@ -158,28 +156,54 @@ public class JavaPackCompilerTest {
         new JavaPackCompiler().compile(contentRoot.toPath(), modern,
                 output.resolve("allocations.yml"), JavaPackTarget.MC_26_3);
         for (String icon : new String[]{"slot", "selected"}) {
-            String def = zipText(modern, "assets/voxel/items/ui/colorpicker/" + icon + ".json").replaceAll("\\s+", "");
-            assertTrue("missing oversized flag: " + def, def.contains("\"oversized_in_gui\":true"));
+            String def = zipText(modern, "assets/voxel/items/ui/colorpicker/" + icon + ".json")
+                    .replaceAll("\\s+", "");
+            assertTrue(def.contains("\"oversized_in_gui\":true"));
             assertTrue(def.contains("\"type\":\"minecraft:model\""));
             assertTrue(def.contains("\"tints\":[{\"type\":\"minecraft:custom_model_data\""));
             assertTrue(def.contains("\"index\":0"));
-            String model = zipText(modern, "assets/voxel/models/ui/colorpicker/" + icon + ".json").replaceAll("\\s+", "");
-            assertTrue(model.contains("\"layer0\":\"voxel:ui/colorpicker/" + icon + "_tint\""));
-            assertTrue(model.contains("\"layer1\":\"voxel:ui/colorpicker/" + icon + "_frame\""));
-            assertTrue(hasEntry(modern, "assets/voxel/textures/ui/colorpicker/" + icon + "_tint.png"));
-            assertTrue(hasEntry(modern, "assets/voxel/textures/ui/colorpicker/" + icon + "_frame.png"));
+
+            String json = zipText(modern, "assets/voxel/models/ui/colorpicker/" + icon + ".json");
+            com.google.gson.JsonObject model = com.google.gson.JsonParser.parseString(json).getAsJsonObject();
+            assertEquals("voxel:ui/colorpicker/" + icon,
+                    model.getAsJsonObject("textures").get("layer0").getAsString());
+            assertTrue(!model.getAsJsonObject("textures").has("layer1"));
+            com.google.gson.JsonArray elements = model.getAsJsonArray("elements");
+            // Inner panel: tinted white rim, grey fill and bottom shadow.
+            // Outer four strips: the original unmodified neutral border.
+            assertEquals(5, elements.size());
+            for (int i = 0; i < elements.size(); i++) {
+                com.google.gson.JsonObject faces = elements.get(i).getAsJsonObject().getAsJsonObject("faces");
+                for (String faceName : new String[]{"north", "south"}) {
+                    com.google.gson.JsonObject face = faces.getAsJsonObject(faceName);
+                    if (i == 0) {
+                        assertEquals(0, face.get("tintindex").getAsInt());
+                    } else {
+                        assertTrue("Outer border must not receive RGB tint", !face.has("tintindex"));
+                    }
+                }
+            }
+            assertTrue(hasEntry(modern, "assets/voxel/textures/ui/colorpicker/" + icon + ".png"));
+            assertTrue(!hasEntry(modern, "assets/voxel/textures/ui/colorpicker/" + icon + "_tint.png"));
+            assertTrue(!hasEntry(modern, "assets/voxel/textures/ui/colorpicker/" + icon + "_frame.png"));
         }
         assertTrue(hasEntry(modern, "assets/voxel/textures/ui/menu/colorpicker/background.png"));
         assertTrue(!hasEntry(modern, "assets/voxel/textures/ui/colorpicker/red.png"));
-        // White layer0 is tinted; layer1 must be fully transparent at the centre
-        // so it cannot cover the arbitrary RGB shade with untinted grey.
-        java.awt.image.BufferedImage tint = javax.imageio.ImageIO.read(
-                new File(pack, "assets/voxel/textures/ui/colorpicker/slot_tint.png"));
-        java.awt.image.BufferedImage frame = javax.imageio.ImageIO.read(
-                new File(pack, "assets/voxel/textures/ui/colorpicker/slot_frame.png"));
-        assertEquals(0xFFFFFFFF, tint.getRGB(6, 6));
-        assertEquals(0x00000000, frame.getRGB(6, 6));
-        assertEquals(0xFF000000, frame.getRGB(0, 0));
+        java.awt.image.BufferedImage slot = javax.imageio.ImageIO.read(
+                new File(pack, "assets/voxel/textures/ui/colorpicker/slot.png"));
+        assertEquals(16, slot.getWidth());
+        assertEquals(0xFFFFFFFF, slot.getRGB(1, 1));   // white highlight tinted
+        assertEquals(0xFFCCCCCC, slot.getRGB(6, 6));   // light-grey main fill tinted
+        assertEquals(0xFF999999, slot.getRGB(1, 14)); // darker bottom padding tinted
+        assertEquals(0xFF000000, slot.getRGB(0, 0));   // black frame stays black
+
+        java.awt.image.BufferedImage selected = javax.imageio.ImageIO.read(
+                new File(pack, "assets/voxel/textures/ui/colorpicker/selected.png"));
+        assertEquals(18, selected.getWidth());
+        assertEquals(0xFFFFFFFF, selected.getRGB(2, 2)); // white rim tinted
+        assertEquals(0xFF999999, selected.getRGB(2, 15)); // bottom shadow tinted
+        assertEquals(0xFF555555, selected.getRGB(1, 1)); // grey selection frame neutral
+        assertEquals(0xFF000000, selected.getRGB(0, 0)); // black selection frame neutral
     }
 
     @Test
