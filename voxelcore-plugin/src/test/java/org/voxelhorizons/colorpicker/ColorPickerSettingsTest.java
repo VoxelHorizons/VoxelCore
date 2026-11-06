@@ -28,6 +28,7 @@ public final class ColorPickerSettingsTest {
         assertEquals(54, settings.size);
         assertEquals(19, settings.inputSlot);
         assertEquals(25, settings.outputSlot);
+        assertEquals("", settings.selectedShadeMaterial);
         assertEquals(9, settings.palettes.size());
         assertEquals(9, settings.shadeSlots.size());
         int[][] expected = {
@@ -43,6 +44,15 @@ public final class ColorPickerSettingsTest {
             assertEquals(expected[i][0], p.shades.get(0).intValue());
             assertEquals(expected[i][1], p.shades.get(8).intValue());
         }
+    }
+
+    @Test public void customSelectedBorderCanBeConfigured() {
+        YamlConfiguration config = defaults();
+        config.set("buttons.color-material", "voxel:ui/blank");
+        config.set("buttons.selected-shade-material", "voxel:ui/colorpicker_selected");
+        ColorPickerSettings settings = ColorPickerSettings.from(config);
+        assertEquals("voxel:ui/blank", settings.colorMaterial);
+        assertEquals("voxel:ui/colorpicker_selected", settings.selectedShadeMaterial);
     }
 
     @Test public void customUiButtonAcceptsResourceStyleItemKeys() {
