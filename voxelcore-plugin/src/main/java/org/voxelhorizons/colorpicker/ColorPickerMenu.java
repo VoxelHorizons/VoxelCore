@@ -24,7 +24,8 @@ import org.voxelhorizons.content.ContentID;
 import org.voxelhorizons.item.ItemManager;
 
 import java.io.File;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -108,7 +109,8 @@ public final class ColorPickerMenu implements Listener {
             ColorPickerSettings.Palette p = config.palettes.get(i);
             String name = substitute(config.colorName, p, p.shades.get(0).intValue());
             if (i == session.paletteIndex) name = config.selectedPrefix + name;
-            session.inventory.setItem(p.slot, icon(config.colorMaterial, p.shades.get(0).intValue(), name));
+            session.inventory.setItem(p.slot, icon(config.colorMaterial, p.shades.get(0).intValue(),
+                    name, config.colorLore, p));
         }
         for (int i = 0; i < config.shadeSlots.size(); i++) {
             ItemStack swatch = null;
@@ -120,7 +122,7 @@ public final class ColorPickerMenu implements Listener {
                 String iconId = selectedShade && !config.selectedShadeMaterial.isEmpty()
                         ? config.selectedShadeMaterial : config.colorMaterial;
                 swatch = icon(iconId, rgb, (selectedShade ? config.selectedPrefix : "")
-                        + substitute(config.shadeName, selected, rgb));
+                        + substitute(config.shadeName, selected, rgb), config.shadeLore, selected);
             }
             session.inventory.setItem(config.shadeSlots.get(i).intValue(), swatch);
         }
@@ -158,7 +160,19 @@ public final class ColorPickerMenu implements Listener {
         return material;
     }
 
-    private ItemStack icon(String materialName, int rgb, String name) {
+    static List<String> formatLore(List<String> templates, ColorPickerSettings.Palette palette,
+                                   int rgb) {
+        List<String> result = new ArrayList<String>();
+        for (String template : templates) {
+            String line = substitute(template, palette, rgb);
+            if (!line.isEmpty())
+                result.add(ChatColor.translateAlternateColorCodes('&', line));
+        }
+        return result;
+    }
+
+    private ItemStack icon(String materialName, int rgb, String name, List<String> loreTemplates,
+                           ColorPickerSettings.Palette palette) {
         ItemStack stack = isCustomButton(materialName)
                 ? items.createRenderItem(parseButtonContentId(materialName))
                 : new ItemStack(resolveMaterial(materialName));
@@ -168,9 +182,14 @@ public final class ColorPickerMenu implements Listener {
                 ((FireworkEffectMeta) meta).setEffect(
                         FireworkEffect.builder().withColor(Color.fromRGB(rgb)).build());
             }
-            meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', name));
-            if (rgb >= 0) meta.setLore(Collections.singletonList(
-                    ChatColor.GRAY + ColorPickerSettings.formatHex(rgb)));
+            // An empty name must not resurrect the underlying PAPER/FIREWORK_STAR
+            // or an inherited custom icon's display name. A blank custom name
+            // keeps the icon visually unnamed instead of using the vanilla default.
+            meta.setDisplayName(name.isEmpty() ? " "
+                    : ChatColor.translateAlternateColorCodes('&', name));
+            // Always overwrite authored item lore, including when [] means none.
+            // No automatic hexadecimal lore is appended here.
+            meta.setLore(formatLore(loreTemplates, palette, rgb));
             stack.setItemMeta(meta);
         }
         return stack;
