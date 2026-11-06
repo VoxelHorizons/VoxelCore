@@ -60,7 +60,10 @@ public final class ColorPickerMenu implements Listener {
     private void validateButton(String identifier, String key) {
         try {
             if (isCustomButton(identifier)) {
-                items.createRenderItem(parseButtonContentId(identifier));
+                ItemStack stack = items.createRenderItem(parseButtonContentId(identifier));
+                if (!items.isDyeable(stack))
+                    plugin.getLogger().warning("Color Picker " + key + " '" + identifier
+                            + "' is not dyeable; RGB swatch tints require the new custom slot model.");
             } else {
                 resolveMaterial(identifier);
             }
@@ -107,10 +110,11 @@ public final class ColorPickerMenu implements Listener {
         ColorPickerSettings.Palette selected = session.palette();
         for (int i = 0; i < config.palettes.size(); i++) {
             ColorPickerSettings.Palette p = config.palettes.get(i);
-            String name = substitute(config.colorName, p, p.shades.get(0).intValue());
+            int rgb = p.buttonColor;
+            String name = substitute(config.colorName, p, rgb);
             if (i == session.paletteIndex && !name.isEmpty())
                 name = config.selectedPrefix + name;
-            session.inventory.setItem(p.slot, icon(config.colorMaterial, p.shades.get(0).intValue(),
+            session.inventory.setItem(p.slot, icon(config.colorMaterial, rgb,
                     name, config.colorLore, p));
         }
         for (int i = 0; i < config.shadeSlots.size(); i++) {
@@ -179,6 +183,11 @@ public final class ColorPickerMenu implements Listener {
         ItemStack stack = isCustomButton(materialName)
                 ? items.createRenderItem(parseButtonContentId(materialName))
                 : new ItemStack(resolveMaterial(materialName));
+        // The tintable model's first generated texture layer is white in the
+        // central square; the frame lives on layer1 and is never tinted.
+        // One shared model/texture pair works for all nine palettes and shades.
+        if (isCustomButton(materialName) && items.isDyeable(stack))
+            stack = items.setDyeColor(stack, rgb);
         ItemMeta meta = stack.getItemMeta();
         if (meta != null) {
             if (rgb >= 0 && meta instanceof FireworkEffectMeta) {
@@ -279,10 +288,13 @@ public final class ColorPickerMenu implements Listener {
         }
         for (int i = 0; i < config.palettes.size(); i++) {
             if (raw == config.palettes.get(i).slot) {
-                session.paletteIndex = i;
-                session.shadeIndex = 0;
-                paint(session);
-                reopenWithPalette(player, session);
+                if (session.paletteIndex != i) {
+                    session.paletteIndex = i;
+                    session.shadeIndex = 0;
+                    // The background is shared across palettes, so repaint
+                    // in place: no inventory reopen, input transfer or flicker.
+                    paint(session);
+                }
                 return;
             }
         }
@@ -317,35 +329,6 @@ public final class ColorPickerMenu implements Listener {
             remainder.setAmount(stack.getAmount() - 1);
             destination.put(remainder);
         }
-    }
-
-    /**
-     * Paper 1.21.1+ explicitly deprecates InventoryView#setTitle because it does
-     * not reliably update client windows. Replace the view on the next tick so
-     * the selected palette's background glyph is sent as a fresh window title.
-     *
-     * Keep the input in the replacement inventory while removing it from the
-     * old inventory before the old InventoryCloseEvent fires. Never duplicate
-     * or return the source during a palette transition.
-     */
-    private void reopenWithPalette(final Player player, final Session session) {
-        final Inventory oldInventory = session.inventory;
-        Bukkit.getScheduler().runTask(plugin, new Runnable() {
-            @Override
-            public void run() {
-                // Player might have closed/replaced the menu before this task ran.
-                if (player.getOpenInventory().getTopInventory() != oldInventory) return;
-                final Inventory replacement = Bukkit.createInventory(session, session.config.size,
-                        title(session));
-                final ItemStack input = oldInventory.getItem(session.config.inputSlot);
-                oldInventory.setItem(session.config.inputSlot, null);
-                oldInventory.setItem(session.config.outputSlot, null);
-                session.inventory = replacement;
-                replacement.setItem(session.config.inputSlot, input);
-                paint(session);
-                player.openInventory(replacement);
-            }
-        });
     }
 
     private void send(Player player, ColorPickerSettings config, String key, String fallback) {
