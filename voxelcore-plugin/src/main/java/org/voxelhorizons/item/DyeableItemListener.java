@@ -1,6 +1,7 @@
 package org.voxelhorizons.item;
 
 import org.bukkit.Color;
+import org.voxelhorizons.colorpicker.ColorPickerMenu;
 import org.bukkit.DyeColor;
 import org.bukkit.Material;
 import org.bukkit.event.EventHandler;
@@ -18,6 +19,9 @@ public final class DyeableItemListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onClick(InventoryClickEvent event) {
+        // A picker needs to own its source and output transitions. The older
+        // dye-on-cursor shortcut would otherwise recolour its input prematurely.
+        if (ColorPickerMenu.isPickerInventory(event.getView().getTopInventory())) return;
         ItemStack target = event.getCurrentItem();
         ItemStack dye = event.getCursor();
         Integer rgb = dyeColor(dye);
