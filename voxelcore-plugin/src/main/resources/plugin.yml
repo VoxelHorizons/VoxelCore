@@ -74,6 +74,13 @@ permissions:
   voxelcore.admin.ui.tooltip:
     default: op
 
+  # Direct self-opening and targeted opening are intentionally separate.
+  # Ordinary players receive neither; bench actions dispatch as console.
+  voxelcore.colorpicker.self:
+    default: op
+  voxelcore.colorpicker.others:
+    default: op
+
   voxelcore.placeholders:
     default: op
   voxelcore.placeholders.chat:
