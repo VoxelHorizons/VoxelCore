@@ -128,6 +128,61 @@ public class JavaPackCompilerTest {
     }
 
     @Test
+    public void compilesExampleColorPickerWithLayeredTintAndSharedBackground() throws Exception {
+        // Test the actual authored examples that are published with the feature:
+        // one UI glyph and two abstract, independently tintable model IDs.
+        Path example = new File("../examples/colorpicker").toPath();
+        File contentRoot = temporaryFolder.newFolder("picker-content");
+        File pack = new File(contentRoot, "voxel");
+        assertTrue(new File(pack, "content").mkdirs());
+        write(new File(pack, "pack.yml"), "schema: 1\nnamespace: voxel\n");
+        String[] samplePaths = {
+            "content/colorpicker.yml",
+            "assets/voxel/models/ui/colorpicker/slot.json",
+            "assets/voxel/models/ui/colorpicker/selected.json",
+            "assets/voxel/textures/ui/colorpicker/slot_tint.png",
+            "assets/voxel/textures/ui/colorpicker/slot_frame.png",
+            "assets/voxel/textures/ui/colorpicker/selected_tint.png",
+            "assets/voxel/textures/ui/colorpicker/selected_frame.png",
+            "assets/voxel/textures/ui/menu/colorpicker/background.png"
+        };
+        for (String path : samplePaths) {
+            Path source = example.resolve(path);
+            assertTrue("Missing Color Picker example asset " + source, Files.isRegularFile(source));
+            Path dest = new File(pack, path).toPath();
+            Files.createDirectories(dest.getParent());
+            Files.copy(source, dest);
+        }
+        Path output = temporaryFolder.newFolder("picker-build").toPath();
+        Path modern = output.resolve("mc-26.3.zip");
+        new JavaPackCompiler().compile(contentRoot.toPath(), modern,
+                output.resolve("allocations.yml"), JavaPackTarget.MC_26_3);
+        for (String icon : new String[]{"slot", "selected"}) {
+            String def = zipText(modern, "assets/voxel/items/ui/colorpicker/" + icon + ".json");
+            assertTrue(def.contains("\\"oversized_in_gui\\": true"));
+            assertTrue(def.contains("\\"type\\":\\"minecraft:model\\""));
+            assertTrue(def.contains("\\"tints\\":[{\\"type\\":\\"minecraft:custom_model_data\\""));
+            assertTrue(def.contains("\\"index\\":0"));
+            String model = zipText(modern, "assets/voxel/models/ui/colorpicker/" + icon + ".json");
+            assertTrue(model.contains("\\"layer0\\": \\"voxel:ui/colorpicker/" + icon + "_tint\\""));
+            assertTrue(model.contains("\\"layer1\\": \\"voxel:ui/colorpicker/" + icon + "_frame\\""));
+            assertTrue(hasEntry(modern, "assets/voxel/textures/ui/colorpicker/" + icon + "_tint.png"));
+            assertTrue(hasEntry(modern, "assets/voxel/textures/ui/colorpicker/" + icon + "_frame.png"));
+        }
+        assertTrue(hasEntry(modern, "assets/voxel/textures/ui/menu/colorpicker/background.png"));
+        assertTrue(!hasEntry(modern, "assets/voxel/textures/ui/colorpicker/red.png"));
+        // White layer0 is tinted; layer1 must be fully transparent at the centre
+        // so it cannot cover the arbitrary RGB shade with untinted grey.
+        java.awt.image.BufferedImage tint = javax.imageio.ImageIO.read(
+                new File(pack, "assets/voxel/textures/ui/colorpicker/slot_tint.png"));
+        java.awt.image.BufferedImage frame = javax.imageio.ImageIO.read(
+                new File(pack, "assets/voxel/textures/ui/colorpicker/slot_frame.png"));
+        assertEquals(0xFFFFFFFF, tint.getRGB(6, 6));
+        assertEquals(0x00000000, frame.getRGB(6, 6));
+        assertEquals(0xFF000000, frame.getRGB(0, 0));
+    }
+
+    @Test
     public void preservesAuthoredModernItemDefinitionInsteadOfGeneratingProvider() throws Exception {
         File contentRoot = temporaryFolder.newFolder("authored-item-content");
         File pack = new File(contentRoot, "voxel");
