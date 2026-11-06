@@ -9,6 +9,8 @@ import org.voxelhorizons.command.CommandRegistry;
 import org.voxelhorizons.command.RootCommand;
 import org.voxelhorizons.command.commands.AdminCommand;
 import org.voxelhorizons.command.commands.BaseCommand;
+import org.voxelhorizons.command.commands.ColorPickerCommand;
+import org.voxelhorizons.colorpicker.ColorPickerMenu;
 import org.voxelhorizons.command.ui.ContentBrowser;
 import org.voxelhorizons.config.ConfigMigrationSupport;
 import org.voxelhorizons.content.item.ItemDefinition;
@@ -91,6 +93,7 @@ public final class VoxelCore extends JavaPlugin {
     private TooltipRenderer tooltipRenderer;
     private InventoryTitlePlaceholderListener inventoryTitlePlaceholderListener;
     private ContentBrowser contentBrowser;
+    private ColorPickerMenu colorPickerMenu;
     private VoxelCurrencyBridge currencyBridge;
     private AdvancementsMenuOverride advancementsMenuOverride;
     private Path contentRoot;
@@ -204,6 +207,8 @@ public final class VoxelCore extends JavaPlugin {
         }
 
         itemManager = new ItemManager(contentRuntime, versionAdapter);
+        colorPickerMenu = new ColorPickerMenu(this, itemManager);
+        getServer().getPluginManager().registerEvents(colorPickerMenu, this);
         getServer().getPluginManager().registerEvents(playerResourcePackService, this);
         playerResourcePackService.reloadHost();
         blockManager = new BlockManager(contentRuntime, versionAdapter.version().atLeast(1, 13, 0));
@@ -247,6 +252,7 @@ public final class VoxelCore extends JavaPlugin {
         RootCommand baseCommand = new BaseCommand();
         CommandFactory commandFactory = new CommandFactory(baseCommand);
         commandFactory.register(new AdminCommand());
+        commandFactory.register(new ColorPickerCommand());
 
         try {
             PluginCommand bukkitCommand = getCommand(baseCommand.getName());
@@ -335,6 +341,7 @@ public final class VoxelCore extends JavaPlugin {
     private void reloadRuntimeConfiguration() {
         reloadConfig();
         config = getConfig();
+        if (colorPickerMenu != null) colorPickerMenu.reload();
         if (playerResourcePackService != null) playerResourcePackService.reloadHost();
         if (advancementsMenuOverride != null) advancementsMenuOverride.reload();
         if (inventoryTitlePlaceholderListener != null) {
@@ -376,6 +383,7 @@ public final class VoxelCore extends JavaPlugin {
     public TextPlaceholderService getTextPlaceholderService() { return textPlaceholderService; }
     public TooltipRenderer getTooltipRenderer() { return tooltipRenderer; }
     public ContentBrowser getContentBrowser() { return contentBrowser; }
+    public ColorPickerMenu getColorPickerMenu() { return colorPickerMenu; }
 
     private void validateForPlatform(ItemDefinitionRegistry items, RenderAllocationRegistry allocations) {
         for (ItemDefinition definition : items.entries().values()) {
