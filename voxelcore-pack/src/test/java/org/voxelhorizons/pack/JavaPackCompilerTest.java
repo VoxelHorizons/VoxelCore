@@ -168,6 +168,13 @@ public class JavaPackCompilerTest {
             assertEquals("voxel:ui/colorpicker/" + icon,
                     model.getAsJsonObject("textures").get("layer0").getAsString());
             assertTrue(!model.getAsJsonObject("textures").has("layer1"));
+            assertEquals("minecraft:block/block", model.get("parent").getAsString());
+            assertEquals(0, model.getAsJsonObject("display")
+                    .getAsJsonObject("gui").getAsJsonArray("rotation").get(0).getAsInt());
+            assertEquals("Only the selected model should be 18px in GUI",
+                    icon.equals("selected") ? 1.125 : 1.0,
+                    model.getAsJsonObject("display").getAsJsonObject("gui")
+                            .getAsJsonArray("scale").get(0).getAsDouble(), 0.00001);
             com.google.gson.JsonArray elements = model.getAsJsonArray("elements");
             // Inner panel: tinted white rim, grey fill and bottom shadow.
             // Outer four strips: the original unmodified neutral border.
