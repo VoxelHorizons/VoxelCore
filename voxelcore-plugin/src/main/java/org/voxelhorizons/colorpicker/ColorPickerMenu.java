@@ -140,8 +140,7 @@ public final class ColorPickerMenu implements Listener {
                 name = config.selectedPrefix + name;
             // Selected primary palette uses the same 18x18 selection model as
             // the active shade, with the representative palette RGB tint.
-            String iconId = selectedPalette && !activeSelectedMaterial.isEmpty()
-                    ? activeSelectedMaterial : activeColorMaterial;
+            String iconId = selectionIcon(selectedPalette, activeColorMaterial, activeSelectedMaterial);
             session.inventory.setItem(p.slot, icon(iconId, rgb,
                     name, config.colorLore, p));
         }
@@ -152,8 +151,7 @@ public final class ColorPickerMenu implements Listener {
                 boolean selectedShade = session.shadeIndex == i;
                 // The 18x18 transparent-border model replaces ONLY the selected shade
                 // icon. Its hollow centre leaves the colour painted in the GUI visible.
-                String iconId = selectedShade && !activeSelectedMaterial.isEmpty()
-                        ? activeSelectedMaterial : activeColorMaterial;
+                String iconId = selectionIcon(selectedShade, activeColorMaterial, activeSelectedMaterial);
                 String shadeName = substitute(config.shadeName, selected, rgb);
                 if (selectedShade && !shadeName.isEmpty())
                     shadeName = config.selectedPrefix + shadeName;
@@ -370,6 +368,12 @@ public final class ColorPickerMenu implements Listener {
     /** Only allow the two intentional quick-move clicks, not drop/creative swaps. */
     static boolean shiftOutputClick(ClickType click) {
         return click == ClickType.SHIFT_LEFT || click == ClickType.SHIFT_RIGHT;
+    }
+
+    /** Both the selected primary palette and selected shade use the same model. */
+    static String selectionIcon(boolean selected, String normalModel, String selectedModel) {
+        return selected && selectedModel != null && !selectedModel.isEmpty()
+                ? selectedModel : normalModel;
     }
 
     private static boolean ordinaryClick(ClickType click) {
