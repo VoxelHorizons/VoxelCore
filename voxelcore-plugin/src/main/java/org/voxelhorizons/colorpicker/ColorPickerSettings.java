@@ -64,7 +64,12 @@ public final class ColorPickerSettings {
                         + shadeSlots.size() + " hex entries");
             List<Integer> colors = new ArrayList<Integer>();
             for (String hex : shades) colors.add(Integer.valueOf(parseHex(hex)));
-            parsed.add(new Palette(key, value.getString("name", key), value.getInt("slot", -1), colors));
+            // Primary palette buttons may have an independent representative
+            // colour, otherwise they use that palette's first configured shade.
+            int buttonColor = value.isSet("button-color") ? parseHex(value.getString("button-color"))
+                    : colors.get(0).intValue();
+            parsed.add(new Palette(key, value.getString("name", key), value.getInt("slot", -1),
+                    buttonColor, colors));
         }
         if (parsed.size() > 9) throw new IllegalArgumentException("colorpicker supports at most nine primary palettes");
         palettes = Collections.unmodifiableList(parsed);
@@ -143,12 +148,14 @@ public final class ColorPickerSettings {
         public final String id;
         public final String name;
         public final int slot;
+        public final int buttonColor;
         public final List<Integer> shades;
 
-        private Palette(String id, String name, int slot, List<Integer> shades) {
+        private Palette(String id, String name, int slot, int buttonColor, List<Integer> shades) {
             this.id = id;
             this.name = name;
             this.slot = slot;
+            this.buttonColor = buttonColor;
             this.shades = Collections.unmodifiableList(new ArrayList<Integer>(shades));
         }
     }
