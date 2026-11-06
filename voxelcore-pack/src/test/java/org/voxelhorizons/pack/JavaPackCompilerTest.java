@@ -158,14 +158,14 @@ public class JavaPackCompilerTest {
         new JavaPackCompiler().compile(contentRoot.toPath(), modern,
                 output.resolve("allocations.yml"), JavaPackTarget.MC_26_3);
         for (String icon : new String[]{"slot", "selected"}) {
-            String def = zipText(modern, "assets/voxel/items/ui/colorpicker/" + icon + ".json");
-            assertTrue(def.contains("\"oversized_in_gui\": true"));
+            String def = zipText(modern, "assets/voxel/items/ui/colorpicker/" + icon + ".json").replaceAll("\\s+", "");
+            assertTrue("missing oversized flag: " + def, def.contains("\"oversized_in_gui\":true"));
             assertTrue(def.contains("\"type\":\"minecraft:model\""));
             assertTrue(def.contains("\"tints\":[{\"type\":\"minecraft:custom_model_data\""));
             assertTrue(def.contains("\"index\":0"));
-            String model = zipText(modern, "assets/voxel/models/ui/colorpicker/" + icon + ".json");
-            assertTrue(model.contains("\"layer0\": \"voxel:ui/colorpicker/" + icon + "_tint\""));
-            assertTrue(model.contains("\"layer1\": \"voxel:ui/colorpicker/" + icon + "_frame\""));
+            String model = zipText(modern, "assets/voxel/models/ui/colorpicker/" + icon + ".json").replaceAll("\\s+", "");
+            assertTrue(model.contains("\"layer0\":\"voxel:ui/colorpicker/" + icon + "_tint\""));
+            assertTrue(model.contains("\"layer1\":\"voxel:ui/colorpicker/" + icon + "_frame\""));
             assertTrue(hasEntry(modern, "assets/voxel/textures/ui/colorpicker/" + icon + "_tint.png"));
             assertTrue(hasEntry(modern, "assets/voxel/textures/ui/colorpicker/" + icon + "_frame.png"));
         }
