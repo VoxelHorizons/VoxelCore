@@ -273,6 +273,17 @@ public final class VoxelCore extends JavaPlugin {
             bukkitCommand.setExecutor(commandFactory);
             bukkitCommand.setTabCompleter(commandFactory);
             CommandRegistry.register(commandFactory);
+            // A short alias can be claimed by another plugin depending on load order.
+            // Expose the real registration in logs rather than reporting the plugin ready
+            // while players are unknowingly executing a different plugin's /vc.
+            PluginCommand alias = getServer().getPluginCommand("vc");
+            if (alias != bukkitCommand) {
+                logger.warning("VOXELCORE_COMMAND_ALIAS_CONFLICT alias=/vc owner="
+                        + (alias == null ? "unregistered" : alias.getPlugin().getName())
+                        + "; use /voxelcore colorpicker or /voxelcore:voxelcore colorpicker");
+            } else {
+                logger.info("VOXELCORE_COMMAND_ALIAS_OK alias=/vc");
+            }
             logger.info("VOXELCORE_COLORPICKER_READY command=/vc colorpicker"
                     + " config=" + new File(getDataFolder(), "colorpicker.yml").getAbsolutePath());
         } catch (Exception exception) {
