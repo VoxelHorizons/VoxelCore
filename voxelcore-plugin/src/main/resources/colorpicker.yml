@@ -21,8 +21,10 @@ buttons:
   # ui-colorpicker_selected; slash-style model IDs resolve to those names.
   # Direct item IDs voxel:ui-colorpicker_slot / voxel:ui-colorpicker_selected
   # work as well and are useful when diagnosing missing content packs.
-  # Their WHITE layer0 centres receive the configured RGB hex values;
-  # layer1 retains the untinted black/grey border and white highlights.
+  # Their original slot.png / selected.png are used directly (one PNG each).
+  # Each model selectively tints its centre, white inner rim and bottom shade
+  # via tintindex 0, while leaving the outer black/grey selected border neutral.
+  # The selected model is used for BOTH the active primary palette and shade.
   # Vanilla FIREWORK_STAR is the safe initial fallback if the optional
   # content-pack item definitions have not been installed yet.
   color-material: FIREWORK_STAR
