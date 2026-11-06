@@ -22,7 +22,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.voxelhorizons.VoxelCore;
 import org.voxelhorizons.content.ContentID;
 import org.voxelhorizons.item.ItemManager;
-import org.voxelhorizons.pack.BedrockPlayers;
 
 import java.io.File;
 import java.util.Collections;
@@ -81,7 +80,7 @@ public final class ColorPickerMenu implements Listener {
             return false;
         }
         Session session = new Session(config);
-        String title = title(player, session);
+        String title = title(session);
         Inventory top = Bukkit.createInventory(session, config.size, title);
         session.inventory = top;
         paint(session);
@@ -89,16 +88,16 @@ public final class ColorPickerMenu implements Listener {
         return true;
     }
 
-    private String title(Player player, Session session) {
+    private String title(Session session) {
         ColorPickerSettings config = session.config;
-        String palette = session.palette().id;
-        String template = BedrockPlayers.isBedrock(player.getUniqueId()) ? config.bedrockTitle : config.javaTitle;
-        String raw = template.replace("{palette}", palette).replace("{name}", session.palette().name);
-        String resolved = BedrockPlayers.isBedrock(player.getUniqueId()) ? raw
-                : plugin.getTextPlaceholderService().resolve(raw, true, true);
-        // The art lives in the author's content pack. A missing glyph must not show a raw alias.
+        String raw = config.title.replace("{palette}", session.palette().id)
+                .replace("{name}", session.palette().name);
+        // Always resolve the same UI glyphs and offsets. Geyser/VoxelCore handle
+        // the Bedrock translation downstream; do not replace them with a plain title.
+        String resolved = plugin.getTextPlaceholderService().resolve(raw, true, true);
+        // Only fall back if a required authored glyph is missing, irrespective of client.
         if (resolved.contains(":colorpicker_"))
-            resolved = config.fallbackTitle.replace("{palette}", palette).replace("{name}", session.palette().name);
+            resolved = "&8Color Picker - " + session.palette().name;
         return ChatColor.translateAlternateColorCodes('&', resolved);
     }
 
@@ -315,7 +314,7 @@ public final class ColorPickerMenu implements Listener {
                 // Player might have closed/replaced the menu before this task ran.
                 if (player.getOpenInventory().getTopInventory() != oldInventory) return;
                 final Inventory replacement = Bukkit.createInventory(session, session.config.size,
-                        title(player, session));
+                        title(session));
                 final ItemStack input = oldInventory.getItem(session.config.inputSlot);
                 oldInventory.setItem(session.config.inputSlot, null);
                 oldInventory.setItem(session.config.outputSlot, null);
