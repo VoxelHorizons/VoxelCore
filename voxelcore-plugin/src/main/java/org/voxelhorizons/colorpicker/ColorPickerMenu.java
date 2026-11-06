@@ -20,6 +20,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.FireworkEffectMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.voxelhorizons.VoxelCore;
+import org.voxelhorizons.content.ContentID;
 import org.voxelhorizons.item.ItemManager;
 import org.voxelhorizons.pack.BedrockPlayers;
 
@@ -49,6 +50,16 @@ public final class ColorPickerMenu implements Listener {
 
     public void reload() {
         ColorPickerSettings next = ColorPickerSettings.from(YamlConfiguration.loadConfiguration(file));
+        // Resolve authored button icons once at load/reload time. This catches missing
+        // custom definitions immediately, rather than silently showing a PAPER icon.
+        if (isCustomButton(next.colorMaterial)) {
+            try {
+                items.createRenderItem(parseButtonContentId(next.colorMaterial));
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException("Invalid colorpicker.yml buttons.color-material '"
+                        + next.colorMaterial + "': " + exception.getMessage(), exception);
+            }
+        }
         settings = next;
     }
 
@@ -117,12 +128,30 @@ public final class ColorPickerMenu implements Listener {
                 .replace("{hex}", ColorPickerSettings.formatHex(rgb));
     }
 
-    private static ItemStack icon(String materialName, int rgb, String name) {
-        Material material = Material.matchMaterial(materialName.toUpperCase(Locale.ROOT));
-        if (material == null && "FIREWORK_STAR".equalsIgnoreCase(materialName))
-            material = Material.matchMaterial("FIREWORK_CHARGE");
-        if (material == null) material = Material.PAPER;
-        ItemStack stack = new ItemStack(material);
+    /** Resource-style identifiers (voxel:ui/blank) map to content keys (voxel:ui-blank). */
+    static ContentID parseButtonContentId(String configured) {
+        return ContentID.parse(configured.trim().replace('/', '-'), "voxel");
+    }
+
+    private static boolean isCustomButton(String configured) {
+        return configured != null && configured.indexOf(':') >= 0
+                && !configured.toLowerCase(Locale.ROOT).startsWith("minecraft:");
+    }
+
+    private ItemStack icon(String materialName, int rgb, String name) {
+        ItemStack stack;
+        if (isCustomButton(materialName)) {
+            // Render items allow abstract, display-only definitions without exposing
+            // them through give commands or changing the custom model identity.
+            stack = items.createRenderItem(parseButtonContentId(materialName));
+        } else {
+            Material material = Material.matchMaterial(materialName);
+            if (material == null && "FIREWORK_STAR".equalsIgnoreCase(materialName))
+                material = Material.matchMaterial("FIREWORK_CHARGE");
+            if (material == null) throw new IllegalArgumentException(
+                    "Unknown colorpicker.yml buttons.color-material: " + materialName);
+            stack = new ItemStack(material);
+        }
         ItemMeta meta = stack.getItemMeta();
         if (meta != null) {
             if (rgb >= 0 && meta instanceof FireworkEffectMeta) {
