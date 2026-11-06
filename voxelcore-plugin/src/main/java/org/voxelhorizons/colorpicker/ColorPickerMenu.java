@@ -25,7 +25,6 @@ import org.voxelhorizons.item.ItemManager;
 import org.voxelhorizons.pack.BedrockPlayers;
 
 import java.io.File;
-import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
@@ -52,15 +51,23 @@ public final class ColorPickerMenu implements Listener {
         ColorPickerSettings next = ColorPickerSettings.from(YamlConfiguration.loadConfiguration(file));
         // Resolve authored button icons once at load/reload time. This catches missing
         // custom definitions immediately, rather than silently showing a PAPER icon.
-        if (isCustomButton(next.colorMaterial)) {
-            try {
-                items.createRenderItem(parseButtonContentId(next.colorMaterial));
-            } catch (IllegalArgumentException exception) {
-                throw new IllegalArgumentException("Invalid colorpicker.yml buttons.color-material '"
-                        + next.colorMaterial + "': " + exception.getMessage(), exception);
-            }
-        }
+        validateButton(next.colorMaterial, "buttons.color-material");
+        if (!next.selectedShadeMaterial.isEmpty())
+            validateButton(next.selectedShadeMaterial, "buttons.selected-shade-material");
         settings = next;
+    }
+
+    private void validateButton(String identifier, String key) {
+        try {
+            if (isCustomButton(identifier)) {
+                items.createRenderItem(parseButtonContentId(identifier));
+            } else {
+                resolveMaterial(identifier);
+            }
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("Invalid colorpicker.yml " + key + " '"
+                    + identifier + "': " + exception.getMessage(), exception);
+        }
     }
 
     public boolean open(Player player) {
@@ -105,11 +112,17 @@ public final class ColorPickerMenu implements Listener {
             session.inventory.setItem(p.slot, icon(config.colorMaterial, p.shades.get(0).intValue(), name));
         }
         for (int i = 0; i < config.shadeSlots.size(); i++) {
-            ItemStack swatch = i < selected.shades.size()
-                    ? icon(config.colorMaterial, selected.shades.get(i).intValue(),
-                        (session.shadeIndex == i ? config.selectedPrefix : "")
-                                + substitute(config.shadeName, selected, selected.shades.get(i).intValue()))
-                    : null;
+            ItemStack swatch = null;
+            if (i < selected.shades.size()) {
+                int rgb = selected.shades.get(i).intValue();
+                boolean selectedShade = session.shadeIndex == i;
+                // The 18x18 transparent-border model replaces ONLY the selected shade
+                // icon. Its hollow centre leaves the colour painted in the GUI visible.
+                String iconId = selectedShade && !config.selectedShadeMaterial.isEmpty()
+                        ? config.selectedShadeMaterial : config.colorMaterial;
+                swatch = icon(iconId, rgb, (selectedShade ? config.selectedPrefix : "")
+                        + substitute(config.shadeName, selected, rgb));
+            }
             session.inventory.setItem(config.shadeSlots.get(i).intValue(), swatch);
         }
         ItemStack source = session.inventory.getItem(config.inputSlot);
@@ -138,20 +151,18 @@ public final class ColorPickerMenu implements Listener {
                 && !configured.toLowerCase(Locale.ROOT).startsWith("minecraft:");
     }
 
+    private static Material resolveMaterial(String name) {
+        Material material = Material.matchMaterial(name);
+        if (material == null && "FIREWORK_STAR".equalsIgnoreCase(name))
+            material = Material.matchMaterial("FIREWORK_CHARGE");
+        if (material == null) throw new IllegalArgumentException("Unknown material: " + name);
+        return material;
+    }
+
     private ItemStack icon(String materialName, int rgb, String name) {
-        ItemStack stack;
-        if (isCustomButton(materialName)) {
-            // Render items allow abstract, display-only definitions without exposing
-            // them through give commands or changing the custom model identity.
-            stack = items.createRenderItem(parseButtonContentId(materialName));
-        } else {
-            Material material = Material.matchMaterial(materialName);
-            if (material == null && "FIREWORK_STAR".equalsIgnoreCase(materialName))
-                material = Material.matchMaterial("FIREWORK_CHARGE");
-            if (material == null) throw new IllegalArgumentException(
-                    "Unknown colorpicker.yml buttons.color-material: " + materialName);
-            stack = new ItemStack(material);
-        }
+        ItemStack stack = isCustomButton(materialName)
+                ? items.createRenderItem(parseButtonContentId(materialName))
+                : new ItemStack(resolveMaterial(materialName));
         ItemMeta meta = stack.getItemMeta();
         if (meta != null) {
             if (rgb >= 0 && meta instanceof FireworkEffectMeta) {
@@ -250,7 +261,7 @@ public final class ColorPickerMenu implements Listener {
                 session.paletteIndex = i;
                 session.shadeIndex = 0;
                 paint(session);
-                refreshTitle(player, session);
+                reopenWithPalette(player, session);
                 return;
             }
         }
@@ -287,14 +298,33 @@ public final class ColorPickerMenu implements Listener {
         }
     }
 
-    private void refreshTitle(Player player, Session session) {
-        try {
-            Object view = player.getOpenInventory();
-            Method method = view.getClass().getMethod("setTitle", String.class);
-            method.invoke(view, title(player, session));
-        } catch (ReflectiveOperationException ignored) {
-            // Legacy APIs do not support a live title change; swatch contents still update.
-        }
+    /**
+     * Paper 1.21.1+ explicitly deprecates InventoryView#setTitle because it does
+     * not reliably update client windows. Replace the view on the next tick so
+     * the selected palette's background glyph is sent as a fresh window title.
+     *
+     * Keep the input in the replacement inventory while removing it from the
+     * old inventory before the old InventoryCloseEvent fires. Never duplicate
+     * or return the source during a palette transition.
+     */
+    private void reopenWithPalette(final Player player, final Session session) {
+        final Inventory oldInventory = session.inventory;
+        Bukkit.getScheduler().runTask(plugin, new Runnable() {
+            @Override
+            public void run() {
+                // Player might have closed/replaced the menu before this task ran.
+                if (player.getOpenInventory().getTopInventory() != oldInventory) return;
+                final Inventory replacement = Bukkit.createInventory(session, session.config.size,
+                        title(player, session));
+                final ItemStack input = oldInventory.getItem(session.config.inputSlot);
+                oldInventory.setItem(session.config.inputSlot, null);
+                oldInventory.setItem(session.config.outputSlot, null);
+                session.inventory = replacement;
+                replacement.setItem(session.config.inputSlot, input);
+                paint(session);
+                player.openInventory(replacement);
+            }
+        });
     }
 
     private void send(Player player, ColorPickerSettings config, String key, String fallback) {
