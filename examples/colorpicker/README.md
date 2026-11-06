@@ -1,6 +1,6 @@
 # VoxelCore Color Picker
 
-Put dyeable VoxelCore furniture/cosmetics into the input, click one of the nine primary colours and a shade, then take the preview from the output or use **Paint Item**. One input item is consumed when a painted item is taken. Closing the GUI returns any unpainted input to the player; if the inventory is full, it drops at the player's location. No dye ingredient or currency is consumed.
+Put dyeable VoxelCore furniture/cosmetics into the input, click one of the nine primary colours and a shade, then take the preview from the output. **Taking the output is the only action that consumes and recolours the input item.** One input item is consumed when a painted item is taken. Closing the GUI returns any unpainted input to the player; if the inventory is full, it drops at the player's location. No dye ingredient or currency is consumed.
 
 ## Setup
 
@@ -20,7 +20,7 @@ The Java menu title defaults to `&f:offset_-8::colorpicker_{palette}:`. It swaps
 
 ## Configuration
 
-`colorpicker.yml` defines menu size/slot indices, 9 primary swatch buttons, a 9-slot shade row, material/display names, title variants, messages, and 81 editable `#RRGGBB` shades. You can change the palette names, the primary button positions and order, shades and number of active palettes. All occupied positions must be unique and within the GUI.
+`colorpicker.yml` defines the 54-slot menu (input slot 19, output slot 25, nine primary palette buttons, and shade slots 36–44), material/display names, title variants, messages, and 81 editable `#RRGGBB` shades. You can change the palette names, the primary button positions and order, shades and number of active palettes. All occupied positions must be unique and within the GUI.
 
 Values were sampled at the centres of the nine shade swatches from the uploaded 176×138 PNGs (not estimates). The primary grid matches the PNGs exactly: red/orange/yellow, magenta/white/purple, green/cyan/blue. After changing shade RGB values or moving swatches, adjust the authored background textures too if you want their baked-in pixels to continue matching the configurable item icons. First shade in each palette is selected by default. `white` is the greyscale palette.
 
