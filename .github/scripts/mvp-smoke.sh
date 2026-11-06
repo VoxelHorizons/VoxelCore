@@ -151,6 +151,22 @@ if [[ "$READY" != 1 ]]; then
   exit 1
 fi
 
+# Color picker regression: the installed, shaded plugin must create the default
+# config and register its /vc colorpicker subcommand even on older platforms
+# where opening an RGB picker is intentionally disabled.
+COLORPICKER_CONFIG="$DATA_DIR/plugins/VoxelCore/colorpicker.yml"
+test -s "$COLORPICKER_CONFIG" || {
+  echo "colorpicker.yml was not created during VoxelCore startup" >&2
+  exit 1
+}
+grep -Eq '^size: 54([[:space:]]|$)' "$COLORPICKER_CONFIG"
+grep -Fx 'input-slot: 19' "$COLORPICKER_CONFIG"
+grep -Fx 'output-slot: 25' "$COLORPICKER_CONFIG"
+docker logs "$NAME" 2>&1 | grep -q 'VOXELCORE_COLORPICKER_READY command=/vc colorpicker'
+COLORPICKER_HELP="$(rcon 'voxelcore colorpicker')"
+echo "$COLORPICKER_HELP"
+grep -Fq 'Usage: /vc colorpicker <player>' <<<"$COLORPICKER_HELP"
+
 CONTENT_INFO="$(rcon 'voxelcore admin content info')"
 echo "$CONTENT_INFO"
 grep -q 'content revision 1: 4 items' <<<"$CONTENT_INFO"
