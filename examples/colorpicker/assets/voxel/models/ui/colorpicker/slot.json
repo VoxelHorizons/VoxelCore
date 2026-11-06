@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "voxel:ui/colorpicker/slot_tint",
+    "layer1": "voxel:ui/colorpicker/slot_frame"
+  }
+}
