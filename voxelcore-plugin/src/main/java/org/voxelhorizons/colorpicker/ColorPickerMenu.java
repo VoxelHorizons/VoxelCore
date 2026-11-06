@@ -108,7 +108,8 @@ public final class ColorPickerMenu implements Listener {
         for (int i = 0; i < config.palettes.size(); i++) {
             ColorPickerSettings.Palette p = config.palettes.get(i);
             String name = substitute(config.colorName, p, p.shades.get(0).intValue());
-            if (i == session.paletteIndex) name = config.selectedPrefix + name;
+            if (i == session.paletteIndex && !name.isEmpty())
+                name = config.selectedPrefix + name;
             session.inventory.setItem(p.slot, icon(config.colorMaterial, p.shades.get(0).intValue(),
                     name, config.colorLore, p));
         }
@@ -121,8 +122,10 @@ public final class ColorPickerMenu implements Listener {
                 // icon. Its hollow centre leaves the colour painted in the GUI visible.
                 String iconId = selectedShade && !config.selectedShadeMaterial.isEmpty()
                         ? config.selectedShadeMaterial : config.colorMaterial;
-                swatch = icon(iconId, rgb, (selectedShade ? config.selectedPrefix : "")
-                        + substitute(config.shadeName, selected, rgb), config.shadeLore, selected);
+                String shadeName = substitute(config.shadeName, selected, rgb);
+                if (selectedShade && !shadeName.isEmpty())
+                    shadeName = config.selectedPrefix + shadeName;
+                swatch = icon(iconId, rgb, shadeName, config.shadeLore, selected);
             }
             session.inventory.setItem(config.shadeSlots.get(i).intValue(), swatch);
         }
