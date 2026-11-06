@@ -1,5 +1,5 @@
 {
-  "parent": "minecraft:item/generated",
+  "parent": "minecraft:block/block",
   "ambientocclusion": false,
   "gui_light": "front",
   "textures": {
@@ -174,5 +174,24 @@
         }
       }
     }
-  ]
+  ],
+  "display": {
+    "gui": {
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    }
+  }
 }
