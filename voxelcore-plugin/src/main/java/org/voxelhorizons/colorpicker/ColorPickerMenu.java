@@ -222,7 +222,7 @@ public final class ColorPickerMenu implements Listener {
                     for (ItemStack item : overflow.values()) player.getWorld().dropItemNaturally(player.getLocation(), item);
             }
             paint(session);
-            send(player, config, "painted", "&aItem recoloured to {hex}.");
+            send(player, config, "painted", "&aItem recoloured to {hex}.", session.color());
             return;
         }
         for (int i = 0; i < config.palettes.size(); i++) {
@@ -269,10 +269,13 @@ public final class ColorPickerMenu implements Listener {
     }
 
     private void send(Player player, ColorPickerSettings config, String key, String fallback) {
+        send(player, config, key, fallback, config.palettes.get(0).shades.get(0).intValue());
+    }
+
+    private void send(Player player, ColorPickerSettings config, String key, String fallback, int rgb) {
         String text = config.messages.containsKey(key) ? config.messages.get(key) : fallback;
-        player.sendMessage(ChatColor.translateAlternateColorCodes('&', text
-                .replace("{hex}", ColorPickerSettings.formatHex(
-                        config.palettes.get(0).shades.get(0).intValue()))));
+        player.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                text.replace("{hex}", ColorPickerSettings.formatHex(rgb))));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
