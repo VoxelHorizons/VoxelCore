@@ -7,21 +7,21 @@ input-slot: 19
 output-slot: 25
 shade-slots: [36, 37, 38, 39, 40, 41, 42, 43, 44]
 
-# Shared title for Java and Bedrock. VoxelCore/Geyser handles the UI
-# conversion; do not supply separate client-specific titles.
-# Register colorpicker_<palette> glyph aliases in your VoxelCore content pack.
-title: '&f:offset_-8::colorpicker_{palette}:'
+# One resource-pack background for every palette on Java and Bedrock.
+# Install the sample UI glyph 'colorpicker_background' in your VoxelCore pack.
+# Switching palettes now updates tinted item icons without reopening the GUI.
+title: '&f:offset_-8::colorpicker_background:'
 
 buttons:
-  # Accepts a Bukkit material (FIREWORK_STAR) OR a VoxelCore renderable item
-  # ID (for example voxel:ui/blank, resolving to voxel:ui-blank).
-  # Use an invisible/blank custom model if the GUI background already draws
-  # the swatches. This also supports abstract, display-only UI item definitions.
-  # Custom content IDs must already be loaded into the VoxelCore item registry.
+  # Install examples/colorpicker/content/colorpicker.yml and its two layered
+  # models in your existing voxel pack, then switch both settings to:
+  # color-material: 'voxel:ui/colorpicker/slot'
+  # selected-shade-material: 'voxel:ui/colorpicker/selected'
+  # Their WHITE layer0 centres receive the configured RGB hex values;
+  # layer1 retains the untinted black/grey border and white highlights.
+  # Vanilla FIREWORK_STAR is the safe initial fallback if the optional
+  # content-pack item definitions have not been installed yet.
   color-material: FIREWORK_STAR
-  # Optional 18x18 selected-shade outline. Install the bundled custom item
-  # before setting this to voxel:ui/colorpicker_selected.
-  # Blank by default so fresh servers do not require that content pack.
   selected-shade-material: ''
   # Editable primary-colour button text. '' makes the visible name blank.
   color-name: '&f{name}'
@@ -47,8 +47,10 @@ messages:
 
 # Primary grid matches your reference: red / orange / yellow,
 # magenta / white / purple, green / cyan / blue.
-# Each entry has its own configurable button slot and 1-9 RGB shades.
-# The first shade is the default when selecting the palette.
+# Each entry has its own configurable primary-button slot and 1-9 RGB shades.
+# The primary button is tinted to shades[0] by default. Optionally set
+# button-color: '#RRGGBB' for a different representative primary tint.
+# Palette switching replaces shade swatches in-place; the GUI title never changes.
 # Selecting a shade updates the output preview. Taking the output applies it.
 palettes:
   red:
