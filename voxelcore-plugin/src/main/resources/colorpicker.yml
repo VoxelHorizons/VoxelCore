@@ -23,8 +23,17 @@ buttons:
   # before setting this to voxel:ui/colorpicker_selected.
   # Blank by default so fresh servers do not require that content pack.
   selected-shade-material: ''
+  # Editable primary-colour button text. '' makes the visible name blank.
   color-name: '&f{name}'
+  # [] or '' removes all lore (including existing custom icon lore).
+  # Supports multiple lines, & formatting, {palette}, {name} and {hex}.
+  color-lore:
+    - '&7{hex}'
+  # Editable per-shade button text. '' also works here.
   shade-name: '&f{name} &7- &f{hex}'
+  shade-lore:
+    - '&7{hex}'
+  # Set to '' to remove the selected-item prefix as well.
   selected-prefix: '&e▶ '
 
 messages:
