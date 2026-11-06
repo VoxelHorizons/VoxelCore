@@ -18,28 +18,24 @@ public final class ColorPickerSettings {
     public final int size;
     public final int inputSlot;
     public final int outputSlot;
-    public final int applySlot;
     public final List<Integer> shadeSlots;
     public final List<Palette> palettes;
     public final String javaTitle;
     public final String fallbackTitle;
     public final String bedrockTitle;
     public final String colorMaterial;
-    public final String applyMaterial;
     public final String colorName;
     public final String shadeName;
-    public final String applyName;
     public final String selectedPrefix;
     public final Map<String, String> messages;
 
     private ColorPickerSettings(Configuration config) {
         enabled = config.getBoolean("enabled", true);
-        size = config.getInt("size", 45);
+        size = config.getInt("size", 54);
         if (size < 9 || size > 54 || size % 9 != 0)
             throw new IllegalArgumentException("colorpicker.size must be a multiple of 9 from 9 to 54");
-        inputSlot = config.getInt("input-slot", 10);
-        outputSlot = config.getInt("output-slot", 16);
-        applySlot = config.getInt("apply-slot", 31);
+        inputSlot = config.getInt("input-slot", 19);
+        outputSlot = config.getInt("output-slot", 25);
         shadeSlots = Collections.unmodifiableList(slots(config.getIntegerList("shade-slots")));
         if (shadeSlots.isEmpty() || shadeSlots.size() > 9)
             throw new IllegalArgumentException("colorpicker.shade-slots must have 1-9 entries");
@@ -47,10 +43,8 @@ public final class ColorPickerSettings {
         fallbackTitle = config.getString("titles.fallback", "&8Color Picker - {palette}");
         bedrockTitle = config.getString("titles.bedrock", "&8Color Picker - {palette}");
         colorMaterial = config.getString("buttons.color-material", "FIREWORK_STAR");
-        applyMaterial = config.getString("buttons.apply-material", "ANVIL");
         colorName = config.getString("buttons.color-name", "&e{palette}");
         shadeName = config.getString("buttons.shade-name", "&f{palette} &7- &f{hex}");
-        applyName = config.getString("buttons.apply-name", "&aPaint Item");
         selectedPrefix = config.getString("buttons.selected-prefix", "&e▶ ");
         ConfigurationSection section = config.getConfigurationSection("palettes");
         if (section == null || section.getKeys(false).isEmpty())
@@ -72,7 +66,6 @@ public final class ColorPickerSettings {
         Set<Integer> occupied = new HashSet<Integer>();
         addSlot(occupied, inputSlot, "input-slot");
         addSlot(occupied, outputSlot, "output-slot");
-        addSlot(occupied, applySlot, "apply-slot");
         for (int slot : shadeSlots) addSlot(occupied, slot, "shade-slots");
         for (Palette palette : palettes) addSlot(occupied, palette.slot, "palettes." + palette.id + ".slot");
 
