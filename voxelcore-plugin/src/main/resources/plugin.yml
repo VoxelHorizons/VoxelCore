@@ -8,7 +8,8 @@ commands:
   voxelcore:
     description: VoxelCore administrative and debug command
     aliases: [vc]
-    permission: voxelcore.use
+    # Permissions are checked per subcommand in CommandFactory.
+    # Keeping the root visible avoids Paper hiding /vc as an unknown command.
 
 permissions:
   voxelcore.use:
