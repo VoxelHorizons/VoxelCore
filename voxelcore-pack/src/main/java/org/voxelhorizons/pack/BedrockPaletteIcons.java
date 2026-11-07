@@ -48,7 +48,8 @@ final class BedrockPaletteIcons {
      * @return reusable atlas icon key, or null when the configured byte budget
      *         would be exceeded. The caller can keep the default Bedrock map.
      */
-    String icon(String model, double[] camera, Map<Integer, Integer> tints) throws IOException {
+    String icon(String model, double[] camera, Map<Integer, Integer> tints,
+                byte[] defaultPng) throws IOException {
         String renderKey = model + "|" + Arrays.toString(camera) + "|" + tints;
         byte[] png = rendered.get(renderKey);
         if (png == null) {
@@ -62,6 +63,9 @@ final class BedrockPaletteIcons {
             }
             rendered.put(renderKey, png);
         }
+        // No additional mapping is useful when the RGB shade produces
+        // exactly the same visible pixels as the undyed/default item.
+        if (Arrays.equals(png, defaultPng)) return "";
         String hash = hex(sha(png));
         String suffix = hash.substring(0, 32);
         String icon = "voxelcore.p_" + suffix;
