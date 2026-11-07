@@ -34,6 +34,17 @@
             <artifactId>core</artifactId>
             <version>${geyser.api.version}</version>
             <scope>provided</scope>
+            <!-- Geyser's floating 2.12.1 snapshot currently references
+                 text-serializer-nbt:0.2.1, which is not published to the
+                 public OpenCollab repository. This extension does not use
+                 that serializer; Geyser provides its runtime dependencies.
+                 Keep only the protocol classes required for compilation. -->
+            <exclusions>
+                <exclusion>
+                    <groupId>org.geysermc.mcprotocollib</groupId>
+                    <artifactId>text-serializer-nbt</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>com.google.code.gson</groupId>
