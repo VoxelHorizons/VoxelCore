@@ -855,8 +855,10 @@ public class BedrockPackCompilerTest {
                 + "      model: demo:item/slot\n      custom_model_data:\n"
                 + "        variant: matte\n        color: '#FFFFFF'\n"
                 + "      rule:\n        select:\n          key: variant\n"
-                + "          cases:\n            matte: demo:item/selected\n"
-                + "          fallback: demo:item/slot\n"
+                + "          cases:\n            matte:\n              model:\n"
+                + "                id: demo:item/selected\n                tint: color\n"
+                + "          fallback:\n            model:\n"
+                + "              id: demo:item/slot\n              tint: color\n"
                 + "    properties:\n      dyeable:\n        key: color\n        color: '#FFFFFF'\n");
         Path config = palette(temp.newFolder("rule-palette").toPath());
         Path manifest = allocationManifest(root);
