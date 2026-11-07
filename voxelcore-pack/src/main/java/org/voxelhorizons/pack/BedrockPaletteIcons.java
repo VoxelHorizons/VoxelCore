@@ -3,6 +3,12 @@ package org.voxelhorizons.pack;
 import com.google.gson.JsonObject;
 
 import java.io.IOException;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.awt.image.BufferedImage;
+import java.awt.image.IndexColorModel;
+import java.awt.image.WritableRaster;
+import javax.imageio.ImageIO;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,6 +16,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -61,6 +68,7 @@ final class BedrockPaletteIcons {
                 Files.createDirectories(file.getParent());
                 Files.write(file, png);
             }
+            png = indexPngIfSmaller(png);
             rendered.put(renderKey, png);
         }
         // No additional mapping is useful when the RGB shade produces
@@ -89,6 +97,52 @@ final class BedrockPaletteIcons {
 
     long uniqueBytes() { return bytes; }
     int uniqueTextures() { return uniqueTextures; }
+
+    /**
+     * Losslessly encode simple swatch and low-colour furniture icons as indexed
+     * PNGs when possible. Indexed PNGs are substantially smaller than RGBA
+     * for the 16x16 / 18x18 picker art; complex 3D icons with >256 distinct
+     * colours keep their original full-colour PNGs.
+     */
+    static byte[] indexPngIfSmaller(byte[] original) {
+        try {
+            BufferedImage source = ImageIO.read(new ByteArrayInputStream(original));
+            if (source == null || source.getWidth() <= 0 || source.getHeight() <= 0)
+                return original;
+            Map<Integer, Integer> palette = new LinkedHashMap<Integer, Integer>();
+            for (int y = 0; y < source.getHeight(); y++)
+                for (int x = 0; x < source.getWidth(); x++) {
+                    Integer argb = Integer.valueOf(source.getRGB(x, y));
+                    if (palette.containsKey(argb)) continue;
+                    if (palette.size() >= 256) return original;
+                    palette.put(argb, Integer.valueOf(palette.size()));
+                }
+            byte[] reds = new byte[palette.size()], greens = new byte[palette.size()];
+            byte[] blues = new byte[palette.size()], alphas = new byte[palette.size()];
+            for (Map.Entry<Integer,Integer> e : palette.entrySet()) {
+                int rgb = e.getKey().intValue(), idx = e.getValue().intValue();
+                reds[idx] = (byte)(rgb >>> 16);
+                greens[idx] = (byte)(rgb >>> 8);
+                blues[idx] = (byte)rgb;
+                alphas[idx] = (byte)(rgb >>> 24);
+            }
+            IndexColorModel indexedModel = new IndexColorModel(8, palette.size(),
+                    reds, greens, blues, alphas);
+            WritableRaster pixels = indexedModel.createCompatibleWritableRaster(
+                    source.getWidth(), source.getHeight());
+            for (int y = 0; y < source.getHeight(); y++)
+                for (int x = 0; x < source.getWidth(); x++)
+                    pixels.setSample(x, y, 0,
+                            palette.get(Integer.valueOf(source.getRGB(x, y))).intValue());
+            BufferedImage indexed = new BufferedImage(indexedModel, pixels, false, null);
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            if (!ImageIO.write(indexed, "png", out)) return original;
+            byte[] optimized = out.toByteArray();
+            return optimized.length < original.length ? optimized : original;
+        } catch (IOException | RuntimeException unsupported) {
+            return original;
+        }
+    }
 
     static byte[] sha(byte[] source) {
         try { return MessageDigest.getInstance("SHA-256").digest(source); }
