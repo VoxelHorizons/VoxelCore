@@ -753,10 +753,12 @@ public class BedrockPackCompilerTest {
                 + "  slot:\n    material: minecraft:paper\n"
                 + "    render:\n      model: demo:item/slot\n"
                 + "      custom_model_data:\n        variant: matte\n        color: '#FFFFFF'\n"
+                + "      rule:\n        model:\n          id: demo:item/slot\n          tint: color\n"
                 + "    properties:\n      dyeable:\n        key: color\n        color: '#FFFFFF'\n"
                 + "  selected:\n    material: minecraft:paper\n"
                 + "    render:\n      model: demo:item/selected\n"
                 + "      custom_model_data:\n        variant: matte\n        color: '#FFFFFF'\n"
+                + "      rule:\n        model:\n          id: demo:item/selected\n          tint: color\n"
                 + "    properties:\n      dyeable:\n        key: color\n        color: '#FFFFFF'\n");
         for (String model : new String[]{"slot", "selected"}) {
             write(root.resolve("demo/assets/demo/models/item/" + model + ".json"),
