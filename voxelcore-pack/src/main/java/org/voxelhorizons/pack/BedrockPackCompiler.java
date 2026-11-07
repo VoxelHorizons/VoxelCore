@@ -589,7 +589,8 @@ public final class BedrockPackCompiler {
     }
 
     /** One Bedrock mapping for an item: the plain model, or one leaf of its render.rule. */
-    private static final class Variant {
+    /** Package-visible for Bedrock predicate/colour parity regression tests. */
+    static final class Variant {
         final String renderModel, suffix;
         final JsonArray predicates;
         final int priority;
