@@ -810,6 +810,7 @@ public class BedrockPackCompilerTest {
                 8, entries.size());
         assertEquals(8, compiled.mappedItems);
         java.util.Set<String> paletteIcons = new java.util.HashSet<String>();
+        java.util.Map<String, Integer> expectedRgbByIcon = new java.util.HashMap<String, Integer>();
         java.util.Set<String> shades = new java.util.HashSet<String>();
         for (JsonElement raw : entries) {
             JsonObject definition = raw.getAsJsonObject();
@@ -823,7 +824,10 @@ public class BedrockPackCompilerTest {
             assertEquals(1, match.get("index").getAsInt());
             assertTrue(match.get("value").getAsString().startsWith("voxelcore:rgb:"));
             shades.add(match.get("value").getAsString());
-            paletteIcons.add(definition.getAsJsonObject("bedrock_options").get("icon").getAsString());
+            String icon = definition.getAsJsonObject("bedrock_options").get("icon").getAsString();
+            paletteIcons.add(icon);
+            expectedRgbByIcon.put(icon, Integer.valueOf(Integer.parseInt(
+                    match.get("value").getAsString().substring("voxelcore:rgb:".length()), 16)));
             assertTrue(definition.get("priority").getAsInt() > 0);
         }
         assertEquals(new java.util.HashSet<String>(java.util.Arrays.asList(
@@ -840,7 +844,9 @@ public class BedrockPackCompilerTest {
                 java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(
                         zip.getInputStream(zip.getEntry(pngPath)));
                 assertEquals(16, img.getWidth());
-                assertEquals(0xFF, (img.getRGB(8, 8) >>> 24) & 0xFF);
+                assertEquals("The generated icon must show the precise selected shade",
+                        0xFF000000 | expectedRgbByIcon.get(icon).intValue(),
+                        img.getRGB(8, 8));
             }
         }
         assertEquals("Rerun with unchanged config and assets must be reproducible",
