@@ -392,7 +392,11 @@ public final class BedrockPackCompiler {
             // Bedrock cannot evaluate Java RGB tint dynamically. Bake only
             // configured shades and select their icon using a stable string in
             // custom_model_data; the actual RGB remains untouched on Java.
-            if (paletteMappings && dyeDefault != null && textureOverride == null) {
+            // A dyeable declaration alone does not apply Java item-model
+            // tinting. Only rule leaves that opt into a color tint can
+            // receive Bedrock variants; otherwise we'd display colours
+            // that Java users never see.
+            if (paletteMappings && dyeDefault != null && variant.tinted && textureOverride == null) {
                 RenderAllocation allocation = renderAllocations.get(item.id()).orElse(null);
                 Integer paletteIndex = allocation == null ? null : allocation.structuredModelData().index(
                         CustomModelDataDefinition.ValueType.STRING,
