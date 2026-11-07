@@ -281,7 +281,9 @@ public final class BedrockPackCompiler {
             }
             for (Variant variant : variants) {
             String label = item.id() + variant.suffix;
-            if (variant.tinted) unsupported.add(label + ": Tinted rule model mapped without Bedrock tint (shows untinted)");
+            if (variant.tinted && (dyeDefault == null || !paletteMappings || textureOverride != null))
+                unsupported.add(label + ": Dynamic Java tint has no matching baked Bedrock shade "
+                        + "(default icon only)");
             byte[] png = null;
             if (textureOverride == null) {
                 try {
@@ -415,7 +417,7 @@ public final class BedrockPackCompiler {
                         String shadeIcon;
                         try {
                             shadeIcon = paletteIcons.icon(variant.renderModel, cameraOverride,
-                                    BedrockGeometryCompiler.withDye(tints, rgb));
+                                    BedrockGeometryCompiler.withDye(tints, rgb), png);
                         } catch (IOException | RuntimeException unsupportedColor) {
                             paletteSkipped++;
                             unsupported.add(shadeLabel + ": cannot render RGB icon: "
@@ -426,6 +428,7 @@ public final class BedrockPackCompiler {
                             paletteSkipped++;
                             continue; // unique-PNG budget reached: default icon is safe fallback
                         }
+                        if (shadeIcon.isEmpty()) continue; // tint does not alter icon pixels
                         // Unique per Java model/rule/RGB, even when two mappings
                         // share the same deduplicated PNG/atlas key.
                         String tintedId = "voxelcore:i_"
