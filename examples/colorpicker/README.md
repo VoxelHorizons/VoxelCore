@@ -41,8 +41,10 @@ button names and lore remain configurable.
    (`slot_tint.png`, `slot_frame.png`, `selected_tint.png`,
    `selected_frame.png`) if you installed the previous draft version.
 5. Set the **single background title** and **two button item IDs** in
-   `plugins/VoxelCore/colorpicker.yml` as below. Leave your palette hex
-   arrays and 0-based button slot assignments unchanged.
+   `plugins/VoxelCore/colorpicker.yml` as below. For existing installations,
+   copy the updated `palettes:` section from the bundled example if you
+   want the new light-to-dark shades; VoxelCore never overwrites your saved
+   configuration automatically. The 0-based button slots are unchanged.
 6. Rebuild/send the VoxelCore resource pack and reload the server/plugin.
    The content definitions must be loaded before button items are validated.
 
@@ -105,11 +107,33 @@ configuration. It declares:
   rectangle and four untinted outer-frame strips, UV-mapped onto the same
   unmodified PNG.
 
-The palette's primary button uses its first configured shade as the RGB tint
-unless `palettes.<name>.button-color: '#RRGGBB'` is explicitly supplied.
-Each of the nine shade icons uses its configured `shades` hex value.
-The selected primary button and selected shade both use the larger selected
-icon, and all other buttons use the slot icon.
+Each palette has an independently configurable `button-color: '#RRGGBB'`
+for the **primary 3×3 colour button**. The bundled defaults preserve the
+original primary button colours, while the nine `shades` values have been
+reordered from **lightest to darkest** using perceptual relative luminance.
+Changing a primary button's colour does not alter its nine shades or their
+configured positions, and the selected primary/shade buttons still use the
+18×18 selected icon.
+
+For example (red):
+
+```yaml
+palettes:
+  red:
+    name: 'Red'
+    slot: 12
+    button-color: '#991E1E'
+    shades: ['#BF9999', '#B87575', '#99371E', '#7A4949', '#991E37',
+             '#991E1E', '#6B1515', '#4C1B15', '#3A2525']
+```
+
+The **first shade is selected by default** when switching to another
+primary palette. VoxelCore uses the list exactly as written; it does not
+automatically reorder customised shades at runtime. If a legacy config
+omits `button-color`, its primary button still falls back to `shades[0]`.
+For Bedrock, the existing palette icon compiler includes both the nine
+shades and any independently configured primary colour, deduplicating
+repeated RGBs rather than generating more PNGs unnecessarily.
 
 ## Bedrock palette-coloured icons (in progress)
 
