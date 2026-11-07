@@ -111,13 +111,57 @@ Each of the nine shade icons uses its configured `shades` hex value.
 The selected primary button and selected shade both use the larger selected
 icon, and all other buttons use the slot icon.
 
-The title is identical for Java and Bedrock; VoxelCore/Geyser handles UI
-translation downstream. **Current compatibility note:** the Java renderer
-displays exact arbitrary RGB icon tints. VoxelCore's existing Bedrock pack
-compiler bakes default icon tints and does not yet support per-instance RGB
-item icon shading, so identical per-shade swatch colours on Bedrock require
-separate Geyser/Bedrock translation support. This does not introduce
-ProtocolLib, PacketEvents, or any third-party packet plugin.
+## Bedrock palette-coloured icons (in progress)
+
+Java still uses **one original texture** for each model, with true per-stack
+RGB tinting. Bedrock needs static 2D item icons, so the Bedrock pack compiler
+now **derives the finite colour set** directly from the effective
+`plugins/VoxelCore/colorpicker.yml`, including any `button-color` overrides.
+
+During `/vc admin pack build`, it renders the two Color Picker swatch models
+and any other VoxelCore `properties.dyeable` model for each unique configured
+shade. It hashes the **final PNG bytes** so visually identical icons share
+one file and one atlas entry across models, caches expensive rendering across
+builds, and compresses the resulting pack with the existing PNG optimiser and
+ZIP level 9. The underlying Java models stay as two original textures;
+generated icons exist **only inside the Bedrock pack**.
+
+A Geyser v2 definition with a `custom_model_data` string `match` predicate
+selects the appropriate baked image. When VoxelCore recolours an item, its
+modern Paper adapter saves BOTH the exact 24-bit RGB in the existing
+`CustomModelDataComponent.colors` list and
+`voxelcore:rgb:RRGGBB` in a reserved string index. The index is permanently
+allocated through `render-allocations.yml`, not hard-coded, so it cannot
+overwrite authored `render.rule.select` strings.
+
+```yaml
+# plugins/VoxelCore/config.yml
+bedrock:
+  palette_icons:
+    max_mappings: 8192
+    max_unique_png_bytes: 33554432
+```
+
+These are maximum **extra** Geyser mapping entries and raw, deduplicated PNG
+bytes. If a budget is exceeded, the uncoloured/default item icon remains
+available and the skipped colours appear in `unsupported-items.txt`.
+Set lower limits if your pack has dozens of complex dyeable furniture models;
+the pack builder logs mapped shades, unique PNG count and raw byte usage.
+
+**Important limitations:**
+
+- This works for colours explicitly listed in the colour picker; arbitrary
+  RGB values outside those shades fall back to the default Bedrock icon while
+  retaining their precise Java colour and item metadata.
+- Each new shade or changed model requires rebuilding/publishing the Bedrock
+  pack and **restarting Geyser** so its fixed custom item mappings load.
+  Reconnect Bedrock clients afterward.
+- Items dyed before the selector was introduced retain their exact RGB data
+  but may require re-dyeing to acquire the Bedrock string selector.
+- This fixes the **inventory / Color Picker 2D icons**, not the separate 3D
+  Geyser furniture-entity dye system.
+- Visual equivalence still needs in-game verification on Bedrock and Java.
+  No ProtocolLib, PacketEvents or other packet plugin is required.
 
 ## Built-in compatibility and permissions
 
