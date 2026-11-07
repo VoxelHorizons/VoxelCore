@@ -745,6 +745,130 @@ public class BedrockPackCompilerTest {
         write(root.resolve("other/assets/minecraft/models/item/test.json"), "{\"parent\":\"demo:b\"}");
         assertEquals(1, new BedrockPackCompiler().compile(root,temp.newFolder().toPath()).mappedItems);
     }
+    /** Two models intentionally use the same pixels, to test content-based dedupe. */
+    private Path dyePaletteFixture() throws Exception {
+        Path root = fixture();
+        write(root.resolve("demo/content/items.yml"),
+                "items:\n"
+                + "  slot:\n    material: minecraft:paper\n"
+                + "    render:\n      model: demo:item/slot\n"
+                + "      custom_model_data:\n        variant: matte\n        color: '#FFFFFF'\n"
+                + "    properties:\n      dyeable:\n        key: color\n        color: '#FFFFFF'\n"
+                + "  selected:\n    material: minecraft:paper\n"
+                + "    render:\n      model: demo:item/selected\n"
+                + "      custom_model_data:\n        variant: matte\n        color: '#FFFFFF'\n"
+                + "    properties:\n      dyeable:\n        key: color\n        color: '#FFFFFF'\n");
+        for (String model : new String[]{"slot", "selected"}) {
+            write(root.resolve("demo/assets/demo/models/item/" + model + ".json"),
+                    "{\"parent\":\"minecraft:item/generated\","
+                    + "\"textures\":{\"layer0\":\"demo:item/palette\"}}");
+        }
+        java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(
+                16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) img.setRGB(x, y, 0xFFFFFFFF);
+        Path texture = root.resolve("demo/assets/demo/textures/item/palette.png");
+        Files.createDirectories(texture.getParent());
+        javax.imageio.ImageIO.write(img, "png", texture.toFile());
+        return root;
+    }
+
+    private Path palette(Path directory) throws Exception {
+        Path file = directory.resolve("colorpicker.yml");
+        write(file, "enabled: true\npalettes:\n  red:\n"
+                + "    shades: ['#FF0000', '#00FF00', '#FF0000']\n"
+                + "    button-color: '#0000FF'\n");
+        return file;
+    }
+
+    private Path allocationManifest(Path root) throws Exception {
+        Path dir = temp.newFolder("palette-allocations").toPath();
+        Path manifest = dir.resolve("render-allocations.yml");
+        org.voxelhorizons.content.item.ItemDefinitionRegistry definitions =
+                new org.voxelhorizons.content.load.ContentLoader().load(root);
+        org.voxelhorizons.content.render.RenderAllocationRegistry allocations =
+                org.voxelhorizons.content.render.RenderAllocationRegistry.reconcile(
+                        definitions,
+                        org.voxelhorizons.content.render.RenderAllocationRegistry.empty());
+        new org.voxelhorizons.content.render.RenderAllocationStore(manifest).save(allocations);
+        return dir.resolve("glyph-allocations.yml");
+    }
+
+    @Test public void generatesExactRgbIconsAndGeyserStringsWithSharedPngAssets() throws Exception {
+        Path root = dyePaletteFixture(), output = temp.newFolder().toPath();
+        Path config = palette(temp.newFolder("effective-palette").toPath());
+        Path manifest = allocationManifest(root);
+        BedrockPackCompiler.Result compiled = new BedrockPackCompiler()
+                .withColorPickerConfig(config).compile(root, output, manifest);
+        JsonObject mappings = JsonParser.parseString(new String(
+                Files.readAllBytes(compiled.directory.resolve("voxelcore-items.json")),
+                StandardCharsets.UTF_8)).getAsJsonObject();
+        JsonArray entries = mappings.getAsJsonObject("items").getAsJsonArray("minecraft:paper");
+        assertEquals("Two default icons + 3 palette shades for both",
+                8, entries.size());
+        assertEquals(8, compiled.mappedItems);
+        java.util.Set<String> paletteIcons = new java.util.HashSet<String>();
+        java.util.Set<String> shades = new java.util.HashSet<String>();
+        for (JsonElement raw : entries) {
+            JsonObject definition = raw.getAsJsonObject();
+            if (!definition.has("predicate")) continue;
+            JsonElement predicate = definition.get("predicate");
+            JsonObject match = predicate.isJsonArray()
+                    ? predicate.getAsJsonArray().get(predicate.getAsJsonArray().size() - 1).getAsJsonObject()
+                    : predicate.getAsJsonObject();
+            assertEquals("match", match.get("type").getAsString());
+            assertEquals("custom_model_data", match.get("property").getAsString());
+            assertEquals(1, match.get("index").getAsInt());
+            assertTrue(match.get("value").getAsString().startsWith("voxelcore:rgb:"));
+            shades.add(match.get("value").getAsString());
+            paletteIcons.add(definition.getAsJsonObject("bedrock_options").get("icon").getAsString());
+            assertTrue(definition.get("priority").getAsInt() > 0);
+        }
+        assertEquals(new java.util.HashSet<String>(java.util.Arrays.asList(
+                "voxelcore:rgb:FF0000", "voxelcore:rgb:00FF00", "voxelcore:rgb:0000FF")), shades);
+        assertEquals("Identical pixels across different source models share the icon atlas",
+                3, paletteIcons.size());
+        try (ZipFile zip = new ZipFile(compiled.directory.resolve("voxelcore.mcpack").toFile())) {
+            JsonObject atlas = JsonParser.parseString(new String(readAll(zip.getInputStream(
+                    zip.getEntry("textures/item_texture.json"))), StandardCharsets.UTF_8))
+                    .getAsJsonObject().getAsJsonObject("texture_data");
+            for (String icon : paletteIcons) {
+                String pngPath = atlas.getAsJsonObject(icon).get("textures").getAsString() + ".png";
+                assertNotNull(zip.getEntry(pngPath));
+                java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(
+                        zip.getInputStream(zip.getEntry(pngPath)));
+                assertEquals(16, img.getWidth());
+                assertEquals(0xFF, (img.getRGB(8, 8) >>> 24) & 0xFF);
+            }
+        }
+        assertEquals("Rerun with unchanged config and assets must be reproducible",
+                compiled.revision, new BedrockPackCompiler().withColorPickerConfig(config)
+                        .compile(root, output, manifest).revision);
+    }
+
+    @Test public void respectsPaletteMappingCapAndFallsBackToUnchangedItem() throws Exception {
+        Path root = dyePaletteFixture(), output = temp.newFolder().toPath();
+        Path config = palette(temp.newFolder("limit-palette").toPath());
+        Path manifest = allocationManifest(root);
+        BedrockPackCompiler.Result compiled = new BedrockPackCompiler()
+                .withColorPickerConfig(config).withPaletteLimits(1, 16 * 1024 * 1024)
+                .compile(root, output, manifest);
+        assertEquals("Two base models + one pre-generated shade", 3, compiled.mappedItems);
+        String unsupported = new String(Files.readAllBytes(
+                compiled.directory.resolve("unsupported-items.txt")), StandardCharsets.UTF_8);
+        assertTrue(unsupported.contains("omitted"));
+    }
+
+    @Test public void byteBudgetCannotPublishPartiallyGeneratedIcons() throws Exception {
+        Path root = dyePaletteFixture(), output = temp.newFolder().toPath();
+        Path config = palette(temp.newFolder("bytes-palette").toPath());
+        Path manifest = allocationManifest(root);
+        BedrockPackCompiler.Result compiled = new BedrockPackCompiler()
+                .withColorPickerConfig(config).withPaletteLimits(100, 1)
+                .compile(root, output, manifest);
+        assertEquals("Only uncoloured base mappings fit the budget", 2, compiled.mappedItems);
+    }
+
     private static void write(Path path, String text) throws Exception {
         Files.createDirectories(path.getParent()); Files.write(path,text.getBytes(StandardCharsets.UTF_8));
     }
