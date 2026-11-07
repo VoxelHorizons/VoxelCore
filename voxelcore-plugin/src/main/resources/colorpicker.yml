@@ -53,45 +53,56 @@ messages:
 
 # Primary grid matches your reference: red / orange / yellow,
 # magenta / white / purple, green / cyan / blue.
-# Each entry has its own configurable primary-button slot and 1-9 RGB shades.
-# The primary button is tinted to shades[0] by default. Optionally set
-# button-color: '#RRGGBB' for a different representative primary tint.
-# Palette switching replaces shade swatches in-place; the GUI title never changes.
+# Each entry has its own configurable primary-button slot, hex and 1-9 shades.
+# button-color sets the exact hex of the PRIMARY 3x3 palette button, independent
+# of its shades. Existing primary button colours are retained by default.
+# shades are ordered LIGHTEST -> DARKEST, left to right in shade-slots.
+# Their order is preserved as authored (no automatic runtime sorting).
+# When switching palettes, the first (lightest) shade is selected by default.
 # Selecting a shade updates the output preview. Taking the output applies it.
 palettes:
   red:
     name: 'Red'
     slot: 12
-    shades: ['#991E1E', '#B87575', '#BF9999', '#991E37', '#99371E', '#7A4949', '#6B1515', '#4C1B15', '#3A2525']
+    button-color: '#991E1E'
+    shades: ['#BF9999', '#B87575', '#99371E', '#7A4949', '#991E37', '#991E1E', '#6B1515', '#4C1B15', '#3A2525']
   orange:
     name: 'Orange'
     slot: 13
-    shades: ['#CC6A28', '#F5C09C', '#FFE0CC', '#CC4928', '#CC8B28', '#A37C62', '#8F4A1C', '#66411C', '#4E3D31']
+    button-color: '#CC6A28'
+    shades: ['#FFE0CC', '#F5C09C', '#CC8B28', '#CC6A28', '#A37C62', '#CC4928', '#8F4A1C', '#66411C', '#4E3D31']
   yellow:
     name: 'Yellow'
     slot: 14
-    shades: ['#CCB028', '#F5E69C', '#FFF6CC', '#CC8F28', '#C7CC28', '#A39862', '#8F7B1C', '#66611C', '#4E4931']
+    button-color: '#CCB028'
+    shades: ['#FFF6CC', '#F5E69C', '#C7CC28', '#CCB028', '#CC8F28', '#A39862', '#8F7B1C', '#66611C', '#4E4931']
   magenta:
     name: 'Magenta'
     slot: 21
-    shades: ['#CC28B6', '#F59CE9', '#FFCCF8', '#C128CC', '#CC2895', '#A3629A', '#8F1C7F', '#661C55', '#4E314A']
+    button-color: '#CC28B6'
+    shades: ['#FFCCF8', '#F59CE9', '#A3629A', '#CC28B6', '#C128CC', '#CC2895', '#8F1C7F', '#661C55', '#4E314A']
   white:
     name: 'White / Greyscale'
     slot: 22
-    shades: ['#CCCCCC', '#ECE8DC', '#D6E0EC', '#B0B0B0', '#96928C', '#7A7E84', '#606060', '#424246', '#28282A']
+    button-color: '#CCCCCC'
+    shades: ['#ECE8DC', '#D6E0EC', '#CCCCCC', '#B0B0B0', '#96928C', '#7A7E84', '#606060', '#424246', '#28282A']
   green:
     name: 'Green'
     slot: 30
-    shades: ['#59CC28', '#B7F59C', '#DBFFCC', '#7ACC28', '#38CC28', '#75A362', '#3E8F1C', '#2B661C', '#3A4E31']
+    button-color: '#59CC28'
+    shades: ['#DBFFCC', '#B7F59C', '#7ACC28', '#59CC28', '#38CC28', '#75A362', '#3E8F1C', '#2B661C', '#3A4E31']
   purple:
     name: 'Purple'
     slot: 23
-    shades: ['#9828CC', '#D99CF5', '#EFCCFF', '#7728CC', '#B928CC', '#8E62A3', '#6A1C8F', '#561C66', '#45314E']
+    button-color: '#9828CC'
+    shades: ['#EFCCFF', '#D99CF5', '#8E62A3', '#B928CC', '#9828CC', '#7728CC', '#6A1C8F', '#45314E', '#561C66']
   blue:
     name: 'Blue'
     slot: 32
-    shades: ['#2841CC', '#9CAAF5', '#CCD4FF', '#2862CC', '#3028CC', '#626CA3', '#1C2D8F', '#1C2066', '#31364E']
+    button-color: '#2841CC'
+    shades: ['#CCD4FF', '#9CAAF5', '#626CA3', '#2862CC', '#2841CC', '#3028CC', '#1C2D8F', '#31364E', '#1C2066']
   cyan:
     name: 'Cyan'
     slot: 31
-    shades: ['#28CCCC', '#9CF5F5', '#CCFFFF', '#28CCAB', '#28ABCC', '#62A3A3', '#1C8F8F', '#1C5F66', '#314E4E']
+    button-color: '#28CCCC'
+    shades: ['#CCFFFF', '#9CF5F5', '#28CCCC', '#28CCAB', '#28ABCC', '#62A3A3', '#1C8F8F', '#1C5F66', '#314E4E']
