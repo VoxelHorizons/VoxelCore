@@ -846,6 +846,50 @@ public class BedrockPackCompilerTest {
                         .compile(root, output, manifest).revision);
     }
 
+    @Test public void combinesExistingRenderRuleWithRgbMatchWithoutOverwritingVariantString() throws Exception {
+        Path root = dyePaletteFixture(), output = temp.newFolder().toPath();
+        write(root.resolve("demo/content/items.yml"), "items:\n  patterned:\n"
+                + "    material: minecraft:paper\n    render:\n"
+                + "      model: demo:item/slot\n      custom_model_data:\n"
+                + "        variant: matte\n        color: '#FFFFFF'\n"
+                + "      rule:\n        select:\n          key: variant\n"
+                + "          cases:\n            matte: demo:item/selected\n"
+                + "          fallback: demo:item/slot\n"
+                + "    properties:\n      dyeable:\n        key: color\n        color: '#FFFFFF'\n");
+        Path config = palette(temp.newFolder("rule-palette").toPath());
+        Path manifest = allocationManifest(root);
+        BedrockPackCompiler.Result result = new BedrockPackCompiler().withColorPickerConfig(config)
+                .compile(root, output, manifest);
+        JsonArray entries = JsonParser.parseString(new String(
+                Files.readAllBytes(result.directory.resolve("voxelcore-items.json")),
+                StandardCharsets.UTF_8)).getAsJsonObject()
+                .getAsJsonObject("items").getAsJsonArray("minecraft:paper");
+        assertEquals(8, entries.size()); // 2 leaf models x (one default + three shades)
+        boolean combined = false, fallback = false;
+        for (JsonElement value : entries) {
+            JsonObject mapping = value.getAsJsonObject();
+            if (!mapping.has("predicate")) continue;
+            JsonElement node = mapping.get("predicate");
+            if (node.isJsonArray() && node.getAsJsonArray().size() == 2) {
+                JsonArray and = node.getAsJsonArray();
+                assertEquals("and", mapping.get("predicate_strategy").getAsString());
+                JsonObject original = and.get(0).getAsJsonObject();
+                JsonObject colour = and.get(1).getAsJsonObject();
+                assertEquals("matte", original.get("value").getAsString());
+                assertEquals(0, original.get("index").getAsInt());
+                assertEquals(1, colour.get("index").getAsInt());
+                assertTrue(colour.get("value").getAsString().startsWith("voxelcore:rgb:"));
+                combined = true;
+            }
+            if (node.isJsonObject() && "match".equals(node.getAsJsonObject().get("type").getAsString())) {
+                assertEquals(1, node.getAsJsonObject().get("index").getAsInt());
+                fallback = true;
+            }
+        }
+        assertTrue("Must combine authored variant and internal colour string", combined);
+        assertTrue("Fallback variant also receives colour mapping", fallback);
+    }
+
     @Test public void respectsPaletteMappingCapAndFallsBackToUnchangedItem() throws Exception {
         Path root = dyePaletteFixture(), output = temp.newFolder().toPath();
         Path config = palette(temp.newFolder("limit-palette").toPath());
