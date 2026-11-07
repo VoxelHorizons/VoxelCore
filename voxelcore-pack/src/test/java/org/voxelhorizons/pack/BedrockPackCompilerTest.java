@@ -816,6 +816,8 @@ public class BedrockPackCompilerTest {
             JsonObject definition = raw.getAsJsonObject();
             if (!definition.has("predicate")) continue;
             JsonElement predicate = definition.get("predicate");
+            if (predicate.isJsonArray() && predicate.getAsJsonArray().size() == 0)
+                continue; // Geyser fallback leaf has an empty predicate array.
             JsonObject match = predicate.isJsonArray()
                     ? predicate.getAsJsonArray().get(predicate.getAsJsonArray().size() - 1).getAsJsonObject()
                     : predicate.getAsJsonObject();
@@ -868,13 +870,31 @@ public class BedrockPackCompilerTest {
                 + "    properties:\n      dyeable:\n        key: color\n        color: '#FFFFFF'\n");
         Path config = palette(temp.newFolder("rule-palette").toPath());
         Path manifest = allocationManifest(root);
+        org.voxelhorizons.content.item.ItemDefinitionRegistry itemRegistry =
+                new org.voxelhorizons.content.load.ContentLoader().load(root);
+        org.voxelhorizons.content.render.RenderAllocationRegistry allocations =
+                org.voxelhorizons.content.render.RenderAllocationRegistry.reconcile(
+                        itemRegistry, org.voxelhorizons.content.render.RenderAllocationRegistry.empty());
+        org.voxelhorizons.content.item.ItemDefinition patterned =
+                itemRegistry.get(org.voxelhorizons.content.ContentID.of("demo", "patterned")).get();
+        assertTrue("Test item must be marked dyeable", patterned.properties().get("dyeable") instanceof java.util.Map);
+        assertEquals(3, BedrockPaletteConfig.read(config).size());
+        assertTrue("Test item must have stable Geyser RGB selector",
+                allocations.get(patterned.id()).get().structuredModelData().strings()
+                        .containsKey(org.voxelhorizons.content.render.RenderAllocationRegistry.BEDROCK_PALETTE_SELECTOR));
+        assertEquals("Conditional leaves must expose two tint-enabled models",
+                2, BedrockPackCompiler.variants(patterned, allocations).size());
+        for (BedrockPackCompiler.Variant leaf : BedrockPackCompiler.variants(patterned, allocations))
+            assertTrue("Conditional model leaf must be RGB-tint enabled", leaf.tinted);
         BedrockPackCompiler.Result result = new BedrockPackCompiler().withColorPickerConfig(config)
                 .compile(root, output, manifest);
         JsonArray entries = JsonParser.parseString(new String(
                 Files.readAllBytes(result.directory.resolve("voxelcore-items.json")),
                 StandardCharsets.UTF_8)).getAsJsonObject()
                 .getAsJsonObject("items").getAsJsonArray("minecraft:paper");
-        assertEquals(8, entries.size()); // 2 leaf models x (one default + three shades)
+        assertEquals("2 leaves x (default + three shades); unsupported: "
+                + new String(Files.readAllBytes(result.directory.resolve("unsupported-items.txt")),
+                        StandardCharsets.UTF_8), 8, entries.size());
         boolean combined = false, fallback = false;
         for (JsonElement value : entries) {
             JsonObject mapping = value.getAsJsonObject();
