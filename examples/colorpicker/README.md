@@ -119,12 +119,16 @@ now **derives the finite colour set** directly from the effective
 `plugins/VoxelCore/colorpicker.yml`, including any `button-color` overrides.
 
 During `/vc admin pack build`, it renders the two Color Picker swatch models
-and any other VoxelCore `properties.dyeable` model for each unique configured
-shade. It hashes the **final PNG bytes** so visually identical icons share
-one file and one atlas entry across models, caches expensive rendering across
-builds, and compresses the resulting pack with the existing PNG optimiser and
-ZIP level 9. The underlying Java models stay as two original textures;
-generated icons exist **only inside the Bedrock pack**.
+and any other VoxelCore `properties.dyeable` item whose Java
+`render.rule.model.tint` enables actual model tinting. Untinted Java model
+leaves are deliberately excluded so Bedrock never invents colours that Java
+would not display. It hashes the **final PNG bytes** so visually identical
+icons share one file and one atlas entry across models, skips recolours whose
+pixels match the default, caches expensive rendering across builds, and
+losslessly encodes simple icons as compact indexed PNGs when this saves bytes.
+The pack retains the existing PNG optimiser and ZIP level 9. The underlying
+Java models stay as two original textures; generated icons exist **only
+inside the Bedrock pack**.
 
 A Geyser v2 definition with a `custom_model_data` string `match` predicate
 selects the appropriate baked image. When VoxelCore recolours an item, its
