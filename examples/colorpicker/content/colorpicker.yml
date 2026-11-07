@@ -1,0 +1,45 @@
+# Merge into the existing voxel namespace content pack (modern item tint support).
+# One shared GUI and two dyeable abstract (display-only) item models.
+ui:
+  colorpicker_background:
+    path: ui/menu/colorpicker/background.png
+    scale_ratio: 138
+    y_position: 13
+    gui: true
+
+items:
+  ui-colorpicker_slot:
+    abstract: true
+    material: minecraft:paper
+    display_name: 'Color Picker Slot'
+    render:
+      model: voxel:ui/colorpicker/slot
+      oversized_in_gui: true
+      custom_model_data:
+        color: '#FFFFFF'
+      rule:
+        model:
+          id: voxel:ui/colorpicker/slot
+          tint: color
+    properties:
+      dyeable:
+        key: color
+        color: '#FFFFFF'
+
+  ui-colorpicker_selected:
+    abstract: true
+    material: minecraft:paper
+    display_name: 'Selected Shade'
+    render:
+      model: voxel:ui/colorpicker/selected
+      oversized_in_gui: true
+      custom_model_data:
+        color: '#FFFFFF'
+      rule:
+        model:
+          id: voxel:ui/colorpicker/selected
+          tint: color
+    properties:
+      dyeable:
+        key: color
+        color: '#FFFFFF'

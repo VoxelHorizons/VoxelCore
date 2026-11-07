@@ -724,6 +724,11 @@ public final class PackCommand implements SubCommand {
                                 .withControllerGlyphPages(controllerGlyphPages)
                                 .withGlyphShrink(glyphShrink)
                                 .withOversizedGlyphSize(oversizedGlyphSize)
+                                .withColorPickerConfig(plugin.getDataFolder().toPath().resolve("colorpicker.yml"))
+                                .withPaletteLimits(
+                                        plugin.getConfig().getInt("bedrock.palette_icons.max_mappings", 8192),
+                                        plugin.getConfig().getLong("bedrock.palette_icons.max_unique_png_bytes",
+                                                32L * 1024L * 1024L))
                                 .compile(
                                 plugin.getPackManager().contentRoot(),
                                 plugin.getPackManager().outputRoot().resolve("bedrock"),

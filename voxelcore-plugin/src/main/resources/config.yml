@@ -137,6 +137,14 @@ bedrock:
   # Always protects the current revision and previous verified Geyser publication.
   # Does not delete icon-cache, other files or Geyser's installed pack. 0 disables cleanup.
   generated_pack_retention: 2
+  # Bake the RGB shades from the effective colorpicker.yml as 2D Bedrock
+  # inventory icons and select them through Geyser's stable string predicate.
+  # RGB data on Java is unchanged; only configured shades get exact Bedrock
+  # icons. Identical PNGs are deduplicated and cached across item models.
+  # Higher limits grow the Bedrock atlas, custom-item registry and mcpack.
+  palette_icons:
+    max_mappings: 8192
+    max_unique_png_bytes: 33554432  # 32 MiB before ZIP, shared textures excluded
   # Vanilla textures/models for Bedrock icons and 3D: furniture models often use
   # minecraft:block/... textures that content packs do not ship. 'auto' downloads the official
   # client jar for this server version once from Mojang (SHA-1 verified, cached in

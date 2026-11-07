@@ -29,7 +29,9 @@ console_command() {
   local command="$1"
   local before after output
   before="$(docker logs "$NAME" 2>&1 | wc -l)"
-  docker exec "$NAME" mc-send-to-console "$command" >&2
+  # Newer itzg image tags enforce the Minecraft data user for console-pipe
+  # writes. Legacy RCON sometimes disappears on 1.14.4; explicitly use UID 1000.
+  docker exec --user 1000:1000 "$NAME" mc-send-to-console "$command" >&2
   output=""
   for _ in $(seq 1 15); do
     sleep 1
@@ -150,6 +152,33 @@ if [[ "$READY" != 1 ]]; then
   docker logs "$NAME" >&2 || true
   exit 1
 fi
+
+# Color picker regression: the installed, shaded plugin must create the default
+# config and register its /vc colorpicker subcommand even on older platforms
+# where opening an RGB picker is intentionally disabled.
+COLORPICKER_CONFIG="$DATA_DIR/plugins/VoxelCore/colorpicker.yml"
+test -s "$COLORPICKER_CONFIG" || {
+  echo "colorpicker.yml was not created during VoxelCore startup" >&2
+  exit 1
+}
+grep -Eq '^size: 54([[:space:]]|$)' "$COLORPICKER_CONFIG"
+grep -Fx 'input-slot: 19' "$COLORPICKER_CONFIG"
+grep -Fx 'output-slot: 25' "$COLORPICKER_CONFIG"
+# The READY polling loop already captured full logs. Avoid docker logs | grep -q
+# under pipefail, where grep can close early and SIGPIPE the docker process (exit 141).
+grep -Fq 'VOXELCORE_COLORPICKER_READY command=/vc colorpicker' <<<"$LOGS"
+# Verify the short alias the actual player uses, as well as the full root.
+# The earlier regression only covered /voxelcore, so a /vc collision was invisible.
+COLORPICKER_HELP="$(rcon 'voxelcore colorpicker')"
+echo "$COLORPICKER_HELP"
+grep -Fq 'Usage: /vc colorpicker <player>' <<<"$COLORPICKER_HELP"
+COLORPICKER_ALIAS="$(rcon 'vc colorpicker')"
+echo "$COLORPICKER_ALIAS"
+grep -Fq 'Usage: /vc colorpicker <player>' <<<"$COLORPICKER_ALIAS"
+# Namespacing is a fallback when another plugin claims the short command.
+COLORPICKER_NAMESPACED="$(rcon 'voxelcore:voxelcore colorpicker')"
+echo "$COLORPICKER_NAMESPACED"
+grep -Fq 'Usage: /vc colorpicker <player>' <<<"$COLORPICKER_NAMESPACED"
 
 CONTENT_INFO="$(rcon 'voxelcore admin content info')"
 echo "$CONTENT_INFO"

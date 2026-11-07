@@ -28,6 +28,27 @@ public final class BedrockPackCompiler {
     private boolean overrideControllerGlyphPages;
     private BedrockGlyphAtlas.Shrink glyphShrink = BedrockGlyphAtlas.Shrink.AREA;
     private int oversizedGlyphSize = BedrockGlyphAtlas.DEFAULT_OVERSIZED_MAX_SIZE;
+    private Path colorPickerConfig;
+    private int maxPaletteMappings = 8192;
+    private long maxPalettePngBytes = 32L * 1024L * 1024L;
+
+    /** Effective server colorpicker.yml: same shades used by Java's GUI. */
+    public BedrockPackCompiler withColorPickerConfig(Path file) {
+        this.colorPickerConfig = file;
+        return this;
+    }
+
+    /**
+     * Limits mapped Bedrock palette variants and unique generated PNG bytes.
+     * No partial PNG is published when the byte budget is exhausted.
+     */
+    public BedrockPackCompiler withPaletteLimits(int mappings, long pngBytes) {
+        if (mappings < 1 || pngBytes < 1L)
+            throw new IllegalArgumentException("Bedrock palette limits must be positive");
+        this.maxPaletteMappings = mappings;
+        this.maxPalettePngBytes = pngBytes;
+        return this;
+    }
 
     /** Longest side in page pixels that glyphs taller than 32 Java pixels are reduced to (16..256). */
     public BedrockPackCompiler withOversizedGlyphSize(int size) {
@@ -195,9 +216,34 @@ public final class BedrockPackCompiler {
         int count = 0;
         ItemDefinitionRegistry itemRegistry = contentDefinitions.items();
         RenderAllocationRegistry renderAllocations = renderAllocations(itemRegistry, glyphAllocationManifest);
+        Path paletteFile = colorPickerConfig != null ? colorPickerConfig
+                : glyphAllocationManifest == null ? null
+                : glyphAllocationManifest.resolveSibling("colorpicker.yml");
+        // Only Java 1.21.4+ has structured RGB + string model-data components.
+        List<Integer> paletteColors = legacy ? Collections.<Integer>emptyList()
+                : BedrockPaletteConfig.read(paletteFile);
+        final boolean paletteMappings = !paletteColors.isEmpty() && renderAllocations != null;
+        if (!paletteColors.isEmpty() && renderAllocations == null)
+            unsupported.add("Palette icons require a stable render-allocations.yml; "
+                    + "generate the Java pack first");
+        BedrockPaletteIcons paletteIcons = paletteMappings
+                ? new BedrockPaletteIcons(renderer, assets, textures, outputRoot, assetsDigest, maxPalettePngBytes)
+                : null;
+        int paletteMapped = 0;
+        int paletteSkipped = 0;
         BuildProgress.Step itemStep = progress.step("Bedrock: converting items (icons + 3D models)",
                 itemRegistry.entries().size());
-        for (ItemDefinition item : itemRegistry.entries().values()) {
+        // The two colour-picker buttons get budget priority over other models.
+        List<ItemDefinition> ordered = new ArrayList<ItemDefinition>(itemRegistry.entries().values());
+        if (paletteMappings) Collections.sort(ordered, new Comparator<ItemDefinition>() {
+            @Override public int compare(ItemDefinition a, ItemDefinition b) {
+                boolean au = a.id().value().startsWith("ui-colorpicker_");
+                boolean bu = b.id().value().startsWith("ui-colorpicker_");
+                if (au != bu) return au ? -1 : 1;
+                return a.id().toString().compareTo(b.id().toString());
+            }
+        });
+        for (ItemDefinition item : ordered) {
             itemStep.advance(1);
             try {
             // Abstract items may be GUI-only, but their rendered ItemStacks still need Geyser mappings.
@@ -235,7 +281,9 @@ public final class BedrockPackCompiler {
             }
             for (Variant variant : variants) {
             String label = item.id() + variant.suffix;
-            if (variant.tinted) unsupported.add(label + ": Tinted rule model mapped without Bedrock tint (shows untinted)");
+            if (variant.tinted && (dyeDefault == null || !paletteMappings || textureOverride != null))
+                unsupported.add(label + ": Dynamic Java tint has no matching baked Bedrock shade "
+                        + "(default icon only)");
             byte[] png = null;
             if (textureOverride == null) {
                 try {
@@ -342,6 +390,75 @@ public final class BedrockPackCompiler {
             if (!items.has(material)) items.add(material, new JsonArray());
             items.getAsJsonArray(material).add(definition);
             count++;
+
+            // Bedrock cannot evaluate Java RGB tint dynamically. Bake only
+            // configured shades and select their icon using a stable string in
+            // custom_model_data; the actual RGB remains untouched on Java.
+            // A dyeable declaration alone does not apply Java item-model
+            // tinting. Only rule leaves that opt into a color tint can
+            // receive Bedrock variants; otherwise we'd display colours
+            // that Java users never see.
+            if (paletteMappings && dyeDefault != null && variant.tinted && textureOverride == null) {
+                RenderAllocation allocation = renderAllocations.get(item.id()).orElse(null);
+                Integer paletteIndex = allocation == null ? null : allocation.structuredModelData().index(
+                        CustomModelDataDefinition.ValueType.STRING,
+                        RenderAllocationRegistry.BEDROCK_PALETTE_SELECTOR).orElse(null);
+                if (paletteIndex == null) {
+                    unsupported.add(label + ": Bedrock palette selector has no stable string index");
+                } else {
+                    for (Integer shade : paletteColors) {
+                        int rgb = shade.intValue();
+                        if (rgb == dyeDefault.intValue()) continue; // existing default icon already matches
+                        if (paletteMapped >= maxPaletteMappings) {
+                            paletteSkipped++;
+                            continue;
+                        }
+                        String shadeLabel = label + "#rgb:" + String.format(Locale.ROOT, "%06X", rgb);
+                        String shadeIcon;
+                        try {
+                            shadeIcon = paletteIcons.icon(variant.renderModel, cameraOverride,
+                                    BedrockGeometryCompiler.withDye(tints, rgb), png);
+                        } catch (IOException | RuntimeException unsupportedColor) {
+                            paletteSkipped++;
+                            unsupported.add(shadeLabel + ": cannot render RGB icon: "
+                                    + unsupportedColor.getMessage());
+                            continue;
+                        }
+                        if (shadeIcon == null) {
+                            paletteSkipped++;
+                            continue; // unique-PNG budget reached: default icon is safe fallback
+                        }
+                        if (shadeIcon.isEmpty()) continue; // tint does not alter icon pixels
+                        // Unique per Java model/rule/RGB, even when two mappings
+                        // share the same deduplicated PNG/atlas key.
+                        String tintedId = "voxelcore:i_"
+                                + hex(sha256(shadeLabel)).substring(0, 32);
+                        String previous = generatedIds.putIfAbsent(tintedId.substring("voxelcore:".length()), shadeLabel);
+                        if (previous != null && !previous.equals(shadeLabel))
+                            throw new IOException("Bedrock dyed item ID collision: " + shadeLabel);
+                        JsonObject colored = definition.deepCopy();
+                        colored.addProperty("bedrock_identifier", tintedId);
+                        colored.getAsJsonObject("bedrock_options").addProperty("icon", shadeIcon);
+                        JsonObject match = new JsonObject();
+                        match.addProperty("type", "match");
+                        match.addProperty("property", "custom_model_data");
+                        match.addProperty("index", paletteIndex.intValue());
+                        match.addProperty("value", BedrockPaletteConfig.selector(rgb));
+                        if (variant.predicates != null && variant.predicates.size() > 0) {
+                            JsonArray and = variant.predicates.deepCopy();
+                            and.add(match);
+                            colored.add("predicate", and);
+                            colored.addProperty("predicate_strategy", "and");
+                        } else {
+                            colored.add("predicate", match);
+                        }
+                        colored.addProperty("priority", variant.priority + 10000);
+                        items.getAsJsonArray(material).add(colored);
+                        paletteMapped++;
+                        count++;
+                    }
+                }
+            }
             }
             } catch (IOException perItem) {
                 // One broken item (missing override texture, bad bedrock settings) must never
@@ -350,6 +467,16 @@ public final class BedrockPackCompiler {
             }
         }
         itemStep.finish(count + " mapped, " + nativeGeometryCount + " 3D, " + unsupported.size() + " unsupported");
+        if (paletteIcons != null) {
+            progress.report("Bedrock RGB palette: " + paletteColors.size() + " unique configured shades; "
+                    + paletteMapped + " colour mappings; " + paletteIcons.uniqueTextures()
+                    + " unique PNGs (" + paletteIcons.uniqueBytes() + " bytes before ZIP), "
+                    + paletteSkipped + " skipped by size/mapping limits or render errors");
+            if (paletteSkipped > 0)
+                unsupported.add("Bedrock RGB palette: " + paletteSkipped
+                        + " icons omitted; increase bedrock.palette_icons mapping/PNG budgets, "
+                        + "or reduce dyeable item models. Omitted shades fall back to the default icon.");
+        }
         // Java Paper remains the only gameplay state owner; Geyser receives only
         // resource-pack textures and exact Java carrier-state visual overrides.
         Path blockManifest = glyphAllocationManifest == null ? null
@@ -465,7 +592,8 @@ public final class BedrockPackCompiler {
     }
 
     /** One Bedrock mapping for an item: the plain model, or one leaf of its render.rule. */
-    private static final class Variant {
+    /** Package-visible for Bedrock predicate/colour parity regression tests. */
+    static final class Variant {
         final String renderModel, suffix;
         final JsonArray predicates;
         final int priority;

@@ -20,6 +20,12 @@ import java.util.Set;
 /** Immutable stable render allocations shared by pack generation and runtime item creation. */
 public final class RenderAllocationRegistry {
     public static final int FIRST_AUTO_CUSTOM_MODEL_DATA = 1000;
+    /**
+     * Stable extra string for Geyser's per-colour icon predicate, not an
+     * authored Java model selector. Preserve this allocation in the manifest
+     * alongside user-defined string keys.
+     */
+    public static final String BEDROCK_PALETTE_SELECTOR = "voxelcore:bedrock_palette";
 
     private final int nextCustomModelData;
     private final Map<ContentID, RenderAllocation> allocations;
@@ -112,11 +118,16 @@ public final class RenderAllocationRegistry {
             CustomModelDataDefinition authored = render.customModelData();
             Integer explicit = authored != null && authored.isNumeric() ? authored.numeric() : null;
 
-            if (authored != null && authored.isStructured()) {
-                StructuredModelDataAllocation structured = nextStructured.get(model);
-                if (structured == null) structured = StructuredModelDataAllocation.empty();
-                nextStructured.put(model, structured.reconcile(authored));
+            StructuredModelDataAllocation structured = nextStructured.get(model);
+            if (structured == null) structured = StructuredModelDataAllocation.empty();
+            if (authored != null && authored.isStructured())
+                structured = structured.reconcile(authored);
+            if (definition.properties().get("dyeable") instanceof Map) {
+                // Reserve AFTER authored strings, preserving all existing
+                // indices and allocating this model's sideband selector once.
+                structured = structured.reserveString(BEDROCK_PALETTE_SELECTOR);
             }
+            nextStructured.put(model, structured);
 
             RenderAllocation existing = next.get(definition.id());
             if (existing != null) {

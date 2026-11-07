@@ -745,6 +745,204 @@ public class BedrockPackCompilerTest {
         write(root.resolve("other/assets/minecraft/models/item/test.json"), "{\"parent\":\"demo:b\"}");
         assertEquals(1, new BedrockPackCompiler().compile(root,temp.newFolder().toPath()).mappedItems);
     }
+    /** Two models intentionally use the same pixels, to test content-based dedupe. */
+    private Path dyePaletteFixture() throws Exception {
+        Path root = fixture();
+        write(root.resolve("demo/content/items.yml"),
+                "items:\n"
+                + "  slot:\n    material: minecraft:paper\n"
+                + "    render:\n      model: demo:item/slot\n"
+                + "      custom_model_data:\n        variant: matte\n        color: '#FFFFFF'\n"
+                + "      rule:\n        model:\n          id: demo:item/slot\n          tint: color\n"
+                + "    properties:\n      dyeable:\n        key: color\n        color: '#FFFFFF'\n"
+                + "  selected:\n    material: minecraft:paper\n"
+                + "    render:\n      model: demo:item/selected\n"
+                + "      custom_model_data:\n        variant: matte\n        color: '#FFFFFF'\n"
+                + "      rule:\n        model:\n          id: demo:item/selected\n          tint: color\n"
+                + "    properties:\n      dyeable:\n        key: color\n        color: '#FFFFFF'\n");
+        for (String model : new String[]{"slot", "selected"}) {
+            write(root.resolve("demo/assets/demo/models/item/" + model + ".json"),
+                    "{\"parent\":\"minecraft:item/generated\","
+                    + "\"textures\":{\"layer0\":\"demo:item/palette\"}}");
+        }
+        java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(
+                16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) img.setRGB(x, y, 0xFFFFFFFF);
+        Path texture = root.resolve("demo/assets/demo/textures/item/palette.png");
+        Files.createDirectories(texture.getParent());
+        javax.imageio.ImageIO.write(img, "png", texture.toFile());
+        return root;
+    }
+
+    private Path palette(Path directory) throws Exception {
+        Path file = directory.resolve("colorpicker.yml");
+        write(file, "enabled: true\npalettes:\n  red:\n"
+                + "    shades: ['#FF0000', '#00FF00', '#FF0000']\n"
+                + "    button-color: '#0000FF'\n");
+        return file;
+    }
+
+    private Path allocationManifest(Path root) throws Exception {
+        Path dir = temp.newFolder("palette-allocations").toPath();
+        Path manifest = dir.resolve("render-allocations.yml");
+        org.voxelhorizons.content.item.ItemDefinitionRegistry definitions =
+                new org.voxelhorizons.content.load.ContentLoader().load(root);
+        org.voxelhorizons.content.render.RenderAllocationRegistry allocations =
+                org.voxelhorizons.content.render.RenderAllocationRegistry.reconcile(
+                        definitions,
+                        org.voxelhorizons.content.render.RenderAllocationRegistry.empty());
+        new org.voxelhorizons.content.render.RenderAllocationStore(manifest).save(allocations);
+        return dir.resolve("glyph-allocations.yml");
+    }
+
+    @Test public void generatesExactRgbIconsAndGeyserStringsWithSharedPngAssets() throws Exception {
+        Path root = dyePaletteFixture(), output = temp.newFolder().toPath();
+        Path config = palette(temp.newFolder("effective-palette").toPath());
+        Path manifest = allocationManifest(root);
+        BedrockPackCompiler.Result compiled = new BedrockPackCompiler()
+                .withColorPickerConfig(config).compile(root, output, manifest);
+        JsonObject mappings = JsonParser.parseString(new String(
+                Files.readAllBytes(compiled.directory.resolve("voxelcore-items.json")),
+                StandardCharsets.UTF_8)).getAsJsonObject();
+        JsonArray entries = mappings.getAsJsonObject("items").getAsJsonArray("minecraft:paper");
+        assertEquals("Two default icons + 3 palette shades for both",
+                8, entries.size());
+        assertEquals(8, compiled.mappedItems);
+        java.util.Set<String> paletteIcons = new java.util.HashSet<String>();
+        java.util.Map<String, Integer> expectedRgbByIcon = new java.util.HashMap<String, Integer>();
+        java.util.Set<String> shades = new java.util.HashSet<String>();
+        for (JsonElement raw : entries) {
+            JsonObject definition = raw.getAsJsonObject();
+            if (!definition.has("predicate")) continue;
+            JsonElement predicate = definition.get("predicate");
+            if (predicate.isJsonArray() && predicate.getAsJsonArray().size() == 0)
+                continue; // Geyser fallback leaf has an empty predicate array.
+            JsonObject match = predicate.isJsonArray()
+                    ? predicate.getAsJsonArray().get(predicate.getAsJsonArray().size() - 1).getAsJsonObject()
+                    : predicate.getAsJsonObject();
+            assertEquals("match", match.get("type").getAsString());
+            assertEquals("custom_model_data", match.get("property").getAsString());
+            assertEquals(1, match.get("index").getAsInt());
+            assertTrue(match.get("value").getAsString().startsWith("voxelcore:rgb:"));
+            shades.add(match.get("value").getAsString());
+            String icon = definition.getAsJsonObject("bedrock_options").get("icon").getAsString();
+            paletteIcons.add(icon);
+            expectedRgbByIcon.put(icon, Integer.valueOf(Integer.parseInt(
+                    match.get("value").getAsString().substring("voxelcore:rgb:".length()), 16)));
+            assertTrue(definition.get("priority").getAsInt() > 0);
+        }
+        assertEquals(new java.util.HashSet<String>(java.util.Arrays.asList(
+                "voxelcore:rgb:FF0000", "voxelcore:rgb:00FF00", "voxelcore:rgb:0000FF")), shades);
+        assertEquals("Identical pixels across different source models share the icon atlas",
+                3, paletteIcons.size());
+        try (ZipFile zip = new ZipFile(compiled.directory.resolve("voxelcore.mcpack").toFile())) {
+            JsonObject atlas = JsonParser.parseString(new String(readAll(zip.getInputStream(
+                    zip.getEntry("textures/item_texture.json"))), StandardCharsets.UTF_8))
+                    .getAsJsonObject().getAsJsonObject("texture_data");
+            for (String icon : paletteIcons) {
+                String pngPath = atlas.getAsJsonObject(icon).get("textures").getAsString() + ".png";
+                assertNotNull(zip.getEntry(pngPath));
+                java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(
+                        zip.getInputStream(zip.getEntry(pngPath)));
+                assertEquals(16, img.getWidth());
+                assertEquals("The generated icon must show the precise selected shade",
+                        0xFF000000 | expectedRgbByIcon.get(icon).intValue(),
+                        img.getRGB(8, 8));
+            }
+        }
+        assertEquals("Rerun with unchanged config and assets must be reproducible",
+                compiled.revision, new BedrockPackCompiler().withColorPickerConfig(config)
+                        .compile(root, output, manifest).revision);
+    }
+
+    @Test public void combinesExistingRenderRuleWithRgbMatchWithoutOverwritingVariantString() throws Exception {
+        Path root = dyePaletteFixture(), output = temp.newFolder().toPath();
+        write(root.resolve("demo/content/items.yml"), "items:\n  patterned:\n"
+                + "    material: minecraft:paper\n    render:\n"
+                + "      model: demo:item/slot\n      custom_model_data:\n"
+                + "        variant: matte\n        color: '#FFFFFF'\n"
+                + "      rule:\n        select:\n          key: variant\n"
+                + "          cases:\n            matte:\n              model:\n"
+                + "                id: demo:item/selected\n                tint: color\n"
+                + "          fallback:\n            model:\n"
+                + "              id: demo:item/slot\n              tint: color\n"
+                + "    properties:\n      dyeable:\n        key: color\n        color: '#FFFFFF'\n");
+        Path config = palette(temp.newFolder("rule-palette").toPath());
+        Path manifest = allocationManifest(root);
+        org.voxelhorizons.content.item.ItemDefinitionRegistry itemRegistry =
+                new org.voxelhorizons.content.load.ContentLoader().load(root);
+        org.voxelhorizons.content.render.RenderAllocationRegistry allocations =
+                org.voxelhorizons.content.render.RenderAllocationRegistry.reconcile(
+                        itemRegistry, org.voxelhorizons.content.render.RenderAllocationRegistry.empty());
+        org.voxelhorizons.content.item.ItemDefinition patterned =
+                itemRegistry.get(org.voxelhorizons.content.ContentID.of("demo", "patterned")).get();
+        assertTrue("Test item must be marked dyeable", patterned.properties().get("dyeable") instanceof java.util.Map);
+        assertEquals(3, BedrockPaletteConfig.read(config).size());
+        assertTrue("Test item must have stable Geyser RGB selector",
+                allocations.get(patterned.id()).get().structuredModelData().strings()
+                        .containsKey(org.voxelhorizons.content.render.RenderAllocationRegistry.BEDROCK_PALETTE_SELECTOR));
+        assertEquals("Conditional leaves must expose two tint-enabled models",
+                2, BedrockPackCompiler.variants(patterned, allocations).size());
+        for (BedrockPackCompiler.Variant leaf : BedrockPackCompiler.variants(patterned, allocations))
+            assertTrue("Conditional model leaf must be RGB-tint enabled", leaf.tinted);
+        BedrockPackCompiler.Result result = new BedrockPackCompiler().withColorPickerConfig(config)
+                .compile(root, output, manifest);
+        JsonArray entries = JsonParser.parseString(new String(
+                Files.readAllBytes(result.directory.resolve("voxelcore-items.json")),
+                StandardCharsets.UTF_8)).getAsJsonObject()
+                .getAsJsonObject("items").getAsJsonArray("minecraft:paper");
+        assertEquals("2 leaves x (default + three shades); unsupported: "
+                + new String(Files.readAllBytes(result.directory.resolve("unsupported-items.txt")),
+                        StandardCharsets.UTF_8), 8, entries.size());
+        boolean combined = false, fallback = false;
+        for (JsonElement value : entries) {
+            JsonObject mapping = value.getAsJsonObject();
+            if (!mapping.has("predicate")) continue;
+            JsonElement node = mapping.get("predicate");
+            if (node.isJsonArray() && node.getAsJsonArray().size() == 2) {
+                JsonArray and = node.getAsJsonArray();
+                assertEquals("and", mapping.get("predicate_strategy").getAsString());
+                JsonObject original = and.get(0).getAsJsonObject();
+                JsonObject colour = and.get(1).getAsJsonObject();
+                assertEquals("matte", original.get("value").getAsString());
+                assertEquals(0, original.get("index").getAsInt());
+                assertEquals(1, colour.get("index").getAsInt());
+                assertTrue(colour.get("value").getAsString().startsWith("voxelcore:rgb:"));
+                combined = true;
+            }
+            if (node.isJsonObject() && "match".equals(node.getAsJsonObject().get("type").getAsString())) {
+                assertEquals(1, node.getAsJsonObject().get("index").getAsInt());
+                fallback = true;
+            }
+        }
+        assertTrue("Must combine authored variant and internal colour string", combined);
+        assertTrue("Fallback variant also receives colour mapping", fallback);
+    }
+
+    @Test public void respectsPaletteMappingCapAndFallsBackToUnchangedItem() throws Exception {
+        Path root = dyePaletteFixture(), output = temp.newFolder().toPath();
+        Path config = palette(temp.newFolder("limit-palette").toPath());
+        Path manifest = allocationManifest(root);
+        BedrockPackCompiler.Result compiled = new BedrockPackCompiler()
+                .withColorPickerConfig(config).withPaletteLimits(1, 16 * 1024 * 1024)
+                .compile(root, output, manifest);
+        assertEquals("Two base models + one pre-generated shade", 3, compiled.mappedItems);
+        String unsupported = new String(Files.readAllBytes(
+                compiled.directory.resolve("unsupported-items.txt")), StandardCharsets.UTF_8);
+        assertTrue(unsupported.contains("omitted"));
+    }
+
+    @Test public void byteBudgetCannotPublishPartiallyGeneratedIcons() throws Exception {
+        Path root = dyePaletteFixture(), output = temp.newFolder().toPath();
+        Path config = palette(temp.newFolder("bytes-palette").toPath());
+        Path manifest = allocationManifest(root);
+        BedrockPackCompiler.Result compiled = new BedrockPackCompiler()
+                .withColorPickerConfig(config).withPaletteLimits(100, 1)
+                .compile(root, output, manifest);
+        assertEquals("Only uncoloured base mappings fit the budget", 2, compiled.mappedItems);
+    }
+
     private static void write(Path path, String text) throws Exception {
         Files.createDirectories(path.getParent()); Files.write(path,text.getBytes(StandardCharsets.UTF_8));
     }
