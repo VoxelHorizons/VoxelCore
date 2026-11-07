@@ -23,7 +23,7 @@ public final class ColorPickerSettingsTest {
         }
     }
 
-    @Test public void bundledPalettesMatchNineUploadedTextures() {
+    @Test public void bundledPrimaryHexesStayIndependentFromLightToDarkShades() {
         ColorPickerSettings settings = ColorPickerSettings.from(defaults());
         assertTrue(settings.enabled);
         assertEquals(54, settings.size);
@@ -33,20 +33,44 @@ public final class ColorPickerSettingsTest {
         assertEquals("&f:offset_-8::colorpicker_background:", settings.title);
         assertEquals(9, settings.palettes.size());
         assertEquals(9, settings.shadeSlots.size());
+        // Keep every previous primary-grid colour unchanged while explicitly
+        // configuring it independently of the new lightest-first shade.
         int[][] expected = {
-            {0x991E1E, 0x3A2525}, {0xCC6A28, 0x4E3D31}, {0xCCB028, 0x4E4931},
-            {0xCC28B6, 0x4E314A}, {0xCCCCCC, 0x28282A}, {0x59CC28, 0x3A4E31},
-            {0x9828CC, 0x45314E}, {0x2841CC, 0x31364E}, {0x28CCCC, 0x314E4E}
+            {0x991E1E, 0xBF9999, 0x3A2525},
+            {0xCC6A28, 0xFFE0CC, 0x4E3D31},
+            {0xCCB028, 0xFFF6CC, 0x4E4931},
+            {0xCC28B6, 0xFFCCF8, 0x4E314A},
+            {0xCCCCCC, 0xECE8DC, 0x28282A},
+            {0x59CC28, 0xDBFFCC, 0x3A4E31},
+            {0x9828CC, 0xEFCCFF, 0x561C66},
+            {0x2841CC, 0xCCD4FF, 0x1C2066},
+            {0x28CCCC, 0xCCFFFF, 0x314E4E}
         };
-        int[] slots = {12,13,14,21,22,30,23,32,31};
+        int[] slots = {12, 13, 14, 21, 22, 30, 23, 32, 31};
         for (int i = 0; i < expected.length; i++) {
             ColorPickerSettings.Palette p = settings.palettes.get(i);
             assertEquals(9, p.shades.size());
             assertEquals(slots[i], p.slot);
-            assertEquals(expected[i][0], p.shades.get(0).intValue());
             assertEquals(expected[i][0], p.buttonColor);
-            assertEquals(expected[i][1], p.shades.get(8).intValue());
+            assertEquals(expected[i][1], p.shades.get(0).intValue());
+            assertEquals(expected[i][2], p.shades.get(8).intValue());
+            // Verify perceptual lightness, not the numeric hex value.
+            for (int j = 1; j < p.shades.size(); j++)
+                assertTrue(p.id + " shade " + j + " is brighter than " + (j - 1),
+                        relativeLuminance(p.shades.get(j - 1).intValue())
+                                >= relativeLuminance(p.shades.get(j).intValue()));
         }
+    }
+
+    private static double relativeLuminance(int rgb) {
+        return 0.2126 * linear((rgb >>> 16) & 255)
+                + 0.7152 * linear((rgb >>> 8) & 255)
+                + 0.0722 * linear(rgb & 255);
+    }
+
+    private static double linear(int channel) {
+        double c = channel / 255.0;
+        return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
     }
 
     @Test public void primaryButtonColorOverridesFirstShadeWithoutChangingShades() {
@@ -54,7 +78,16 @@ public final class ColorPickerSettingsTest {
         config.set("palettes.red.button-color", "#1234AB");
         ColorPickerSettings settings = ColorPickerSettings.from(config);
         assertEquals(0x1234AB, settings.palettes.get(0).buttonColor);
-        assertEquals(0x991E1E, settings.palettes.get(0).shades.get(0).intValue());
+        assertEquals(0xBF9999, settings.palettes.get(0).shades.get(0).intValue());
+    }
+
+    @Test public void oldConfigsWithoutButtonHexStillUseTheirFirstShade() {
+        YamlConfiguration config = defaults();
+        config.set("palettes.red.button-color", null);
+        ColorPickerSettings settings = ColorPickerSettings.from(config);
+        assertEquals(0xBF9999, settings.palettes.get(0).buttonColor);
+        assertEquals(settings.palettes.get(0).shades.get(0).intValue(),
+                settings.palettes.get(0).buttonColor);
     }
 
     @Test public void invalidPrimaryButtonColorIsRejected() {
