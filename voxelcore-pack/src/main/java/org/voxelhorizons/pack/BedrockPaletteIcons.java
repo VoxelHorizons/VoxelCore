@@ -34,6 +34,7 @@ final class BedrockPaletteIcons {
     private final Map<String, byte[]> assets;
     private final JsonObject textures;
     private final Map<String, byte[]> rendered = new HashMap<String, byte[]>();
+    private final Map<String, byte[]> indexed = new HashMap<String, byte[]>();
     private final Path cache;
     private final byte[] sourceDigest;
     private final long maxBytes;
@@ -68,12 +69,18 @@ final class BedrockPaletteIcons {
                 Files.createDirectories(file.getParent());
                 Files.write(file, png);
             }
-            png = indexPngIfSmaller(png);
             rendered.put(renderKey, png);
         }
-        // No additional mapping is useful when the RGB shade produces
-        // exactly the same visible pixels as the undyed/default item.
+        // Compare BEFORE PNG re-encoding. The raw previews have identical
+        // bytes when a shade makes no visible change, but an indexed and RGBA
+        // file can encode identical pixels with different file bytes.
         if (Arrays.equals(png, defaultPng)) return "";
+        byte[] optimized = indexed.get(renderKey);
+        if (optimized == null) {
+            optimized = indexPngIfSmaller(png);
+            indexed.put(renderKey, optimized);
+        }
+        png = optimized;
         String hash = hex(sha(png));
         String suffix = hash.substring(0, 32);
         String icon = "voxelcore.p_" + suffix;
