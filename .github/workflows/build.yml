@@ -73,6 +73,35 @@ jobs:
             done
           done
 
+      - name: Verify color picker is actually packaged in every distribution
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A successful Maven build is not enough: users install shaded per-version JARs.
+          # Verify both new classes AND the config resource used by saveResource().
+          for module in voxelcore-v1_12 voxelcore-v1_14 voxelcore-v1_19_4 voxelcore-v1_20_5 voxelcore-v1_21_4 voxelcore-v26_2 voxelcore-v26_3; do
+            jar=$(find "$module/target" -maxdepth 1 -name 'VoxelCore-*.jar' -print -quit)
+            test -n "$jar"
+            echo "Checking $jar"
+            for entry in \
+                org/voxelhorizons/colorpicker/ColorPickerMenu.class \
+                org/voxelhorizons/colorpicker/ColorPickerSettings.class \
+                org/voxelhorizons/command/commands/ColorPickerCommand.class \
+                colorpicker.yml; do
+              unzip -Z1 "$jar" | grep -Fx "$entry"
+            done
+            # module-specific plugin.yml, not the upstream plugin module's metadata.
+            unzip -p "$jar" plugin.yml | grep -F 'voxelcore.colorpicker.self:'
+            unzip -p "$jar" plugin.yml | grep -F 'voxelcore.colorpicker.others:'
+            unzip -p "$jar" colorpicker.yml | grep -F 'size: 54'
+            unzip -p "$jar" colorpicker.yml | grep -F 'input-slot: 19'
+            unzip -p "$jar" colorpicker.yml | grep -F 'output-slot: 25'
+            if unzip -p "$jar" colorpicker.yml | grep -q '^apply-slot:'; then
+              echo "::error::Obsolete apply-slot is still bundled in $jar"
+              exit 1
+            fi
+          done
+
       - name: Verify Geyser extension metadata
         shell: bash
         run: |

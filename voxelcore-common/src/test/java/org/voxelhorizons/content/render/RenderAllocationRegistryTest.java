@@ -171,6 +171,59 @@ public class RenderAllocationRegistryTest {
         RenderAllocationRegistry.reconcile(loader.load(root.toPath()), first);
     }
 
+    @Test
+    public void reservesPaletteStringWithoutOverwritingAuthoredStringsAcrossReloads() throws Exception {
+        File root = temporaryFolder.newFolder("bedrock-palette-allocation");
+        File content = new File(root, "pack/content");
+        assertTrue(content.mkdirs());
+        write(new File(root, "pack/pack.yml"), "schema: 1\nnamespace: test\n");
+        File items = new File(content, "items.yml");
+        write(items, "items:\n  painted:\n    material: minecraft:paper\n"
+                + "    render:\n      model: test:item/painted\n"
+                + "      custom_model_data:\n        finish: matte\n        color: '#FFFFFF'\n"
+                + "    properties:\n      dyeable:\n        key: color\n        color: '#FFFFFF'\n");
+        ContentLoader loader = new ContentLoader();
+        RenderAllocationRegistry first = RenderAllocationRegistry.reconcile(
+                loader.load(root.toPath()), RenderAllocationRegistry.empty());
+        StructuredModelDataAllocation old = first.get(ContentID.of("test", "painted"))
+                .get().structuredModelData();
+        assertEquals(Integer.valueOf(0), old.strings().get("finish"));
+        assertEquals(Integer.valueOf(1), old.strings().get(
+                RenderAllocationRegistry.BEDROCK_PALETTE_SELECTOR));
+        assertEquals(Integer.valueOf(0), old.colors().get("color"));
+
+        File manifest = temporaryFolder.newFile("bedrock-palette-allocations.yml");
+        RenderAllocationStore store = new RenderAllocationStore(manifest.toPath());
+        store.save(first);
+        RenderAllocationRegistry saved = store.load();
+        assertEquals(old.strings(), saved.get(ContentID.of("test", "painted"))
+                .get().structuredModelData().strings());
+        // New authored keys cannot displace the reserved Geyser selector.
+        write(items, "items:\n  painted:\n    material: minecraft:paper\n"
+                + "    render:\n      model: test:item/painted\n"
+                + "      custom_model_data:\n        finish: matte\n"
+                + "        pattern: dotted\n        color: '#FFFFFF'\n"
+                + "    properties:\n      dyeable:\n        key: color\n        color: '#FFFFFF'\n");
+        RenderAllocationRegistry second = RenderAllocationRegistry.reconcile(
+                loader.load(root.toPath()), saved);
+        StructuredModelDataAllocation updated = second.get(ContentID.of("test", "painted"))
+                .get().structuredModelData();
+        assertEquals(Integer.valueOf(0), updated.strings().get("finish"));
+        assertEquals(Integer.valueOf(1), updated.strings().get(
+                RenderAllocationRegistry.BEDROCK_PALETTE_SELECTOR));
+        assertEquals(Integer.valueOf(2), updated.strings().get("pattern"));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsAuthorUsingReservedPaletteKeyForNonStringModelData() {
+        java.util.Map<String,Integer> other = new java.util.HashMap<String,Integer>();
+        other.put(RenderAllocationRegistry.BEDROCK_PALETTE_SELECTOR, Integer.valueOf(0));
+        new StructuredModelDataAllocation(other, java.util.Collections.<String,Integer>emptyMap(),
+                java.util.Collections.<String,Integer>emptyMap(),
+                java.util.Collections.<String,Integer>emptyMap())
+                .reserveString(RenderAllocationRegistry.BEDROCK_PALETTE_SELECTOR);
+    }
+
     private static void write(File file, String content) throws Exception {
         Files.write(file.toPath(), content.getBytes(StandardCharsets.UTF_8));
     }

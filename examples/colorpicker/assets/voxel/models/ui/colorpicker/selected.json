@@ -1,0 +1,197 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "gui_light": "front",
+  "textures": {
+    "layer0": "voxel:ui/colorpicker/selected",
+    "particle": "voxel:ui/colorpicker/selected"
+  },
+  "elements": [
+    {
+      "from": [
+        1.777778,
+        1.777778,
+        7.5
+      ],
+      "to": [
+        14.222222,
+        14.222222,
+        8.5
+      ],
+      "shade": false,
+      "faces": {
+        "north": {
+          "uv": [
+            1.777778,
+            1.777778,
+            14.222222,
+            14.222222
+          ],
+          "texture": "#layer0",
+          "tintindex": 0
+        },
+        "south": {
+          "uv": [
+            1.777778,
+            1.777778,
+            14.222222,
+            14.222222
+          ],
+          "texture": "#layer0",
+          "tintindex": 0
+        }
+      }
+    },
+    {
+      "from": [
+        0,
+        14.222222,
+        7.5
+      ],
+      "to": [
+        16,
+        16,
+        8.5
+      ],
+      "shade": false,
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            0,
+            16,
+            1.777778
+          ],
+          "texture": "#layer0"
+        },
+        "south": {
+          "uv": [
+            0,
+            0,
+            16,
+            1.777778
+          ],
+          "texture": "#layer0"
+        }
+      }
+    },
+    {
+      "from": [
+        0,
+        0,
+        7.5
+      ],
+      "to": [
+        16,
+        1.777778,
+        8.5
+      ],
+      "shade": false,
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            14.222222,
+            16,
+            16
+          ],
+          "texture": "#layer0"
+        },
+        "south": {
+          "uv": [
+            0,
+            14.222222,
+            16,
+            16
+          ],
+          "texture": "#layer0"
+        }
+      }
+    },
+    {
+      "from": [
+        0,
+        1.777778,
+        7.5
+      ],
+      "to": [
+        1.777778,
+        14.222222,
+        8.5
+      ],
+      "shade": false,
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            1.777778,
+            1.777778,
+            14.222222
+          ],
+          "texture": "#layer0"
+        },
+        "south": {
+          "uv": [
+            0,
+            1.777778,
+            1.777778,
+            14.222222
+          ],
+          "texture": "#layer0"
+        }
+      }
+    },
+    {
+      "from": [
+        14.222222,
+        1.777778,
+        7.5
+      ],
+      "to": [
+        16,
+        14.222222,
+        8.5
+      ],
+      "shade": false,
+      "faces": {
+        "north": {
+          "uv": [
+            14.222222,
+            1.777778,
+            16,
+            14.222222
+          ],
+          "texture": "#layer0"
+        },
+        "south": {
+          "uv": [
+            14.222222,
+            1.777778,
+            16,
+            14.222222
+          ],
+          "texture": "#layer0"
+        }
+      }
+    }
+  ],
+  "display": {
+    "gui": {
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1.125,
+        1.125,
+        1.125
+      ]
+    }
+  }
+}

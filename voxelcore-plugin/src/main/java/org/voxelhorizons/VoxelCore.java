@@ -9,6 +9,8 @@ import org.voxelhorizons.command.CommandRegistry;
 import org.voxelhorizons.command.RootCommand;
 import org.voxelhorizons.command.commands.AdminCommand;
 import org.voxelhorizons.command.commands.BaseCommand;
+import org.voxelhorizons.command.commands.ColorPickerCommand;
+import org.voxelhorizons.colorpicker.ColorPickerMenu;
 import org.voxelhorizons.command.ui.ContentBrowser;
 import org.voxelhorizons.config.ConfigMigrationSupport;
 import org.voxelhorizons.content.item.ItemDefinition;
@@ -91,6 +93,7 @@ public final class VoxelCore extends JavaPlugin {
     private TooltipRenderer tooltipRenderer;
     private InventoryTitlePlaceholderListener inventoryTitlePlaceholderListener;
     private ContentBrowser contentBrowser;
+    private ColorPickerMenu colorPickerMenu;
     private VoxelCurrencyBridge currencyBridge;
     private AdvancementsMenuOverride advancementsMenuOverride;
     private Path contentRoot;
@@ -115,6 +118,13 @@ public final class VoxelCore extends JavaPlugin {
                 saveDefaultConfig();
             }
             checkConfigVersion();
+            // Generate the separate color-picker config at the START of plugin startup.
+            // It must exist even if loading a content pack or initializing an adapter fails.
+            File colorPickerConfigFile = new File(getDataFolder(), "colorpicker.yml");
+            if (!colorPickerConfigFile.isFile()) {
+                saveResource("colorpicker.yml", false);
+                logger.info("Generated color picker configuration: " + colorPickerConfigFile.getAbsolutePath());
+            }
         } catch (RuntimeException exception) {
             logger.log(Level.SEVERE, "Unable to initialize or migrate VoxelCore configuration", exception);
             getServer().getPluginManager().disablePlugin(this);
@@ -204,6 +214,14 @@ public final class VoxelCore extends JavaPlugin {
         }
 
         itemManager = new ItemManager(contentRuntime, versionAdapter);
+        try {
+            colorPickerMenu = new ColorPickerMenu(this, itemManager);
+            getServer().getPluginManager().registerEvents(colorPickerMenu, this);
+        } catch (RuntimeException exception) {
+            logger.log(Level.SEVERE, "Invalid colorpicker.yml; unable to start VoxelCore color picker", exception);
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
         getServer().getPluginManager().registerEvents(playerResourcePackService, this);
         playerResourcePackService.reloadHost();
         blockManager = new BlockManager(contentRuntime, versionAdapter.version().atLeast(1, 13, 0));
@@ -247,6 +265,7 @@ public final class VoxelCore extends JavaPlugin {
         RootCommand baseCommand = new BaseCommand();
         CommandFactory commandFactory = new CommandFactory(baseCommand);
         commandFactory.register(new AdminCommand());
+        commandFactory.register(new ColorPickerCommand());
 
         try {
             PluginCommand bukkitCommand = getCommand(baseCommand.getName());
@@ -254,6 +273,19 @@ public final class VoxelCore extends JavaPlugin {
             bukkitCommand.setExecutor(commandFactory);
             bukkitCommand.setTabCompleter(commandFactory);
             CommandRegistry.register(commandFactory);
+            // A short alias can be claimed by another plugin depending on load order.
+            // Expose the real registration in logs rather than reporting the plugin ready
+            // while players are unknowingly executing a different plugin's /vc.
+            PluginCommand alias = getServer().getPluginCommand("vc");
+            if (alias != bukkitCommand) {
+                logger.warning("VOXELCORE_COMMAND_ALIAS_CONFLICT alias=/vc owner="
+                        + (alias == null ? "unregistered" : alias.getPlugin().getName())
+                        + "; use /voxelcore colorpicker or /voxelcore:voxelcore colorpicker");
+            } else {
+                logger.info("VOXELCORE_COMMAND_ALIAS_OK alias=/vc");
+            }
+            logger.info("VOXELCORE_COLORPICKER_READY command=/vc colorpicker"
+                    + " config=" + new File(getDataFolder(), "colorpicker.yml").getAbsolutePath());
         } catch (Exception exception) {
             logger.log(Level.SEVERE, "Unable to register VoxelCore commands", exception);
             getServer().getPluginManager().disablePlugin(this);
@@ -320,6 +352,9 @@ public final class VoxelCore extends JavaPlugin {
         ContentReloadResult result = prepared == null
                 ? contentReloader.reload() : contentReloader.reloadPrepared(prepared);
         if (result.success()) {
+            // The picker resolves optional item IDs from the published content
+            // registry. Revalidate after the new registry becomes active.
+            if (colorPickerMenu != null) colorPickerMenu.reload();
             blockMiningSpeedController.clearAll();
             org.voxelhorizons.pack.UiGlyphRegistry currentGlyphs = packManager.uiGlyphs(true);
             textPlaceholderService.update(currentGlyphs);
@@ -376,6 +411,7 @@ public final class VoxelCore extends JavaPlugin {
     public TextPlaceholderService getTextPlaceholderService() { return textPlaceholderService; }
     public TooltipRenderer getTooltipRenderer() { return tooltipRenderer; }
     public ContentBrowser getContentBrowser() { return contentBrowser; }
+    public ColorPickerMenu getColorPickerMenu() { return colorPickerMenu; }
 
     private void validateForPlatform(ItemDefinitionRegistry items, RenderAllocationRegistry allocations) {
         for (ItemDefinition definition : items.entries().values()) {

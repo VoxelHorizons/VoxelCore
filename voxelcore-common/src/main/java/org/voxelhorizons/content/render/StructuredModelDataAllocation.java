@@ -95,6 +95,21 @@ public final class StructuredModelDataAllocation {
         return new StructuredModelDataAllocation(nextFloats, nextFlags, nextStrings, nextColors);
     }
 
+    /**
+     * Reserve an internal Geyser-only string index for a dyeable model.
+     * Existing indices and authored strings remain stable across rebuilds.
+     */
+    public StructuredModelDataAllocation reserveString(String key) {
+        if (key == null || key.isEmpty()) throw new IllegalArgumentException("Reserved key cannot be blank");
+        CustomModelDataDefinition.ValueType existing = typeOf(key);
+        if (existing != null && existing != CustomModelDataDefinition.ValueType.STRING)
+            throw new IllegalArgumentException("Reserved string key '" + key + "' conflicts with " + existing);
+        if (strings.containsKey(key)) return this;
+        Map<String, Integer> next = new LinkedHashMap<String, Integer>(strings);
+        next.put(key, Integer.valueOf(size(CustomModelDataDefinition.ValueType.STRING)));
+        return new StructuredModelDataAllocation(floats, flags, next, colors);
+    }
+
     private CustomModelDataDefinition.ValueType typeOf(String key) {
         if (floats.containsKey(key)) return CustomModelDataDefinition.ValueType.FLOAT;
         if (flags.containsKey(key)) return CustomModelDataDefinition.ValueType.FLAG;

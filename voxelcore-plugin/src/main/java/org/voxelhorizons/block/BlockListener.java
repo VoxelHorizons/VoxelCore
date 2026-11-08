@@ -15,6 +15,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.EquipmentSlot;
 import org.voxelhorizons.action.ActionContext;
 import org.voxelhorizons.action.ActionExecutor;
 import org.voxelhorizons.content.ContentID;
@@ -74,9 +75,18 @@ public final class BlockListener implements Listener {
         BlockDefinition definition = blocks.getDefinition(id.get()).orElse(null);
         if (definition == null) return;
         ItemStack held = event.getItem();
-        actions.execute(definition.events().forEvent("placed_block.interact"),
-                new ActionContext(event.getPlayer(), held, items.identify(held).orElse(null), clicked,
-                        id.get(), event.getBlockFace(), event));
+        ActionContext context = new ActionContext(event.getPlayer(), held, items.identify(held).orElse(null),
+                clicked, id.get(), event.getBlockFace(), event);
+        actions.execute(definition.events().forEvent("placed_block.interact"), context);
+        // Optional side-specific actions, without changing older placed_block.interact behavior.
+        // Right-click actions fire for the main hand only so modern dual-hand interaction
+        // does not run the command twice and reopen/close an in-progress picker.
+        if (event.getAction() == Action.RIGHT_CLICK_BLOCK
+                && (event.getHand() == null || event.getHand() == EquipmentSlot.HAND)) {
+            actions.execute(definition.events().forEvent("placed_block.interact.right"), context);
+        } else if (event.getAction() == Action.LEFT_CLICK_BLOCK) {
+            actions.execute(definition.events().forEvent("placed_block.interact.left"), context);
+        }
         // Prevent note-block tuning and other vanilla carrier interactions from changing the allocated state.
         if (event.getAction() == Action.RIGHT_CLICK_BLOCK) event.setCancelled(true);
     }

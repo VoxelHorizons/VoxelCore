@@ -41,7 +41,21 @@ public class CommandFactory implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        // The plugin.yml root is intentionally not permission-gated: Paper hides
+        // permission-gated root commands as "unknown" for players without voxelcore.use.
+        // Preserve the previous restriction for every subcommand except the Color Picker,
+        // which checks .colorpicker.self/.others inside its own argument handler.
+        if (!isColorPickerAlias(args[0])
+                && !canExecute(sender, root.getPermission(), root.playerOnly())) {
+            return true;
+        }
         return subExecute(sender, args, subCommands);
+    }
+
+    private static boolean isColorPickerAlias(String value) {
+        return "colorpicker".equalsIgnoreCase(value)
+                || "colourpicker".equalsIgnoreCase(value)
+                || "paint".equalsIgnoreCase(value);
     }
 
     private boolean subExecute(CommandSender sender, String[] args, Map<String, SubCommand> commands) {
@@ -87,12 +101,21 @@ public class CommandFactory implements CommandExecutor, TabCompleter {
         return tabCompleteSub(sender, args, subCommands);
     }
 
+    private boolean allowedAtRoot(CommandSender sender, SubCommand command) {
+        if (isColorPickerAlias(command.getName())) {
+            return sender.hasPermission("voxelcore.colorpicker.self")
+                    || sender.hasPermission("voxelcore.colorpicker.others");
+        }
+        return sender.hasPermission(root.getPermission());
+    }
+
     private List<String> tabCompleteSub(CommandSender sender, String[] args, Map<String, SubCommand> commands) {
         if (args.length == 1) {
             final String input = args[0].toLowerCase();
             return commands.values().stream()
                     .distinct()
-                    .filter(cmd -> canExecute(sender, cmd.getPermission(), cmd.playerOnly()))
+                    .filter(cmd -> allowedAtRoot(sender, cmd)
+                            && canExecute(sender, cmd.getPermission(), cmd.playerOnly()))
                     .map(SubCommand::getName)
                     .filter(name -> name.toLowerCase().startsWith(input))
                     .sorted()
@@ -100,7 +123,8 @@ public class CommandFactory implements CommandExecutor, TabCompleter {
         }
 
         SubCommand current = commands.get(args[0].toLowerCase());
-        if (current == null || !canExecute(sender, current.getPermission(), current.playerOnly())) {
+        if (current == null || !allowedAtRoot(sender, current)
+                || !canExecute(sender, current.getPermission(), current.playerOnly())) {
             return Collections.emptyList();
         }
 

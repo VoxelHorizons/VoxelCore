@@ -144,6 +144,20 @@ public final class v26_3_ItemAdapter implements ItemPlatformAdapter {
         List<Color> colors = new ArrayList<Color>(component.getColors());
         while (colors.size() <= index.intValue()) colors.add(Color.WHITE);
         colors.set(index.intValue(), Color.fromRGB(rgb & 0xFFFFFF));
-        component.setColors(colors); meta.setCustomModelDataComponent(component); stack.setItemMeta(meta); return stack;
+        component.setColors(colors);
+        // Geyser v2 matches STRING custom_model_data, not colour values.
+        // Keep the precise Java RGB and all authored strings untouched; the
+        // reserved index is stable per item model in render-allocations.yml.
+        Integer selector = allocation.structuredModelData().index(
+                CustomModelDataDefinition.ValueType.STRING,
+                org.voxelhorizons.content.render.RenderAllocationRegistry.BEDROCK_PALETTE_SELECTOR).orElse(null);
+        if (selector != null) {
+            List<String> strings = new ArrayList<String>(component.getStrings());
+            while (strings.size() <= selector.intValue()) strings.add("");
+            strings.set(selector.intValue(), String.format(java.util.Locale.ROOT,
+                    "voxelcore:rgb:%06X", rgb & 0xFFFFFF));
+            component.setStrings(strings);
+        }
+        meta.setCustomModelDataComponent(component); stack.setItemMeta(meta); return stack;
     }
 }

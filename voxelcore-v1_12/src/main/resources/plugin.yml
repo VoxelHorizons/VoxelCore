@@ -7,9 +7,15 @@ commands:
   voxelcore:
     description: VoxelCore administrative and debug command
     aliases: [vc]
-    permission: voxelcore.use
+    # Permissions are checked per subcommand in CommandFactory.
+    # Keeping the root visible avoids Paper hiding /vc as an unknown command.
 
 permissions:
+  # GUI commands are op-only; normal players use the bench's console action.
+  voxelcore.colorpicker.self:
+    default: op
+  voxelcore.colorpicker.others:
+    default: op
   voxelcore.use:
     default: op
   voxelcore.admin:

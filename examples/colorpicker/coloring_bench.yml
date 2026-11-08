@@ -1,0 +1,29 @@
+# Copy this content into the existing voxel namespace, e.g.
+# plugins/VoxelCore/content/voxel/content/coloring_bench.yml
+# Keep the matching 6 block textures in assets/voxel/textures/block/.
+# VoxelCore automatically generates the cube model.
+blocks:
+  coloring_bench:
+    display_name: "&rColoring Bench"
+    method: auto
+    model: cube
+    textures:
+      north: voxel:block/coloring_bench_front
+      south: voxel:block/coloring_bench_back
+      west: voxel:block/coloring_bench_left
+      east: voxel:block/coloring_bench_right
+      up: voxel:block/coloring_bench_top
+      down: voxel:block/coloring_bench_bottom
+    hardness: 2.0
+    blast_resistance: 3.0
+    drop_when_mined: true
+    events:
+      placed_block:
+        interact:
+          right:
+            actions:
+              # Console opens the picker for the interacting player. Players do not
+              # need voxelcore.colorpicker.self or voxelcore.colorpicker.others.
+              - type: command
+                executor: console
+                command: "vc colorpicker {player}"
