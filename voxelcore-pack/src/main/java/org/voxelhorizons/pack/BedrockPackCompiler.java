@@ -196,6 +196,7 @@ public final class BedrockPackCompiler {
                         overrideControllerGlyphPages, glyphShrink, oversizedGlyphSize);
         progress.report("Bedrock: " + mappedGlyphs + " font glyphs placed"
                 + (unsupported.isEmpty() ? "" : "; " + unsupported.size() + " glyphs skipped (see unsupported-items.txt)"));
+        final boolean authoredChestScreen = assets.containsKey(BedrockChestGui.SCREEN_PATH);
         int menuBackgrounds = glyphAllocationManifest == null ? 0
                 : BedrockChestGui.append(contentRoot, glyphAllocationManifest, javaAssets, assets, unsupported);
         if (menuBackgrounds > 0)
@@ -231,6 +232,7 @@ public final class BedrockPackCompiler {
                 : null;
         int paletteMapped = 0;
         int paletteSkipped = 0;
+        List<BedrockOversizedGui.Entry> oversizedGui = new ArrayList<BedrockOversizedGui.Entry>();
         BuildProgress.Step itemStep = progress.step("Bedrock: converting items (icons + 3D models)",
                 itemRegistry.entries().size());
         // The two colour-picker buttons get budget priority over other models.
@@ -383,6 +385,17 @@ public final class BedrockPackCompiler {
             definition.addProperty("bedrock_identifier", identifier);
             JsonObject options = new JsonObject(); options.addProperty("icon", icon);
             definition.add("bedrock_options", options);
+            if (item.render().oversizedInGui()) {
+                try {
+                    BedrockOversizedGui.Entry oversized = BedrockOversizedGui.entry(
+                            item, bedrockSettings, renderer, variant.renderModel);
+                    if (oversized != null) oversizedGui.add(oversized);
+                    else unsupported.add(label + ": oversized_in_gui has no oversized GUI scale; "
+                            + "set properties.bedrock.oversized_gui.width/height if the model spans other slots");
+                } catch (IOException unsupportedOverlay) {
+                    unsupported.add(label + ": " + unsupportedOverlay.getMessage());
+                }
+            }
             if (variant.predicates != null) {
                 definition.add("predicate", variant.predicates);
                 definition.addProperty("priority", variant.priority);
@@ -466,6 +479,9 @@ public final class BedrockPackCompiler {
                 unsupported.add(item.id() + ": " + perItem.getMessage());
             }
         }
+        int oversizedCount = BedrockOversizedGui.append(oversizedGui, assets, authoredChestScreen, unsupported);
+        if (oversizedCount > 0)
+            progress.report("Bedrock: " + oversizedCount + " experimental oversized Classic chest item overlays");
         itemStep.finish(count + " mapped, " + nativeGeometryCount + " 3D, " + unsupported.size() + " unsupported");
         if (paletteIcons != null) {
             progress.report("Bedrock RGB palette: " + paletteColors.size() + " unique configured shades; "
