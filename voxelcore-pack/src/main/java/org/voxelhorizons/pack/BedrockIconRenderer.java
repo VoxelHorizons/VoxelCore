@@ -11,6 +11,17 @@ import java.util.*;
 final class BedrockIconRenderer {
     private final Map<String, byte[]> assets;
     BedrockIconRenderer(Map<String, byte[]> assets) { this.assets = assets; }
+    /** GUI display scale of the resolved Java model (including inherited display transforms). */
+    double[] guiScale(String model) throws IOException {
+        JsonObject resolved = resolve(model, new HashSet<String>());
+        JsonObject gui = resolved.has("display") && resolved.getAsJsonObject("display").has("gui")
+                ? resolved.getAsJsonObject("display").getAsJsonObject("gui") : new JsonObject();
+        double[] scale = vector(gui, "scale", new double[]{1, 1, 1});
+        if (scale.length < 2 || !Double.isFinite(scale[0]) || !Double.isFinite(scale[1]))
+            throw new IOException("Invalid GUI display scale for " + model);
+        return scale;
+    }
+
     byte[] render(String model) throws IOException {
         return render(model, null);
     }
