@@ -61,6 +61,7 @@ final class VoxelCoreItemProvider extends ItemProvider {
      * amountSelectionGUI.buttons.set1.item                (quantity selector)
      * amountSelectionGUIBulkBuy.buttons.buy1.item         (other GUI variants)
      * shopMenuItems.1.item                                 (shop selector icon)
+     * specialElements.balance.item                         (display-only special element)
      *
      * The nested GUI root is deliberately matched by its "GUI" component,
      * rather than an exhaustive hardcoded list of button names or menus. This
@@ -72,7 +73,8 @@ final class VoxelCoreItemProvider extends ItemProvider {
         if (parts.length == 3 && "item".equalsIgnoreCase(parts[2])) {
             // Only well-known display-only selector/button sections.
             return !parts[1].isEmpty() && ("buttons".equalsIgnoreCase(parts[0])
-                    || "shopMenuItems".equalsIgnoreCase(parts[0]));
+                    || "shopMenuItems".equalsIgnoreCase(parts[0])
+                    || "specialElements".equalsIgnoreCase(parts[0]));
         }
         return parts.length == 4
                 && parts[0].toLowerCase(java.util.Locale.ROOT).contains("gui")
