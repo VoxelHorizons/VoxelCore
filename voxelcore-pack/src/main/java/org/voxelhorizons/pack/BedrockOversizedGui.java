@@ -75,10 +75,12 @@ final class BedrockOversizedGui {
 
     private static int integer(Map<?, ?> config, String key, int fallback, int min, int max) throws IOException {
         Object value = config.get(key);
-        if (value == null) return fallback;
-        if (!(value instanceof Number) || ((Number) value).doubleValue() != ((Number) value).intValue())
-            throw new IOException("oversized_gui." + key + " must be an integer");
-        int result = ((Number) value).intValue();
+        int result = fallback;
+        if (value != null) {
+            if (!(value instanceof Number) || ((Number) value).doubleValue() != ((Number) value).intValue())
+                throw new IOException("oversized_gui." + key + " must be an integer");
+            result = ((Number) value).intValue();
+        }
         if (result < min || result > max)
             throw new IOException("oversized_gui." + key + " must be between " + min + " and " + max);
         return result;
