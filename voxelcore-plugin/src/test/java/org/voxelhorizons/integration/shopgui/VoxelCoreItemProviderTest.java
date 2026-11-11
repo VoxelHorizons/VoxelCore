@@ -28,7 +28,8 @@ public class VoxelCoreItemProviderTest {
 
         ItemStack loaded = provider.loadItem(config);
 
-        assertEquals(ContentID.of("voxel", "ruby_ore"), resolver.created);
+        assertEquals(ContentID.of("voxel", "ruby_ore"), resolver.renderCreated);
+        assertNull("Item provider should use the rendering factory", resolver.created);
         assertTrue(provider.isValidItem(loaded));
     }
 
@@ -54,7 +55,8 @@ public class VoxelCoreItemProviderTest {
 
         provider.loadItem(config);
 
-        assertEquals(ContentID.of("voxel", "ui-blank"), resolver.created);
+        assertEquals(ContentID.of("voxel", "ui-blank"), resolver.renderCreated);
+        assertNull(resolver.created);
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -123,23 +125,44 @@ public class VoxelCoreItemProviderTest {
     }
 
     @Test
-    public void abstractItemsRemainUntradeableEvenWhenUsedAsShopStock() {
+    public void specialElementsAllowAbstractIconsUsingTheRenderOnlyFactory() {
         FakeResolver resolver = new FakeResolver();
         resolver.abstractItem = ContentID.of("voxel", "ui-blank");
         VoxelCoreItemProvider provider = new VoxelCoreItemProvider(resolver, Logger.getAnonymousLogger());
         YamlConfiguration config = new YamlConfiguration();
-        ConfigurationSection product = config.createSection("shops.farming.items.1");
-        product.set("voxelcore", "voxel:ui-blank");
+        ConfigurationSection balance = config.createSection("specialElements.balance.item");
+        balance.set("voxelcore", "voxel:ui/blank");
 
-        try {
-            provider.loadItem(product);
-            org.junit.Assert.fail("Abstract items must never be accepted as shop stock");
-        } catch (IllegalArgumentException expected) {
-            assertTrue(expected.getMessage().contains("Cannot create abstract item"));
-            assertTrue(expected.getMessage().contains("shops.farming.items.1"));
+        ItemStack icon = provider.loadItem(balance);
+
+        assertTrue(provider.isValidItem(icon));
+        assertEquals(ContentID.of("voxel", "ui-blank"), resolver.renderCreated);
+        assertNull("Balance icon must not invoke tradeable factory", resolver.created);
+    }
+
+    @Test
+    public void rendersItemsWithoutHardcodedShopGuiConfigurationPaths() {
+        FakeResolver resolver = new FakeResolver();
+        resolver.abstractItem = ContentID.of("voxel", "ui-blank");
+        VoxelCoreItemProvider provider = new VoxelCoreItemProvider(resolver, Logger.getAnonymousLogger());
+        YamlConfiguration config = new YamlConfiguration();
+
+        for (String path : new String[] {
+                "specialElements.balance.item",
+                "buttons.goBack.item",
+                "shops.farming.items.1",
+                "arbitrary.future.section"
+        }) {
+            ConfigurationSection section = config.createSection(path);
+            section.set("voxelcore", "voxel:ui/blank");
+            resolver.renderCreated = null;
+            ItemStack rendered = provider.loadItem(section);
+
+            assertTrue(provider.isValidItem(rendered));
+            assertEquals("Renderer must not depend on config path " + path,
+                    ContentID.of("voxel", "ui-blank"), resolver.renderCreated);
+            assertNull("Provider must not use the grant-only factory", resolver.created);
         }
-        assertEquals(ContentID.of("voxel", "ui-blank"), resolver.created);
-        assertNull(resolver.renderCreated);
     }
 
     @Test
@@ -158,33 +181,6 @@ public class VoxelCoreItemProviderTest {
             assertTrue(expected.getMessage().contains("buttons.goBack.item"));
             assertTrue(expected.getMessage().contains("renderable model and material"));
         }
-    }
-
-    @Test
-    public void onlyKnownDisplayGuiPathsHaveAbstractRenderPrivileges() {
-        assertTrue(VoxelCoreItemProvider.isGuiButtonItem("buttons.goBack.item"));
-        assertTrue(VoxelCoreItemProvider.isGuiButtonItem("buttons.back.item"));
-        assertTrue(VoxelCoreItemProvider.isGuiButtonItem("amountSelectionGUI.buttons.set1.item"));
-        assertTrue(VoxelCoreItemProvider.isGuiButtonItem("amountSelectionGUI.buttons.confirm.item"));
-        assertTrue(VoxelCoreItemProvider.isGuiButtonItem("amountSelectionGUIBulkBuy.buttons.buy1.item"));
-        assertTrue(VoxelCoreItemProvider.isGuiButtonItem("amountSelectionGUIBulkSell.buttons.sell9.item"));
-        assertTrue(VoxelCoreItemProvider.isGuiButtonItem("buyGUI.buttons.confirm.item"));
-        assertTrue(VoxelCoreItemProvider.isGuiButtonItem("shopMenuItems.1.item"));
-
-        assertFalse(VoxelCoreItemProvider.isGuiButtonItem(null));
-        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("buttons.goBack"));
-        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("buttons.goBack.item.other"));
-        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("amountSelectionGUI.buttons.set1"));
-        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("amountSelectionGUI.buttons..item"));
-        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("amountSelectionGUI.buttons.set1.price"));
-        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("shops.test.buttons.goBack.item"));
-        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("shops.test.items.1"));
-        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("shops.test.items.1.item"));
-        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("shopMenuItems.1"));
-        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("shops.amountSelectionGUI.buttons.set1.item"));
-        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("buttons.goBack.price"));
-        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("buttons..item"));
-        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("items.1.item"));
     }
 
     @Test
