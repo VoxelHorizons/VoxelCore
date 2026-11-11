@@ -123,6 +123,22 @@ public class VoxelCoreItemProviderTest {
     }
 
     @Test
+    public void specialElementsAllowAbstractIconsUsingTheRenderOnlyFactory() {
+        FakeResolver resolver = new FakeResolver();
+        resolver.abstractItem = ContentID.of("voxel", "ui-blank");
+        VoxelCoreItemProvider provider = new VoxelCoreItemProvider(resolver, Logger.getAnonymousLogger());
+        YamlConfiguration config = new YamlConfiguration();
+        ConfigurationSection balance = config.createSection("specialElements.balance.item");
+        balance.set("voxelcore", "voxel:ui/blank");
+
+        ItemStack icon = provider.loadItem(balance);
+
+        assertTrue(provider.isValidItem(icon));
+        assertEquals(ContentID.of("voxel", "ui-blank"), resolver.renderCreated);
+        assertNull("Balance icon must not invoke tradeable factory", resolver.created);
+    }
+
+    @Test
     public void abstractItemsRemainUntradeableEvenWhenUsedAsShopStock() {
         FakeResolver resolver = new FakeResolver();
         resolver.abstractItem = ContentID.of("voxel", "ui-blank");
@@ -170,6 +186,8 @@ public class VoxelCoreItemProviderTest {
         assertTrue(VoxelCoreItemProvider.isGuiButtonItem("amountSelectionGUIBulkSell.buttons.sell9.item"));
         assertTrue(VoxelCoreItemProvider.isGuiButtonItem("buyGUI.buttons.confirm.item"));
         assertTrue(VoxelCoreItemProvider.isGuiButtonItem("shopMenuItems.1.item"));
+        assertTrue(VoxelCoreItemProvider.isGuiButtonItem("specialElements.balance.item"));
+        assertTrue(VoxelCoreItemProvider.isGuiButtonItem("specialElements.info.item"));
 
         assertFalse(VoxelCoreItemProvider.isGuiButtonItem(null));
         assertFalse(VoxelCoreItemProvider.isGuiButtonItem("buttons.goBack"));
@@ -181,6 +199,10 @@ public class VoxelCoreItemProviderTest {
         assertFalse(VoxelCoreItemProvider.isGuiButtonItem("shops.test.items.1"));
         assertFalse(VoxelCoreItemProvider.isGuiButtonItem("shops.test.items.1.item"));
         assertFalse(VoxelCoreItemProvider.isGuiButtonItem("shopMenuItems.1"));
+        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("specialElements.balance"));
+        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("specialElements..item"));
+        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("specialElements.balance.item.other"));
+        assertFalse(VoxelCoreItemProvider.isGuiButtonItem("shops.farming.specialElements.balance.item"));
         assertFalse(VoxelCoreItemProvider.isGuiButtonItem("shops.amountSelectionGUI.buttons.set1.item"));
         assertFalse(VoxelCoreItemProvider.isGuiButtonItem("buttons.goBack.price"));
         assertFalse(VoxelCoreItemProvider.isGuiButtonItem("buttons..item"));
