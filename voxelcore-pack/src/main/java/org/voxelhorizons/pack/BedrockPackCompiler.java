@@ -385,7 +385,7 @@ public final class BedrockPackCompiler {
             definition.addProperty("bedrock_identifier", identifier);
             JsonObject options = new JsonObject(); options.addProperty("icon", icon);
             definition.add("bedrock_options", options);
-            if (item.render().oversizedInGui()) {
+            if (item.render().oversizedInGui() && !Boolean.FALSE.equals(bedrockSettings.get("oversized_gui"))) {
                 try {
                     BedrockOversizedGui.Entry oversized = BedrockOversizedGui.entry(
                             item, bedrockSettings, renderer, variant.renderModel);
