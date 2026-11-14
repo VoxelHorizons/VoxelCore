@@ -24,7 +24,7 @@ public class PlaceholderApiPixelPaddingTest {
         assertEquals(MinecraftTextPixelWidth.width("Fibbicles"),
                 MinecraftTextPixelWidth.width("&eFibbicles"));
         assertEquals(7, MinecraftTextPixelWidth.width("&lA"));
-        assertEquals(12, MinecraftTextPixelWidth.width("&lA&fA"));
+        assertEquals(13, MinecraftTextPixelWidth.width("&lA&fA"));
         assertEquals(6, MinecraftTextPixelWidth.width("&#ff00ffA"));
     }
 
