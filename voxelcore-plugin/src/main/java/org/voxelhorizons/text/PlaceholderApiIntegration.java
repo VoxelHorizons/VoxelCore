@@ -24,7 +24,7 @@ public final class PlaceholderApiIntegration {
                 plugin.getLogger().warning("PlaceholderAPI rejected the VoxelCore expansion registration.");
                 return false;
             }
-            plugin.getLogger().info("Enabled PlaceholderAPI font placeholders (%voxelcore_font_<name>%).");
+            plugin.getLogger().info("Enabled PlaceholderAPI text placeholders (font, pad, topdisplay).");
             return true;
         } catch (ReflectiveOperationException | LinkageError exception) {
             plugin.getLogger().warning("Unable to register PlaceholderAPI integration: " + exception.getMessage());
