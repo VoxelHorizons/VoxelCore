@@ -21,6 +21,10 @@ public final class VoxelCorePlaceholderExpansion extends PlaceholderExpansion {
 
     @Override
     public String onRequest(OfflinePlayer player, String parameters) {
-        return PlaceholderApiFontResolver.resolve(parameters, placeholders);
+        String value = PlaceholderApiFontResolver.resolve(parameters, placeholders);
+        if (value != null) return value;
+        value = PlaceholderApiPixelPadding.resolve(player, parameters);
+        if (value != null) return value;
+        return PlaceholderApiTopDisplayName.resolve(player, parameters);
     }
 }
